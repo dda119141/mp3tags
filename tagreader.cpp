@@ -1,47 +1,28 @@
 //============================================================================
 // Name        : Threading.cpp
-// Author      : 
+// Author      : Maxime Moge
 // Version     :
 // Copyright   : Your copyright notice
-// Description : Hello World in C++, Ansi-style
+// Description : tag reader, tad writer in C++ > c++14
 //============================================================================
 
 #include <iostream>
 #include <memory>
-#include <fstream>
-#include <vector>
-#include <algorithm>
-#include <optional>
 #include <time.h>
+#include "tagreader.hpp"
 
 #define __MP3
 
-template <unsigned int T>
-std::optional<std::vector<char>> Get_string_from_file(const std::string& _filename )
-{
-	std::ifstream fil(_filename);
-	std::vector<char> buffer(T, '0');
-
-	if(!fil.good()){
-		std::cerr << "mp3 file not good\n";
-		return {};
-	}
-
-	fil.read(buffer.data(), T);
-
-	return buffer;
-}
-
-auto Get_ID3v2_Header(const std::string& _filename )
-{
-	return Get_string_from_file<10>(_filename );
-}
-
-auto Get_ID3v2_Tag_Size(const std::string& _filename )
-{
-	//TODO compute size
-	return Get_string_from_file<10>(_filename );
-}
+const std::vector<std::string> ID3v2_frame_names{
+	"TALB", "TBPM"
+	,"TCOM", "TCON"
+	,"TCOP", "TDAT"
+	,"TCOP", "TDLY"
+	,"TENC", "TEXT"
+	,"TFLT", "TIME"
+	,"TIT1", "TIT2"
+	,"TIT3", "TKEY"
+};
 
 int main() {
 
@@ -50,15 +31,28 @@ int main() {
 
 #ifdef __MP3
 
-	std::cout << "Start: \n";
-
-	auto buffer = Get_ID3v2_Header("file_example_MP3_700KB.mp3").value();
-
-	std::for_each(buffer.begin(), buffer.end() , [](char &n) { std::cout << std::dec << n << ' '; } );
-	std::cout << std::endl;
+#if 0
+	auto buffer = id3v2::GetHeader("file_example_MP3_700KB.mp3").value();
 
 	std::for_each(buffer.begin(), buffer.end() , [](char &n) { std::cout << std::hex << (int)n << ' '; } );
-	std::cout << std::endl;
+	cout << std::endl;
+
+	cout << "file identifier: " << id3v2::GetID3FileIdentifier(buffer) << std::endl;
+	cout << "version: " << id3v2::GetID3Version(buffer) << std::endl;
+	cout << "Tag size: " << id3v2::GetTagSize(buffer) << std::endl;
+#endif
+
+#if 0
+for (auto& tagi : id3v2::tag_names){
+	auto tag = id3v2::retrieve_tag<std::string>(tagi, std::string("file_example_MP3_700KB.mp3") );
+	if(tag.has_value())
+		cout << "Retrieve tag : " << tagi << " at position: " << tag.value() << std::endl;
+}
+#endif
+
+std::for_each(id3v2::tag_names.cbegin(), id3v2::tag_names.cend(), 
+	id3v2::RetrieveTag<std::string>(std::string("file_example_MP3_700KB.mp3")) );
+	
 
 #else
 
@@ -88,12 +82,8 @@ std::cout << "channel: " << update_channel << std::endl;
 	std::cout << buf2 << std::endl;
 #endif
 
-clock_t t = clock();
-
-while( (clock() - t) * 1000/(CLOCKS_PER_SEC) < 0);
-
-printf("hjjjjjj\n");
 #endif
+
 	return 0;
 }
 
