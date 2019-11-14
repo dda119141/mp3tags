@@ -16,18 +16,33 @@
 #include <range/v3/action/transform.hpp>
 #include <range/v3/view/filter.hpp>
 
-
-template <typename T>
-void integral_unsigned_asserts()
+template <typename T, typename F>
+auto mbind(std::optional<T> obj, F&& f)
+	-> decltype(f(obj.value()))
 {
-	static_assert(std::is_integral<T>::value, "parameter should be integers");
-	static_assert(std::is_unsigned<T>::value, "parameter should be unsigned");
+    auto fuc = std::forward<F>(f);
+	if(obj){
+		return fuc(obj.value());
+	}
+	else{
+		return {};
+	}
 }
 
 template <typename T>
-std::optional<std::vector<char>> GetStringFromFile(const T& _filename, auto num )
+struct integral_unsigned_asserts
 {
-	std::ifstream fil(_filename);
+	void operator()()
+	{
+		static_assert(std::is_integral<T>::value, "parameter should be integers");
+		static_assert(std::is_unsigned<T>::value, "parameter should be unsigned");
+	}
+};
+
+template <typename T>
+std::optional<std::vector<char>> GetStringFromFile(const T& FileName, auto num )
+{
+	std::ifstream fil(FileName);
 	std::vector<char> buffer(num, '0');
 
 	if(!fil.good()){
@@ -43,7 +58,7 @@ std::optional<std::vector<char>> GetStringFromFile(const T& _filename, auto num 
 template <typename T>
 const auto GetValFromBuffer(const std::vector<char>& buffer, T index, T num_of_bytes_in_hex)
 {
-    integral_unsigned_asserts<T>();
+    	integral_unsigned_asserts<T> eval;
 
 	if(buffer.size() < num_of_bytes_in_hex){
 		return 0;
@@ -67,9 +82,9 @@ const auto GetValFromBuffer(const std::vector<char>& buffer, T index, T num_of_b
 }
 
 template <typename T>
-const auto GetHexFromBuffer(const std::vector<char>& buffer, T index, T num_of_bytes_in_hex)
+const std::optional<std::string> GetHexFromBuffer(const std::vector<char>& buffer, T index, T num_of_bytes_in_hex)
 {
-    integral_unsigned_asserts<T>();
+    integral_unsigned_asserts<T> eval;
 
 	std::stringstream stream_obj;
 
@@ -79,21 +94,35 @@ const auto GetHexFromBuffer(const std::vector<char>& buffer, T index, T num_of_b
 
 	auto version = GetValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
 
-	stream_obj << std::hex << version;
+    if(version != 0){
 
-	return stream_obj.str();
+        stream_obj << std::hex << version;
+
+        return stream_obj.str();
+
+    }else{
+        return {};
+    }
 }
 
 template <typename T1, typename T2>
-const auto CutStringElement(const std::vector<char>& buffer, T1 start, T1 end, T2 num_of_elements=0)
+const std::optional<std::string> ExtractString(const std::vector<char>& buffer, T1 start, T1 end)
 {
-	static_assert(std::is_integral<T1>::value, "second and third parameters should be integers");
-	static_assert(std::is_unsigned<T2>::value, "num of elements must be unsigned");
+    if(end < start){
+        std::cerr << "boundary error - start: " << start << " end: " << end << std::endl;
+        return {};
 
-	std::string obj(buffer.data(), (num_of_elements==0 ? (end - start) : num_of_elements) );
-	const std::string obj2(obj, start, end);
+    } else if(buffer.size() >= end) {
+		static_assert(std::is_integral<T1>::value, "second and third parameters should be integers");
+		static_assert(std::is_unsigned<T2>::value, "num of elements must be unsigned");
 
-	return obj2;
+		std::string obj(buffer.data(), end);
+
+		return obj.substr(start, (end - start));
+	} else {
+        std::cerr << "error start: " << start << " end: " << end << std::endl;
+		return {};
+	}
 }
 
 
@@ -141,62 +170,141 @@ const std::vector<std::string> tag_names{
 };
 
 
-template <typename T, typename F>
-auto mbind(std::optional<T> obj, F f)
-	-> decltype(f(obj.value()))
-{
-	if(obj){
-		return f(obj.value());
-	}
-	else{
-		return {};
-	}
-}
-
 constexpr auto GetHeaderSize(void)
 {
 	return 10;
 }
 
-std::optional<std::vector<char>> GetHeader(const std::string& _filename )
+constexpr auto FrameIDSize(void)
 {
-	auto val = GetStringFromFile(_filename, GetHeaderSize());
+	return 4;
+}
+
+std::optional<std::vector<char>> GetHeader(const std::string& FileName )
+{
+	auto val = GetStringFromFile(FileName, GetHeaderSize());
 
 	return val;
 }
 
-const auto GetTagSize(const std::vector<char>& buffer)
+std::optional<unsigned int> GetTagSize(const std::vector<char>& buffer)
 {
-	auto val = buffer[6] * std::pow(2, 21);
+	if(buffer.size() >= GetHeaderSize())
+	{
+		auto val = buffer[6] * std::pow(2, 21);
 
-	val += buffer[7] * std::pow(2, 14);
-	val += buffer[8] * std::pow(2, 7);
-	val += buffer[9] * std::pow(2, 0);
+		val += buffer[7] * std::pow(2, 14);
+		val += buffer[8] * std::pow(2, 7);
+		val += buffer[9] * std::pow(2, 0);
 
-	return val;
+		if(val > GetHeaderSize()){
+			return val;
+		}
+	} else
+	{
+	}
+
+	return {};
+}
+
+std::optional<unsigned int> GetHeaderAndTagSize(const std::vector<char>& buffer)
+{
+	return mbind(GetTagSize(buffer), [=](const uint32_t Tagsize){
+            return (Tagsize + GetHeaderSize());
+            });
+}
+
+
+std::optional<unsigned int> GetFrameSize(const std::vector<char>& buffer, uint32_t index)
+{
+	const auto start = FrameIDSize() + index;
+
+	if(buffer.size() >= start)
+	{
+		auto val = buffer[start + 0] * std::pow(2, 24);
+
+		val += buffer[start + 1] * std::pow(2, 16);
+		val += buffer[start + 2] * std::pow(2, 8);
+		val += buffer[start + 3] * std::pow(2, 0);
+
+		return val;
+
+	} else	{
+            std::cout << __func__ << ": Error " << buffer.size() << " start: " << start << std::endl;
+	}
+
+	return {};
 }
 
 const auto GetTagSizeExclusiveHeader(const std::vector<char>& buffer)
 {
-	return GetTagSize(buffer) - GetHeaderSize();
+	return mbind(GetTagSize(buffer), [](const int tag_size){
+		return tag_size - GetHeaderSize();}
+		);
 }
 
 template <typename T>
-const auto GetHeaderElement(const std::vector<char>& buffer, T start, T end)
+T cond_return(T&& obj)
 {
-	return CutStringElement<T, unsigned int>(buffer, start, end, GetHeaderSize());
+	T _obj = std::forward<T>(obj);
+
+	if(_obj.has_value()){
+		return _obj;
+	}else{
+		return {};
+	}
 }
 
 template <typename T>
+const std::optional<std::string> GetHeaderElement(const std::vector<char>& buffer, T start, T end)
+{
+			return ExtractString<T, unsigned int>(buffer, start, end);
+}
+
+#if 0
+template <typename F, typename... Args>
+const std::optional<std::string> GetArea(const std::vector<char>& buffer, uint32_t start, F fuc, Args&&... args)
+{
+	return mbind(fuc(buffer, std::forward<Args>(args)...), [&](const int& tag_size)
+		{ 
+			return ExtractString<unsigned int, unsigned int>(buffer, 
+			    start, start + tag_size);
+    });
+}
+#else
+
+const std::optional<std::string> GetArea(const std::vector<char>& buffer, uint32_t start, uint32_t tag_size)
+{
+			return ExtractString<unsigned int, unsigned int>(buffer, 
+			    start, start + tag_size);
+}
+#endif
+
 const std::optional<std::string> GetTagArea(const std::vector<char>& buffer)
 {
-	return CutStringElement<T, unsigned int>(buffer, 
-	static_cast<unsigned int>(GetHeaderSize()), static_cast<unsigned int>(GetTagSize(buffer)));
+//	return mbind(GetTagSize(buffer), [&](uint32_t _size)
+	return mbind(GetHeaderAndTagSize(buffer), [&](uint32_t _size)
+            { 
+                return GetArea(buffer, 0, _size); 
+            });
+}
+
+auto GetFrameArea(uint32_t start)
+{
+    return ([=](const std::vector<char>& buffer)
+    {
+        const auto offset = start + GetHeaderSize();
+      //  std::cout<< " GetFrameArea**: " << start << " size: " << GetFrameSize(buffer, start).value() << std::endl;
+	    return mbind(GetFrameSize(buffer, start), [&](uint32_t _size)
+                    {
+                        return GetArea(buffer, offset, _size);
+                    });
+    });
 }
 
 const auto GetID3FileIdentifier(const std::vector<char>& buffer)
 {
-	return GetHeaderElement(buffer, 0, 3);
+	return GetHeaderElement(buffer, 0, 3).value();
 
 #ifdef __TEST_CODE
 	auto y = [&buffer] () -> std::string {
@@ -206,7 +314,7 @@ const auto GetID3FileIdentifier(const std::vector<char>& buffer)
 #endif
 }
 
-const auto GetID3Version(const std::vector<char>& buffer)
+const std::optional<std::string> GetID3Version(const std::vector<char>& buffer)
 {
 	constexpr auto kID3IndexStart = 4;
 	constexpr int kID3VersionBytesLength = 2;
@@ -226,7 +334,7 @@ class search_tag
 	{
 	}
 
-	std::optional<int> operator()(const Type& tag)
+	std::optional<uint32_t> operator()(const Type& tag)
 	{
 		auto it = std::search(_tagArea.cbegin(), _tagArea.cend(), 
 			std::boyer_moore_searcher(tag.cbegin(), tag.cend()) );
@@ -239,69 +347,70 @@ class search_tag
 	}
 };
 
-
-template <typename type>
-const std::optional<int> retrieve_tag(const type& tag, const type& filename)
-{
-	auto header = id3v2::GetHeader(filename);
-	if(!header.has_value())
-		return {};
-
-	auto tags_size = GetTagSize(header.value());
-
-	auto buffer = GetStringFromFile(filename, tags_size );
-	if(!buffer.has_value())
-		return {};
-	
-	auto tagArea = GetTagArea<unsigned int>(buffer.value());
-	
-	auto AreaToSearch = search_tag<std::string>(tagArea);
-	auto it = AreaToSearch(tag);
-
-	return it;
-}
-
 template <typename type>
 class RetrieveTag
 {
-	std::string _filename;
+	std::string FileName;
 
 	public:
 
 	RetrieveTag(std::string filename)
 	{
-		_filename = filename;
+		FileName = filename;
 	}
 
-	const std::optional<int> operator() (const type& tag)
+	const std::optional<std::string> operator() (const type& tag)
 	{
 		using namespace id3v2;
 		using namespace ranges;
 
-		auto tags_size = mbind(GetHeader(_filename), GetTagSize);
+		const auto tags_size = mbind(GetHeader(FileName), GetTagSize).value();
 		
-		auto buffer = GetStringFromFile(_filename, tags_size );
-		auto it = mbind( 
+		auto buffer = GetStringFromFile(FileName, tags_size + GetHeaderSize() );
+		auto TagIndex = mbind( 
 				mbind(buffer, [](const std::vector<char>& buffer)
 					{ 
-						return GetTagArea<unsigned int>(buffer);
+						return GetTagArea(buffer);
 					}), 
-				[&](const std::string& tagArea)
+				[&tag](const std::string& tagArea)
 				{ 
 					auto searchTag = search_tag<std::string>(tagArea);
 					return searchTag(tag);
 				});
 
-		if(it.has_value()){
-			std::cout << "Retrieve tag : " << tag << " at position: " << std::dec << it.value() << std::endl;
+
+		if(TagIndex.has_value()){
+           // std::cout << "Retrieve tag : " << tag << " at position: " << std::dec << TagIndex.value() << std::endl;
+
+            auto frameArea = GetFrameArea(TagIndex.value());
+            auto res = mbind(buffer, frameArea);
+
+            if(res.has_value()){
+               // std::cout << "Tag content: " << res.value() << std::endl;
+                return res.value();
+            }
 		}
 
-		return it ;
+		return {} ;
 	
 	}
 };
 
-auto is_tag(std::string name)
+const std::optional<std::string> GetAlbum(const std::string filename)
+{
+    const std::vector<std::string> tags{
+	    "TALB" //     [#TALB Album/Movie/Show title]
+    };
+	
+    RetrieveTag<std::string> obj(filename);
+
+    return obj("TALB");
+
+//	std::for_each(tags.cbegin(), id3v2::tags.cend(), 
+//			id3v2::RetrieveTag<std::string>(std::string(filename)) );
+}
+
+const auto is_tag(std::string name)
 {
     return (
         std::any_of(tag_names.cbegin(), tag_names.cend(), 
