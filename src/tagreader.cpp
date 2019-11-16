@@ -37,7 +37,7 @@ int main() {
     const std::string filename = "../file_example_MP3_700KB.mp3";
 	print_header_infos(filename);
 
-	cout << "Album: " << id3v2::GetAlbum(filename).value() << endl;
+	cout << "Album: " << GetAlbum(filename).value() << endl;
 	//std::for_each(id3v2::tag_names.cbegin(), id3v2::tag_names.cend(), 
 	//		id3v2::RetrieveTag<std::string>(std::string("../file_example_MP3_700KB.mp3")) );
 
