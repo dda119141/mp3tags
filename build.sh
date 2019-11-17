@@ -1,5 +1,5 @@
 #!/bin/bash
 
-pushd 
-cd out && rm -rf * && cmake ../ && make && ./tagreader
+pushd . 
+cd out && make clean ../ && make && ./tagreader
 popd

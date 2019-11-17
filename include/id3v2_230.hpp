@@ -8,7 +8,6 @@ namespace id3v2
 
 struct v230
 {
-
     public:
         const std::vector<std::string> tag_names{
             "TALB" //     [#TALB Album/Movie/Show title]
@@ -61,7 +60,7 @@ struct v230
         }
 
 
-        std::optional<unsigned int> GetFrameSize(const std::vector<char>& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(const std::vector<char>& buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 

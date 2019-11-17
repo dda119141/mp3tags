@@ -85,7 +85,7 @@ struct v00
             return ::id3v2::RetrieveSize(6);
         }
 
-        std::optional<unsigned int> GetFrameSize(const std::vector<char>& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(const std::vector<char>& buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 

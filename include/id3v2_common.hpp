@@ -10,11 +10,13 @@
 #include <optional>
 #include <cmath>
 #include <variant>
+#include <type_traits>
 //#include <range/v3/all.hpp>
 #include <range/v3/view.hpp>
 #include <range/v3/action.hpp>
 #include <range/v3/action/transform.hpp>
 #include <range/v3/view/filter.hpp>
+
 
 template <typename T, typename F>
 auto mbind(std::optional<T> obj, F&& function)
@@ -29,6 +31,27 @@ auto mbind(std::optional<T> obj, F&& function)
 	}
 }
 
+
+template <typename T>
+using is_optional_string = std::is_same<std::decay_t<T>, std::optional<std::string>>;
+
+template <typename T>
+using is_optional_vector_char =	std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>;
+
+template <typename T,
+	typename = std::enable_if_t<(std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>::value
+		|| std::is_same<std::decay_t<T>, std::optional<std::string>>::value
+		|| std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value) >
+	, typename F >
+ auto operator | (T&& obj, F&& Function)
+-> decltype(Function(obj.value()))
+{
+	//static_assert(is_optional<std::vector<char>>::value, "first operand needs to be of type std::optional<std::vector>");
+	//static_assert(std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>::value, "std::optional<std::vector>");
+
+	return mbind(std::forward<T>(obj), Function);
+}
+
 template <typename T>
 struct integral_unsigned_asserts
 {
@@ -40,7 +63,7 @@ struct integral_unsigned_asserts
 };
 
 template <typename T>
-std::optional<std::vector<char>> GetStringFromFile(const T& FileName, auto num )
+std::optional<std::vector<char>> GetStringFromFile(const T& FileName, uint32_t num )
 {
 	std::ifstream fil(FileName);
 	std::vector<char> buffer(num, '0');
@@ -128,19 +151,21 @@ const std::optional<std::string> ExtractString(const std::vector<char>& buffer, 
 	}
 }
 
-constexpr auto GetHeaderSize(void)
+template <typename T>
+constexpr T GetHeaderSize(void)
 {
 	return 10;
 }
 
-constexpr auto RetrieveSize(auto n)
+template <typename T>
+constexpr T RetrieveSize(T n)
 {
 	return n;
 }
 
-std::optional<unsigned int> GetTagSize(const std::vector<char>& buffer)
+std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
 {
-	if(buffer.size() >= GetHeaderSize())
+	if(buffer.size() >= GetHeaderSize<uint32_t>())
 	{
 		auto val = buffer[6] * std::pow(2, 21);
 
@@ -148,7 +173,7 @@ std::optional<unsigned int> GetTagSize(const std::vector<char>& buffer)
 		val += buffer[8] * std::pow(2, 7);
 		val += buffer[9] * std::pow(2, 0);
 
-		if(val > GetHeaderSize()){
+		if(val > GetHeaderSize<uint32_t>()){
 			return val;
 		}
 	} else
@@ -158,23 +183,23 @@ std::optional<unsigned int> GetTagSize(const std::vector<char>& buffer)
 	return {};
 }
 
-std::optional<unsigned int> GetHeaderAndTagSize(const std::vector<char>& buffer)
+std::optional<uint32_t> GetHeaderAndTagSize(const std::vector<char>& buffer)
 {
 	return mbind(GetTagSize(buffer), [=](const uint32_t Tagsize){
-            return (Tagsize + GetHeaderSize());
+            return (Tagsize + GetHeaderSize<uint32_t>());
             });
 }
 
 const auto GetTagSizeExclusiveHeader(const std::vector<char>& buffer)
 {
 	return mbind(GetTagSize(buffer), [](const int tag_size){
-		return tag_size - GetHeaderSize();}
+		return tag_size - GetHeaderSize<uint32_t>();}
 		);
 }
 
 std::optional<std::vector<char>> GetHeader(const std::string& FileName )
 {
-	auto val = GetStringFromFile(FileName, GetHeaderSize());
+	auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>());
 
 	return val;
 }
@@ -183,21 +208,22 @@ std::optional<std::vector<char>> GetHeader(const std::string& FileName )
 template <typename T>
 const std::optional<std::string> GetHeaderElement(const std::vector<char>& buffer, T start, T end)
 {
-			return ExtractString<T, unsigned int>(buffer, start, end);
+			return ExtractString<T, uint32_t>(buffer, start, end);
 }
 
 const std::optional<std::string> GetArea(const std::vector<char>& buffer, uint32_t start, uint32_t tag_size)
 {
-			return ExtractString<unsigned int, unsigned int>(buffer, 
+			return ExtractString<uint32_t, uint32_t>(buffer, 
 			    start, start + tag_size);
 }
 
 const std::optional<std::string> GetTagArea(const std::vector<char>& buffer)
 {
-    return mbind(GetHeaderAndTagSize(buffer), [&](uint32_t _size)
+    return  GetHeaderAndTagSize(buffer)
+			| [&](uint32_t _size)
             { 
                 return GetArea(buffer, 0, _size); 
-            });
+            };
 }
 
 template <typename id3Type>
@@ -220,11 +246,11 @@ auto GetFrameArea(uint32_t start, id3Type& tagversion)
     });
 }
 
-const auto GetID3FileIdentifier(const std::vector<char>& buffer)
+const std::optional<std::string> GetID3FileIdentifier(const std::vector<char>& buffer)
 {
     constexpr auto FileIdentifierStart = 0;
     constexpr auto FileIdentifierEnd = 3;
-	return GetHeaderElement(buffer, FileIdentifierStart, FileIdentifierEnd).value();
+	return GetHeaderElement(buffer, FileIdentifierStart, FileIdentifierEnd);
 
 #ifdef __TEST_CODE
 	auto y = [&buffer] () -> std::string {
