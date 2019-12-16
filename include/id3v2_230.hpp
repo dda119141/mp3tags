@@ -1,7 +1,7 @@
 #ifndef _ID3V2_230
 #define _ID3V2_230
 
-#include <id3v2_common.hpp>
+#include <id3v2_base.hpp>
 
 namespace id3v2
 {
@@ -64,10 +64,10 @@ struct v230
         {
             const auto start = FrameIDSize() + index;
 
-       //         std::cout << __func__ << ": index " << index << " start: " << start << std::endl;
+            //    std::cout << __func__ << ": index " << index << " start: " << start << std::endl;
             if(buffer.size() >= start)
             {
-                auto val = buffer[start + 0] * std::pow(2, 24);
+                uint32_t val = buffer[start + 0] * std::pow(2, 24);
 
                 val += buffer[start + 1] * std::pow(2, 16);
                 val += buffer[start + 2] * std::pow(2, 8);

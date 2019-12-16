@@ -1,7 +1,7 @@
 #ifndef _ID3V2_000
 #define _ID3V2_000
 
-#include <id3v2_common.hpp>
+#include <id3v2_base.hpp>
 
 namespace id3v2
 {

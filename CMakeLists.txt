@@ -4,6 +4,10 @@ project(tagreader VERSION 1.3.6)
 
 list( APPEND CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS} -g -ftest-coverage -fprofile-arcs")
 
+add_definitions(
+        -Wfatal-errors
+)
+
 set(libtagreader_SOURCES
   src/tagreader.cpp
 )
