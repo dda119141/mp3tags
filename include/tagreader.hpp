@@ -14,21 +14,21 @@ class RetrieveTag
 
     public:
 
-    RetrieveTag(std::string filename)
+    explicit RetrieveTag(std::string filename)
+        : FileName(filename)
     {
 //  std::call_once(m_once, [&filename, this]
             {
-            using namespace id3v2;
+                using namespace id3v2;
 
-            FileName = filename;
-            const auto tags_size = GetHeader(FileName) | GetTagSize;
+                const auto tags_size = GetHeader(FileName) | GetTagSize;
 
-            buffer = GetHeader(FileName)
-            | GetTagSize
-            | [&](uint32_t tags_size)
-            {
-            return GetStringFromFile(FileName, tags_size + GetHeaderSize<uint32_t>());
-            };
+                buffer = GetHeader(FileName)
+                    | GetTagSize
+                    | [&](uint32_t tags_size)
+                    {
+                        return GetStringFromFile(FileName, tags_size + GetHeaderSize<uint32_t>());
+                    };
             }
 //          });
     }
@@ -40,12 +40,11 @@ class RetrieveTag
 
         auto res = buffer
             | [](const std::vector<char>& buffer)
-            { 
+            {
                 return GetTagArea(buffer);
             }
             | [&tag](const std::string& tagArea)
-            { 
-
+            {
                 auto searchTagPosition = search_tag<std::string>(tagArea);
                 return searchTagPosition(tag);
             }
@@ -77,40 +76,77 @@ class RetrieveTag
         std::optional<std::vector<char>> buffer;
 };
 
-template <typename E>
-const std::optional<E> GetTag(const std::variant <id3v2::v230, id3v2::v00> &tagversion,
+template <typename T>
+const std::optional<T> GetTag(const std::variant <id3v2::v230, id3v2::v00> &tagversion,
      const std::string filename,
     const std::string tagname)
 {
-        RetrieveTag<E> obj(filename);
+        RetrieveTag<T> obj(filename);
 
         return obj.find_tag (tagname, tagversion);
 }
-
-std::optional<std::vector<char>> check_for_ID3(const std::vector<char>& buffer)
-{
-    auto tag = id3v2::GetID3FileIdentifier(buffer);
-    if (tag != "ID3") {
-        std::cerr << "error " << __func__ << std::endl;
-        return {};
-    }
-    else {
-        return buffer;
-    }
-}
-
-const std::optional<std::string> GetAlbum(const std::string filename)
+#if 0
+const std::optional<std::string> GetTagType(const std::string& filename, const std::vector<std::pair<std::string, std::string>>& tags)
 {
     using iD3Variant = std::variant <id3v2::v230, id3v2::v00>;
     iD3Variant _tagversion;
 
-    return id3v2::GetHeader(filename)
-    | check_for_ID3
-    | [](const std::vector<char>& buffer)
-    {
-        return id3v2::GetID3Version(buffer);
-    }
-    | [&](const std::string& id3Version) {
+    return (
+            id3v2::ProcessID3Version(filename)
+            | [&](const std::string& id3Version) {
+            std::for_each (tags.begin(), tags.end(), [&] (std::pair<std::string, std::string> tag)
+                    {
+                    if (id3Version == tag.first) //tag.first is the id3 Version
+                    {
+                         iD3Variant tagversion = std::get<id3v2::v230> (_tagversion);
+                        return GetTag<std::string>(tagversion, filename, tag.second);
+                    }
+                    });
+            }
+           );
+}
+
+#else
+const std::optional<std::string> GetTagType(const std::string& filename, const std::vector<std::pair<std::string, std::string>>& tags)
+{
+    using iD3Variant = std::variant <id3v2::v230, id3v2::v00>;
+    iD3Variant _tagversion;
+
+    return 
+            id3v2::GetHeader(filename)
+            | id3v2::check_for_ID3
+            | [](const std::vector<char>& buffer)
+            {
+                return id3v2::GetID3Version(buffer);
+            }
+            | [&](const std::string& id3Version) {
+                for (auto tag: tags)
+                {
+                    if (id3Version == tag.first) //tag.first is the id3 Version
+                    {
+                        iD3Variant tagversion = std::get<id3v2::v230> (_tagversion);
+                        return GetTag<std::string>(tagversion, filename, tag.second);
+                    }
+                }
+            };
+}
+
+
+#endif
+#if 0
+const std::optional<std::string> GetAlbum(const std::string& filename)
+{
+    using iD3Variant = std::variant <id3v2::v230, id3v2::v00>;
+    iD3Variant _tagversion;
+
+    return 
+        id3v2::GetHeader(filename)
+        | id3v2::check_for_ID3
+        | [](const std::vector<char>& buffer)
+        {
+            return id3v2::GetID3Version(buffer);
+        }
+        | [&](const std::string& id3Version) {
         if (id3Version == "0x0300")
         {
             iD3Variant tagversion = std::get<id3v2::v230> (_tagversion);
@@ -121,16 +157,41 @@ const std::optional<std::string> GetAlbum(const std::string filename)
             iD3Variant tagversion = std::get<id3v2::v00> (_tagversion);
             return GetTag<std::string>(tagversion, filename, "TAL");
         }
+     };
+}
+#else
+const std::optional<std::string> GetAlbum(const std::string& filename)
+{
+    const std::vector<std::pair<std::string, std::string>> tags
+    {
+        {"0x0300", "TALB"},
+        {"0x0000", "TAL"},
     };
+
+    return GetTagType(filename, tags);
+}
+#endif
+
+const std::optional<std::string> GetComposer(const std::string& filename)
+{
+    const std::vector<std::pair<std::string, std::string>> tags
+    {
+        {"0x0300", "TCOM"},
+        {"0x0000", "TCM"},
+    };
+
+    return GetTagType(filename, tags);
 }
 
-template <typename id3Type>
-const auto is_tag(std::string name)
+const std::optional<std::string> GetDate(const std::string& filename)
 {
-    return (
-        std::any_of(id3v2::GetTagNames<id3Type>().cbegin(), id3v2::GetTagNames<id3Type>().cend(), 
-        [&](std::string obj) { return name == obj; } ) 
-        );
+    const std::vector<std::pair<std::string, std::string>> tags
+    {
+        {"0x0300", "TDAT"},
+        {"0x0000", "TDA"},
+    };
+
+    return GetTagType(filename, tags);
 }
 
 

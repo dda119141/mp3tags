@@ -165,6 +165,34 @@ constexpr T RetrieveSize(T n)
 
 std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
 {
+    using paire = std::pair<uint32_t, uint32_t>;
+
+    const std::vector<uint32_t> pow_val = { 21, 14, 7, 0 };
+
+    std::vector<paire> result(pow_val.size());
+    constexpr uint32_t TagIndex = 6;
+
+    std::transform(std::begin(buffer) + 6, std::begin(buffer) + TagIndex + pow_val.size(),
+            pow_val.begin(), result.begin(),
+            [](uint32_t a, uint32_t b){
+            return std::make_pair(a, b);
+            }
+            );
+
+    const uint32_t val = std::accumulate(result.begin(), result.end(), 0,
+            [](int a, paire b)
+            {
+            return ( a + (b.first * std::pow(2, b.second)) );
+            }
+            ); 
+
+    if(val > GetHeaderSize<uint32_t>()){
+        return val;
+    }else{
+        return {};
+    }
+
+#if 0
     if(buffer.size() >= GetHeaderSize<uint32_t>())
     {
         auto val = buffer[6] * std::pow(2, 21);
@@ -181,6 +209,7 @@ std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
     }
 
     return {};
+#endif
 }
 
 std::optional<uint32_t> GetHeaderAndTagSize(const std::vector<char>& buffer)

@@ -45,6 +45,41 @@ namespace id3v2
                 }, TagVersion);
     }
 
+    std::optional<std::vector<char>> check_for_ID3(const std::vector<char>& buffer)
+    {
+        auto tag = id3v2::GetID3FileIdentifier(buffer);
+        if (tag != "ID3") {
+            std::cerr << "error " << __func__ << std::endl;
+            return {};
+        }
+        else {
+            return buffer;
+        }
+    }
+
+    const std::optional<std::string> ProcessID3Version(const std::string& filename)
+    {
+        return(
+                id3v2::GetHeader(filename)
+                | id3v2::check_for_ID3
+                | [](const std::vector<char>& buffer)
+                {
+                return id3v2::GetID3Version(buffer);
+                }
+              );
+    }
+
+
+    template <typename id3Type>
+        const auto is_tag(std::string name)
+        {
+            return (
+                    std::any_of(id3v2::GetTagNames<id3Type>().cbegin(), id3v2::GetTagNames<id3Type>().cend(), 
+                        [&](std::string obj) { return name == obj; } ) 
+                   );
+        }
+
+
 
 }; //end namespace id3v2
 
