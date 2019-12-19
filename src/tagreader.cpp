@@ -8,9 +8,12 @@
 
 #include <iostream>
 #include <memory>
+#include <experimental/filesystem>
 #include <time.h>
 #include "tagreader.hpp"
 
+
+namespace fs = std::experimental::filesystem;
 
 void print_header_infos(const std::string& filename)
 {
@@ -49,17 +52,29 @@ int main() {
     using std::cout;
     using std::endl;
 
-    const std::string filename = "../file_example_MP3_700KB.mp3";
 //  print_header_infos(filename);
+    for (auto& filen : fs::directory_iterator("../files/"))
+    {
+        const std::string filename = filen.path().string();
 
-    cout << "Album: " << GetAlbum(filename).value() << endl;
-    cout << "Composer: " << GetComposer(filename).value() << endl;
-    //std::for_each(id3v2::tag_names.cbegin(), id3v2::tag_names.cend(), 
-    //      id3v2::RetrieveTag<std::string>(std::string("../file_example_MP3_700KB.mp3")) );
+        cout << "Album: " << GetAlbum(filename) << endl;
+#if 1
+        cout << "Composer: " << GetComposer(filename) << endl;
+        cout << "Date: " << GetDate(filename) << endl;
+        cout << "Year: " << GetYear(filename) << endl;
+        cout << "Text writer: " << GetTextWriter(filename) << endl;
+        cout << "Content type: " << GetContentType(filename) << endl;
+        cout << "File type: " << GetFileType(filename) << endl;
+        cout << "Title: " << GetTitle(filename) << endl;
+        cout << "Group Description: " << GetContentGroupDescription(filename) << endl;
+#endif
+        //std::for_each(id3v2::tag_names.cbegin(), id3v2::tag_names.cend(), 
+        //      id3v2::RetrieveTag<std::string>(std::string("../file_example_MP3_700KB.mp3")) );
 
 
-    //printf("gcc version: %d.%d.%d\n",__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
-
+        //printf("gcc version: %d.%d.%d\n",__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
+        cout << endl;
+    }
 
     return 0;
 }

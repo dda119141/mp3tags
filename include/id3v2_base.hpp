@@ -23,7 +23,7 @@ auto mbind(std::optional<T> obj, F&& function)
     -> decltype(function(obj.value()))
 {
     auto fuc = std::forward<F>(function);
-    if(obj){
+    if(obj.has_value()){
         return fuc(obj.value());
     }
     else{
@@ -48,8 +48,7 @@ template <typename T,
 {
     //static_assert(is_optional<std::vector<char>>::value, "first operand needs to be of type std::optional<std::vector>");
     //static_assert(std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>::value, "std::optional<std::vector>");
-
-    return mbind(std::forward<T>(obj), Function);
+     return mbind(std::forward<T>(obj), Function);
 }
 
 template <typename T>
@@ -189,6 +188,7 @@ std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
     if(val > GetHeaderSize<uint32_t>()){
         return val;
     }else{
+        std::cerr << "error " << __func__ << ": " << val  <<std::endl;
         return {};
     }
 
@@ -253,7 +253,10 @@ const std::optional<std::string> GetTagArea(const std::vector<char>& buffer)
 {
     return  GetHeaderAndTagSize(buffer)
             | [&](uint32_t _size)
-            { 
+            {
+#ifdef DEBUG
+                std::cout << "__size: " << _size << std::endl;
+#endif
                 return GetArea(buffer, 0, _size); 
             };
 }
@@ -306,6 +309,7 @@ class search_tag
         if(it != _tagArea.cend()){
             return (it - _tagArea.cbegin());
         }else{
+//            std::cout << "tag: "  << tag << " not found" << std::endl;
             return {};
         }
     }

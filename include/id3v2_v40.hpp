@@ -6,7 +6,7 @@
 namespace id3v2
 {
 
-struct v230
+struct v40
 {
     public:
         const std::vector<std::string> tag_names{
@@ -15,12 +15,11 @@ struct v230
                 ,"TCOM" //     [#TCOM Composer]
                 ,"TCON" //     [#TCON Content type]
                 ,"TCOP" //     [#TCOP Copyright message]
-                ,"TDAT" //     [#TDAT Date]
+                ,"TDRC" //     [#TDRC release time]
                 ,"TDLY" //     [#TDLY Playlist delay]
                 ,"TENC" //     [#TENC Encoded by]
                 ,"TEXT" //     [#TEXT Lyricist/Text writer]
                 ,"TFLT" //     [#TFLT File type]
-                ,"TIME" //     [#TIME Time]
                 ,"TIT1" //     [#TIT1 Content group description]
                 ,"TIT2" //     [#TIT2 Title/songname/content description]
                 ,"TIT3" //     [#TIT3 Subtitle/Description refinement]	
@@ -31,7 +30,7 @@ struct v230
                 ,"TOFN"//      [#TOFN Original filename]
                 ,"TOLY"//      [#TOLY Original lyricist(s)/text writer(s)]
                 ,"TOPE"//      [#TOPE Original artist(s)/performer(s)]
-                ,"TORY"//      [#TORY Original release year]
+                ,"TDOR"//      [#TDOR Original release time]
                 ,"TOWN"//      [#TOWN File owner/licensee]
                 ,"TPE1"//      [#TPE1 Lead performer(s)/Soloist(s)]
                 ,"TPE2"//      [#TPE2 Band/orchestra/accompaniment]
@@ -40,13 +39,24 @@ struct v230
                 ,"TPOS"//      [#TPOS Part of a set]
                 ,"TPUB"//      [#TPUB Publisher]
                 ,"TRCK"//      [#TRCK Track number/Position in set]
-                ,"TRDA"//      [#TRDA Recording dates]
                 ,"TRSN"//      [#TRSN Internet radio station name]
                 ,"TRSO"//      [#TRSO Internet radio station owner]
-                ,"TSIZ"//      [#TSIZ Size]
                 ,"TSRC"//      [#TSRC ISRC (international standard recording code)]
                 ,"TSSE"//      [#TSEE Software/Hardware and settings used for encoding]
-                ,"TYER"//      [#TYER Year]
+                ,"ASPI"//      [#Audio Seek Point]
+                ,"EQU2"//        Equalisation (2) [F:4.12]
+                ,"RVA2"//       Relative volume adjustment (2) [F:4.11]
+                ,"SEEK"//        Seek frame [F:4.29]
+                ,"WCOM"//      Commercial information
+                ,"WCOP"// Copyright/Legal information
+                ,"WOAF"// Official audio file webpage
+                ,"WOAR"// Official artist/performer webpage
+                ,"WOAS"// Official audio source webpage
+                ,"WORS"// Official Internet radio station homepage
+                ,"WPAY"// Payment
+                ,"WPUB"// Publishers official webpage
+                ,"WXXX"// User defined URL link frame
+
         };
 
         constexpr auto FrameIDSize(void)
@@ -67,11 +77,25 @@ struct v230
             //    std::cout << __func__ << ": index " << index << " start: " << start << std::endl;
             if(buffer.size() >= start)
             {
-                uint32_t val = buffer[start + 0] * std::pow(2, 24);
+                using paire = std::pair<uint32_t, uint32_t>;
 
-                val += buffer[start + 1] * std::pow(2, 16);
-                val += buffer[start + 2] * std::pow(2, 8);
-                val += buffer[start + 3] * std::pow(2, 0);
+                const std::vector<uint32_t> pow_val = { 24, 16, 8, 0 };
+
+                std::vector<paire> result(pow_val.size());
+
+                std::transform(std::begin(buffer) + start, std::begin(buffer) + start + pow_val.size(),
+                        pow_val.begin(), result.begin(),
+                        [](uint32_t a, uint32_t b){
+                        return std::make_pair(a, b);
+                        }
+                        );
+
+                const uint32_t val = std::accumulate(result.begin(), result.end(), 0,
+                        [](int a, paire b)
+                        {
+                        return ( a + (b.first * std::pow(2, b.second)) );
+                        }
+                        ); 
 
                 return val;
 
@@ -82,7 +106,7 @@ struct v230
             return {};
         }
 
-}; //v230
+}; //v40
 
 };
 #endif //_ID3V2_230

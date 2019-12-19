@@ -17,3 +17,5 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party/ericniebler/range-v3/include)
 
 add_executable(tagreader ${libtagreader_SOURCES})
+
+target_link_libraries(${PROJECT_NAME} stdc++fs)
