@@ -11,6 +11,7 @@
 #include <experimental/filesystem>
 #include <time.h>
 #include "tagreader.hpp"
+#include "tagwriter.hpp"
 
 
 namespace fs = std::experimental::filesystem;
@@ -66,6 +67,7 @@ int main() {
         cout << "Content type: " << GetContentType(filename) << endl;
         cout << "File type: " << GetFileType(filename) << endl;
         cout << "Title: " << GetTitle(filename) << endl;
+        cout << "Artist: " << GetLeadArtist(filename) << endl;
         cout << "Group Description: " << GetContentGroupDescription(filename) << endl;
 #endif
         //std::for_each(id3v2::tag_names.cbegin(), id3v2::tag_names.cend(), 

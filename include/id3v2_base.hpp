@@ -61,8 +61,7 @@ struct integral_unsigned_asserts
     }
 };
 
-template <typename T>
-std::optional<std::vector<char>> GetStringFromFile(const T& FileName, uint32_t num )
+std::optional<std::vector<char>> GetStringFromFile(const std::string& FileName, uint32_t num )
 {
     std::ifstream fil(FileName);
     std::vector<char> buffer(num, '0');
@@ -171,7 +170,7 @@ std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
     std::vector<paire> result(pow_val.size());
     constexpr uint32_t TagIndex = 6;
 
-    std::transform(std::begin(buffer) + 6, std::begin(buffer) + TagIndex + pow_val.size(),
+    std::transform(std::begin(buffer) + TagIndex, std::begin(buffer) + TagIndex + pow_val.size(),
             pow_val.begin(), result.begin(),
             [](uint32_t a, uint32_t b){
             return std::make_pair(a, b);
@@ -236,28 +235,15 @@ std::optional<std::vector<char>> GetHeader(const std::string& FileName )
     return val;
 }
 
-
-template <typename T>
-const std::optional<std::string> GetHeaderElement(const std::vector<char>& buffer, T start, T end)
-{
-            return ExtractString<T, uint32_t>(buffer, start, end);
-}
-
-const std::optional<std::string> GetArea(const std::vector<char>& buffer, uint32_t start, uint32_t tag_size)
-{
-            return ExtractString<uint32_t, uint32_t>(buffer, 
-                start, start + tag_size);
-}
-
 const std::optional<std::string> GetTagArea(const std::vector<char>& buffer)
 {
     return  GetHeaderAndTagSize(buffer)
-            | [&](uint32_t _size)
+            | [&](uint32_t tagSize)
             {
 #ifdef DEBUG
-                std::cout << "__size: " << _size << std::endl;
+                std::cout << "tag__size: " << tagSize << std::endl;
 #endif
-                return GetArea(buffer, 0, _size); 
+                return ExtractString<uint32_t, uint32_t>(buffer, 0, tagSize);
             };
 }
 
@@ -271,7 +257,8 @@ const std::optional<std::string> GetID3FileIdentifier(const std::vector<char>& b
 {
     constexpr auto FileIdentifierStart = 0;
     constexpr auto FileIdentifierEnd = 3;
-    return GetHeaderElement(buffer, FileIdentifierStart, FileIdentifierEnd);
+
+    return ExtractString<uint32_t, uint32_t>(buffer, FileIdentifierStart, FileIdentifierEnd);
 
 #ifdef __TEST_CODE
     auto y = [&buffer] () -> std::string {

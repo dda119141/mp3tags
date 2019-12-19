@@ -2,122 +2,25 @@
 #define _TAG_READER
 
 #include <id3v2_common.hpp>
+#include <id3v2_v40.hpp>
 #include <id3v2_v30.hpp>
 #include <id3v2_v00.hpp>
 
 
-template <typename type>
-class RetrieveTag
-{
-    using iD3Variant = std::variant <id3v2::v30, id3v2::v00>;
-    std::string FileName;
-
-    public:
-
-    explicit RetrieveTag(std::string filename)
-        : FileName(filename)
-    {
-//  std::call_once(m_once, [&filename, this]
-            {
-                using namespace id3v2;
-
-                const auto tags_size = GetHeader(FileName) | GetTagSize;
-
-                buffer = GetHeader(FileName)
-                    | GetTagSize
-                    | [&](uint32_t tags_size)
-                    {
-                        return GetStringFromFile(FileName, tags_size + GetHeaderSize<uint32_t>());
-                    };
-            }
-//          });
-    }
-
-    const std::optional<type> find_tag(const type& tag, const iD3Variant& TagVersion)
-    {
-        using namespace id3v2;
-        using namespace ranges;
-
-        auto res = buffer
-            | [](const std::vector<char>& buffer)
-            {
-                return GetTagArea(buffer);
-            }
-            | [&tag](const std::string& tagArea)
-            {
-                auto searchTagPosition = search_tag<type>(tagArea);
-#ifdef DEBUG
-                std::cout << "tag name " << tag << std::endl;
-#endif
-                return searchTagPosition(tag);
-            }
-            | [&](uint32_t TagIndex)
-            {
-#ifdef DEBUG
-                    std::cout << "tag index " << TagIndex << std::endl;
-#endif
-                return buffer 
-                | [&TagIndex, &TagVersion](const std::vector<char>& buff)
-                {
-                   return GetFrameSize(buff, TagVersion, TagIndex);
-                }
-                | [&](uint32_t FrameSize)
-                {
-                    uint32_t tag_offset = TagIndex + GetFrameHeaderSize(TagVersion);
-#ifdef DEBUG
-                    std::cout << "tag_offset " << tag_offset << std::endl;
-#endif
-                    //
-                    return buffer
-                        | [&](const std::vector<char>& buff)
-                        {
-                            return GetArea(buff, tag_offset, FrameSize);
-                        };
-                };
-            };
-
-        return res;
-    }
-
-    private:
-    //  std::once_flag m_once;
-        std::optional<std::vector<char>> buffer;
-};
+using iD3Variant = std::variant <id3v2::v30, id3v2::v00, id3v2::v40>;
 
 template <typename T>
-const std::optional<T> GetTag(const std::variant <id3v2::v30, id3v2::v00> &tagversion,
+const std::optional<T> GetTag(const iD3Variant& tagVersion,
      const std::string filename,
     const std::string tagname)
 {
-        RetrieveTag<T> obj(filename);
-
-        return obj.find_tag(tagname, tagversion);
-}
-#if 0
-const std::optional<std::string> GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, std::string>>& tags)
-{
-    using iD3Variant = std::variant <id3v2::v30, id3v2::v00>;
-    iD3Variant _tagversion;
-
-    return (
-            id3v2::ProcessID3Version(filename)
-            | [&](const std::string& id3Version) {
-            std::for_each (tags.begin(), tags.end(), [&] (std::pair<std::string, std::string> tag)
-                    {
-                    if (id3Version == tag.first) //tag.first is the id3 Version
-                    {
-                         iD3Variant tagversion = std::get<id3v2::v30> (_tagversion);
-                        return GetTag<std::string>(tagversion, filename, tag.second);
-                    }
-                    });
-            }
-           );
+        id3v2::RetrieveTagLocation<std::string> obj(filename);
+        return obj.find_tag(tagname, tagVersion);
 }
 
-#else
+
 const std::string GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, std::string>>& tags)
 {
-    using iD3Variant = std::variant <id3v2::v30, id3v2::v00>;
     iD3Variant _tagversion;
 
     const auto ret = 
@@ -133,8 +36,21 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
                 {
                     if (id3Version == tag.first) //tag.first is the id3 Version
                     {
-                        iD3Variant tagversion = std::get<id3v2::v30> (_tagversion);
-                        return GetTag<std::string>(tagversion, filename, tag.second);
+                        if(id3Version == "0x0300"){
+                            iD3Variant tagVersion = std::get<id3v2::v30>(_tagversion);
+                            return GetTag<std::string>(tagVersion, filename, tag.second);
+                        }
+                        else if(id3Version == "0x0400"){
+                            iD3Variant tagVersion = std::get<id3v2::v40>(_tagversion);
+                            return GetTag<std::string>(tagVersion, filename, tag.second);
+                        }
+                        else if(id3Version == "0x0000"){
+                            iD3Variant tagVersion = std::get<id3v2::v00>(_tagversion);
+                            return GetTag<std::string>(tagVersion, filename, tag.second);
+                        }
+                        else
+                            return std::optional<std::string>(std::string("version not supported"));
+
                     }
                 }
             };
@@ -144,8 +60,8 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
     }else{
 
         auto val = ret.value();
-
         auto it = val.begin();
+
         while(it++ != val.end()){
             val.erase(remove_if(val.begin(), it, [](char c) { return !isprint(c); } ), it);
         }
@@ -153,13 +69,14 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
         return val;
     }
 }
-#endif
+
 
 const std::string GetAlbum(const std::string& filename)
 {
     const std::vector<std::pair<std::string, std::string>> tags
     {
-        {"0x0300", "TALB"},
+        {"0x0400", "TALB"},
+            {"0x0300", "TALB"},
             {"0x0000", "TAL"},
     };
 
@@ -170,6 +87,7 @@ const std::string GetComposer(const std::string& filename)
 {
     const std::vector<std::pair<std::string, std::string>> tags
     {
+        {"0x0400", "TCOM"},
         {"0x0300", "TCOM"},
             {"0x0000", "TCM"},
     };
@@ -205,6 +123,7 @@ const std::string GetTextWriter(const std::string& filename)
 {
     const std::vector<std::pair<std::string, std::string>> tags
     {
+        {"0x0400", "TEXT"},
         {"0x0300", "TEXT"},
         {"0x0000", "TXT"},
     };
@@ -258,6 +177,31 @@ const std::string GetContentGroupDescription(const std::string& filename)
 
     return GetTheTag(filename, tags);
 }
+
+const std::string GetTrackPosition(const std::string& filename)
+{
+    const std::vector<std::pair<std::string, std::string>> tags
+    {
+        {"0x0400", "TRCK"},
+        {"0x0300", "TRCK"},
+        {"0x0000", "TRK"},
+    };
+
+    return GetTheTag(filename, tags);
+}
+
+const std::string GetLeadArtist(const std::string& filename)
+{
+    const std::vector<std::pair<std::string, std::string>> tags
+    {
+        {"0x0400", "TPE1"},
+        {"0x0300", "TPE1"},
+        {"0x0000", "TP1"},
+    };
+
+    return GetTheTag(filename, tags);
+}
+
 
 
 

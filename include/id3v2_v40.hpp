@@ -1,5 +1,5 @@
-#ifndef _ID3V2_230
-#define _ID3V2_230
+#ifndef _ID3V2_V40
+#define _ID3V2_V40
 
 #include <id3v2_base.hpp>
 
@@ -109,4 +109,4 @@ struct v40
 }; //v40
 
 };
-#endif //_ID3V2_230
+#endif //ID3V2_V40
