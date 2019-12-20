@@ -21,7 +21,6 @@ const std::optional<id3v2::TagInfos> GetTagInfo(const iD3Variant& tagVersion,
 
 bool SetTag(const std::string& filename, const std::vector<std::pair<std::string, std::string>>& tags, const std::string& content)
 {
-    iD3Variant _tagversion;
 
     //std::optional<bool> ret =
     const auto ret =
@@ -32,37 +31,35 @@ bool SetTag(const std::string& filename, const std::vector<std::pair<std::string
             return id3v2::GetID3Version(buffer);
         }
     | [&](const std::string& id3Version) {
-        // std::cout << "id3version: " << id3Version << std::endl;
+        iD3Variant DefaultTagVersion, tagVersion;
+
         for (auto& tag: tags)
         {
             if (id3Version == tag.first) //tag.first is the id3 Version
             {
                 if(id3Version == "0x0300"){
-                    iD3Variant tagVersion = std::get<id3v2::v30>(_tagversion);
-                    id3v2::RetrieveTagLocation<std::string> obj(filename);
-
-                    std::optional<id3v2::TagInfos> locs = obj.findTagInfos(tag.second, tagVersion);
-                    if(locs.has_value())
-                    {
-                        return obj.SetTag(content, locs.value());
-                    }
-                    else{
-                        std::cerr << "Tag slot not found" << std::endl;
-                        return std::optional<bool>(false);
-                    }
+                    tagVersion = std::get<id3v2::v30>(DefaultTagVersion);
                 }
-#if 0
                 else if(id3Version == "0x0400"){
-                    iD3Variant tagVersion = std::get<id3v2::v40>(_tagversion);
-                    return GetTag<std::string>(tagVersion, filename, tag.second);
+                    tagVersion = std::get<id3v2::v40>(DefaultTagVersion);
                 }
                 else if(id3Version == "0x0000"){
-                    iD3Variant tagVersion = std::get<id3v2::v00>(_tagversion);
-                    return GetTag<std::string>(tagVersion, filename, tag.second);
+                    tagVersion = std::get<id3v2::v00>(DefaultTagVersion);
                 }
-#endif
                 else{
                     std::cerr << "version not supported" << std::endl;
+                    return std::optional<bool>(false);
+                }
+
+                id3v2::RetrieveTagLocation<std::string> obj(filename);
+
+                std::optional<id3v2::TagInfos> locs = obj.findTagInfos(tag.second, tagVersion);
+                if(locs.has_value())
+                {
+                    return obj.SetTag(content, locs.value());
+                }
+                else{
+                    std::cerr << "Tag slot not found" << std::endl;
                     return std::optional<bool>(false);
                 }
 

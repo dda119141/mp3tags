@@ -6,9 +6,10 @@
 namespace id3v2
 {
 
-struct v40
+class v40
 {
     public:
+#if 0
         const std::vector<std::string> tag_names{
             "TALB" //     [#TALB Album/Movie/Show title]
                 ,"TBPM" //     [#TBPM BPM (beats per minute)]
@@ -58,7 +59,7 @@ struct v40
                 ,"WXXX"// User defined URL link frame
 
         };
-
+#endif
         constexpr auto FrameIDSize(void)
         {
             return ::id3v2::RetrieveSize(4);

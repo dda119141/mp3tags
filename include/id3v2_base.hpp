@@ -17,6 +17,31 @@
 #include <range/v3/action/transform.hpp>
 #include <range/v3/view/filter.hpp>
 
+namespace id3v2
+{
+    class TagInfos
+    {
+        public:
+            TagInfos(uint32_t StartPos, uint32_t Length):
+                startPos(StartPos)
+                ,length(Length)
+        {
+        }
+            const uint32_t getStartPos() const
+            {
+                return startPos;
+            }
+
+            const uint32_t getLength() const
+            {
+                return length;
+            }
+        private:
+            // TagInfos() = delete;
+            uint32_t startPos;
+            uint32_t length;
+    };
+};
 
 template <typename T, typename F>
 auto mbind(std::optional<T> obj, F&& function)
@@ -41,6 +66,7 @@ using is_optional_vector_char = std::is_same<std::decay_t<T>, std::optional<std:
 template <typename T,
     typename = std::enable_if_t<(std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>::value
         || std::is_same<std::decay_t<T>, std::optional<std::string>>::value
+        || std::is_same<std::decay_t<T>, std::optional<id3v2::TagInfos>>::value
         || std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value) >
     , typename F >
  auto operator | (T&& obj, F&& Function)
@@ -67,7 +93,7 @@ std::optional<std::vector<char>> GetStringFromFile(const std::string& FileName, 
     std::vector<char> buffer(num, '0');
 
     if(!fil.good()){
-        std::cerr << "mp3 file not good\n";
+        std::cerr << "mp3 file could not be read\n";
         return {};
     }
 
@@ -84,9 +110,8 @@ const auto GetValFromBuffer(const std::vector<char>& buffer, T index, T num_of_b
 {
     integral_unsigned_asserts<T> eval;
 
-    if(buffer.size() < num_of_bytes_in_hex){
-        return 0;
-    }
+    assert(buffer.size() > num_of_bytes_in_hex);
+
     auto version = 0;
     auto remaining = 0;
     auto bytes_to_add = num_of_bytes_in_hex;
@@ -110,6 +135,8 @@ const std::optional<std::string> GetHexFromBuffer(const std::vector<char>& buffe
 {
     integral_unsigned_asserts<T> eval;
 
+    assert(buffer.size() > num_of_bytes_in_hex);
+
     std::stringstream stream_obj;
 
     stream_obj << "0x"
@@ -132,11 +159,9 @@ const std::optional<std::string> GetHexFromBuffer(const std::vector<char>& buffe
 template <typename T1, typename T2>
 const std::optional<std::string> ExtractString(const std::vector<char>& buffer, T1 start, T1 end)
 {
-    if(end < start){
-        std::cerr << "boundary error - start: " << start << " end: " << end << std::endl;
-        return {};
+    assert(end > start);
 
-    } else if(buffer.size() >= end) {
+    if(buffer.size() >= end) {
         static_assert(std::is_integral<T1>::value, "second and third parameters should be integers");
         static_assert(std::is_unsigned<T2>::value, "num of elements must be unsigned");
 
@@ -229,8 +254,9 @@ std::optional<std::vector<char>> GetHeader(const std::string& FileName )
 {
     auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>());
 
-    if(!val)
+    if(!val.has_value()){
         std::cerr << "error " << __func__ << std::endl;
+    }
 
     return val;
 }
@@ -279,22 +305,22 @@ const std::optional<std::string> GetID3Version(const std::vector<char>& buffer)
 template <typename Type>
 class search_tag
 {
-    const Type& _tagArea;
+    const Type& mTagArea;
 
     public:
 
     search_tag(const Type& tagArea):
-    _tagArea(tagArea)
+    mTagArea(tagArea)
     {
     }
 
     std::optional<uint32_t> operator()(const Type& tag)
     {
-        auto it = std::search(_tagArea.cbegin(), _tagArea.cend(), 
+        auto it = std::search(mTagArea.cbegin(), mTagArea.cend(), 
             std::boyer_moore_searcher(tag.cbegin(), tag.cend()) );
 
-        if(it != _tagArea.cend()){
-            return (it - _tagArea.cbegin());
+        if(it != mTagArea.cend()){
+            return (it - mTagArea.cbegin());
         }else{
 //            std::cout << "tag: "  << tag << " not found" << std::endl;
             return {};

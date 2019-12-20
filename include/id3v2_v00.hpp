@@ -6,10 +6,11 @@
 namespace id3v2
 {
 
-struct v00
+class v00
 {
     public:
-        const std::vector<std::string> tag_names{
+#if 0
+        std::vector<std::string> tag_names{
             "BUF" // Recommended buffer size
                 ,"CNT " //Play counter
                 ,"COM " //Comments
@@ -74,7 +75,7 @@ struct v00
                 ,"WPB " //Publishers official webpage
                 ,"WXX " //User defined URL link frame
         };
-
+#endif
         constexpr auto FrameIDSize(void)
         {
             return ::id3v2::RetrieveSize(3);

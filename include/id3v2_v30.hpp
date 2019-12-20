@@ -6,10 +6,11 @@
 namespace id3v2
 {
 
-struct v30
+class v30
 {
     public:
-        const std::vector<std::string> tag_names{
+#if 0
+        std::vector<std::string> tag_names{
             "TALB" //     [#TALB Album/Movie/Show title]
                 ,"TBPM" //     [#TBPM BPM (beats per minute)]
                 ,"TCOM" //     [#TCOM Composer]
@@ -48,7 +49,7 @@ struct v30
                 ,"TSSE"//      [#TSEE Software/Hardware and settings used for encoding]
                 ,"TYER"//      [#TYER Year]
         };
-
+#endif
         constexpr auto FrameIDSize(void)
         {
             return ::id3v2::RetrieveSize(4);

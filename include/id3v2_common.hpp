@@ -65,29 +65,6 @@ namespace id3v2
         }
     }
 
-    class TagInfos
-    {
-        public:
-            TagInfos(uint32_t StartPos, uint32_t Length):
-                startPos(StartPos)
-                ,length(Length)
-            {
-            }
-            const uint32_t getStartPos() const
-            {
-                return startPos;
-            }
-
-            const uint32_t getLength() const
-            {
-                return length;
-            }
-        private:
-           // TagInfos() = delete;
-            uint32_t startPos;
-            uint32_t length;
-    };
-
     template <typename type>
         class RetrieveTagLocation
         {
@@ -121,6 +98,8 @@ namespace id3v2
 #endif
                         uint32_t index = 0;
                         auto start = tagLoc.getStartPos();
+
+                        assert(start > 0);
 
                         while(start++ < tagLoc.getLength()){
                             if(index < content.size())
@@ -182,46 +161,19 @@ namespace id3v2
             const std::optional<type> find_tag(const type& tag, const iD3Variant& TagVersion)
             {
                 using namespace id3v2;
-                using namespace ranges;
+
+                std::optional<TagInfos> tagLoc = findTagInfos(tag, TagVersion);
 
                 auto res = buffer
-                    | [](const std::vector<char>& buffer)
-                    {
-                        return GetTagArea(buffer);
-                    }
-                | [&tag](const std::string& tagArea)
-                {
-                    auto searchTagPosition = search_tag<type>(tagArea);
-#ifdef DEBUG
-                    std::cout << "tag name " << tag << std::endl;
-#endif
-                    return searchTagPosition(tag);
-                }
-                | [&](uint32_t TagIndex)
-                {
-#ifdef DEBUG
-                    std::cout << "tag index " << TagIndex << std::endl;
-#endif
-                    return buffer 
-                        | [&TagIndex, &TagVersion](const std::vector<char>& buff)
-                        {
-                            return GetFrameSize(buff, TagVersion, TagIndex);
-                        }
-                    | [&](uint32_t FrameSize)
-                    {
-                        uint32_t tagOffset = TagIndex + GetFrameHeaderSize(TagVersion);
-#ifdef DEBUG
-                        std::cout << "tagOffset " << tagOffset << std::endl;
-#endif
-                        //
-                        return buffer
                             | [=](const std::vector<char>& buff)
                             {
-                                return ExtractString<uint32_t, uint32_t>(buff, tagOffset, tagOffset + FrameSize);
+                                return tagLoc
+                                    | [&](const TagInfos& TagLoc)
+                                    {
+                                        return ExtractString<uint32_t, uint32_t>(buff, TagLoc.getStartPos(), 
+                                                TagLoc.getStartPos() + TagLoc.getLength());
+                                    };
                             };
-                    };
-                };
-
                 return res;
             }
 
@@ -230,20 +182,6 @@ namespace id3v2
             //  std::once_flag m_once;
             std::optional<std::vector<char>> buffer;
         };
-
-
-    const std::optional<std::string> ProcessID3Version(const std::string& filename)
-    {
-        return(
-                id3v2::GetHeader(filename)
-                | id3v2::check_for_ID3
-                | [](const std::vector<char>& buffer)
-                {
-                return id3v2::GetID3Version(buffer);
-                }
-              );
-    }
-
 
     template <typename id3Type>
         const auto is_tag(std::string name)

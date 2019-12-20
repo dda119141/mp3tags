@@ -19,9 +19,9 @@ const std::optional<T> GetTag(const iD3Variant& tagVersion,
 }
 
 
-const std::string GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, std::string>>& tags)
+template<typename tagType>
+const std::string GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, tagType>>& tags)
 {
-    iD3Variant _tagversion;
 
     const auto ret = 
             id3v2::GetHeader(filename)
@@ -32,24 +32,26 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
             }
             | [&](const std::string& id3Version) {
                // std::cout << "id3version: " << id3Version << std::endl;
+                iD3Variant DefaultTagVersion, tagVersion;
+
                 for (auto& tag: tags)
                 {
                     if (id3Version == tag.first) //tag.first is the id3 Version
                     {
                         if(id3Version == "0x0300"){
-                            iD3Variant tagVersion = std::get<id3v2::v30>(_tagversion);
-                            return GetTag<std::string>(tagVersion, filename, tag.second);
+                            tagVersion = std::get<id3v2::v30>(DefaultTagVersion);
                         }
                         else if(id3Version == "0x0400"){
-                            iD3Variant tagVersion = std::get<id3v2::v40>(_tagversion);
-                            return GetTag<std::string>(tagVersion, filename, tag.second);
+                            tagVersion = std::get<id3v2::v40>(DefaultTagVersion);
                         }
                         else if(id3Version == "0x0000"){
-                            iD3Variant tagVersion = std::get<id3v2::v00>(_tagversion);
-                            return GetTag<std::string>(tagVersion, filename, tag.second);
+                            tagVersion = std::get<id3v2::v00>(DefaultTagVersion);
                         }
-                        else
+                        else{
                             return std::optional<std::string>(std::string("version not supported"));
+                        }
+
+                        return GetTag<tagType>(tagVersion, filename, tag.second);
 
                     }
                 }
@@ -80,7 +82,7 @@ const std::string GetAlbum(const std::string& filename)
             {"0x0000", "TAL"},
     };
 
-    return  GetTheTag(filename, tags);
+    return  GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetComposer(const std::string& filename)
@@ -92,7 +94,7 @@ const std::string GetComposer(const std::string& filename)
             {"0x0000", "TCM"},
     };
 
-    return  GetTheTag(filename, tags);
+    return  GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetDate(const std::string& filename)
@@ -104,7 +106,7 @@ const std::string GetDate(const std::string& filename)
         {"0x0000", "TDA"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetContentType(const std::string& filename)
@@ -116,7 +118,7 @@ const std::string GetContentType(const std::string& filename)
         {"0x0000", "TCO"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetTextWriter(const std::string& filename)
@@ -128,7 +130,7 @@ const std::string GetTextWriter(const std::string& filename)
         {"0x0000", "TXT"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetYear(const std::string& filename)
@@ -140,7 +142,7 @@ const std::string GetYear(const std::string& filename)
         {"0x0000", "TYE"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetFileType(const std::string& filename)
@@ -151,7 +153,7 @@ const std::string GetFileType(const std::string& filename)
         {"0x0000", "TFT"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetTitle(const std::string& filename)
@@ -163,7 +165,7 @@ const std::string GetTitle(const std::string& filename)
         {"0x0000", "TT2"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetContentGroupDescription(const std::string& filename)
@@ -175,7 +177,7 @@ const std::string GetContentGroupDescription(const std::string& filename)
         {"0x0000", "TT1"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetTrackPosition(const std::string& filename)
@@ -187,7 +189,7 @@ const std::string GetTrackPosition(const std::string& filename)
         {"0x0000", "TRK"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetLeadArtist(const std::string& filename)
@@ -199,7 +201,7 @@ const std::string GetLeadArtist(const std::string& filename)
         {"0x0000", "TP1"},
     };
 
-    return GetTheTag(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 
