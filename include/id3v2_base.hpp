@@ -66,6 +66,7 @@ using is_optional_vector_char = std::is_same<std::decay_t<T>, std::optional<std:
 template <typename T,
     typename = std::enable_if_t<(std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>::value
         || std::is_same<std::decay_t<T>, std::optional<std::string>>::value
+        || std::is_same<std::decay_t<T>, std::optional<bool>>::value
         || std::is_same<std::decay_t<T>, std::optional<id3v2::TagInfos>>::value
         || std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value) >
     , typename F >
@@ -194,8 +195,9 @@ std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
 
     std::vector<paire> result(pow_val.size());
     constexpr uint32_t TagIndex = 6;
+    const auto it = std::begin(buffer) + TagIndex;
 
-    std::transform(std::begin(buffer) + TagIndex, std::begin(buffer) + TagIndex + pow_val.size(),
+    std::transform(it, it + pow_val.size(),
             pow_val.begin(), result.begin(),
             [](uint32_t a, uint32_t b){
             return std::make_pair(a, b);
@@ -209,12 +211,9 @@ std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
             }
             ); 
 
-    if(val > GetHeaderSize<uint32_t>()){
-        return val;
-    }else{
-        std::cerr << "error " << __func__ << ": " << val  <<std::endl;
-        return {};
-    }
+    assert(val > GetHeaderSize<uint32_t>());
+
+    return val;
 
 #if 0
     if(buffer.size() >= GetHeaderSize<uint32_t>())
@@ -314,7 +313,7 @@ class search_tag
     {
     }
 
-    std::optional<uint32_t> operator()(const Type& tag)
+    std::optional<uint32_t> operator()(Type tag)
     {
         auto it = std::search(mTagArea.cbegin(), mTagArea.cend(), 
             std::boyer_moore_searcher(tag.cbegin(), tag.cend()) );

@@ -66,41 +66,82 @@ namespace id3v2
     }
 
     template <typename type>
-        class RetrieveTagLocation
+        class TagReadWriter
         {
-            std::string FileName;
-
             public:
 
-            explicit RetrieveTagLocation(std::string filename)
+            explicit TagReadWriter(const std::string& filename)
                 : FileName(filename)
             {
-                {
-                    const auto tags_size = GetHeader(FileName) | GetTagSize;
+                const auto tags_size = GetHeader(FileName) | GetTagSize;
 
-                    buffer = GetHeader(FileName)
-                        | GetTagSize
-                        | [&](uint32_t tags_size)
-                        {
-                            return GetStringFromFile(FileName, tags_size + GetHeaderSize<uint32_t>());
-                        };
+                buffer = GetHeader(FileName)
+                    | GetTagSize
+                    | [&](uint32_t tags_size)
+                    {
+                        return GetStringFromFile(FileName, tags_size + GetHeaderSize<uint32_t>());
+                    };
+            }
+
+            std::optional<bool> ReWriteFile(const std::string& filename)
+            {
+                std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
+                std::ofstream filWrite(filename + ".mod");
+
+                if(!filRead.good())
+                {
+                    return {};
                 }
+
+                assert(buffer.has_value());
+
+                std::vector<char> bufRead;
+
+                const auto dataSize = filRead.tellg();
+                filRead.seekg(0);
+                filRead.read(&bufRead[0], dataSize);
+
+                std::for_each(std::begin(buffer.value()), std::end(buffer.value()), [&filWrite](const char& n)
+                        {
+                            filWrite << n;
+                        });
+
+                std::for_each(std::begin(bufRead) + buffer.value().size(), std::end(bufRead), [&filWrite](const char& n)
+                        {
+                            filWrite << n;
+                        });
+
+                return true;
             }
 
             std::optional<bool> SetTag(const std::string& content, const TagInfos& tagLoc)
             {
-                auto res = buffer
+                assert (content.size() > tagLoc.getLength());
+
+                const auto res = buffer
                     | [&](std::vector<char>& buffer)
                     {
-#if 0
-                        const auto start = buffer.begin() + tagLoc.getStartPos();
-                        return std::string(start, start + tagLoc.getLength()).replace(0, tagLoc.getLength(), content);
-#endif
-                        uint32_t index = 0;
+                       uint32_t index = 0;
                         auto start = tagLoc.getStartPos();
 
                         assert(start > 0);
 
+                        const auto iter = std::begin(buffer) + tagLoc.getStartPos();
+                        std::transform(iter, iter + content.size(), content.begin(), iter,
+                                [](char a, char b){ return b;}
+                                );
+
+                        std::transform(iter + content.size(), iter + tagLoc.getLength(), content.begin(), iter,
+                                [](char a, char b){ return 0x00;}
+                                );
+
+                        return true;
+                    };
+
+                return res;
+#if 0
+                        const auto start = buffer.begin() + tagLoc.getStartPos();
+                        return std::string(start, start + tagLoc.getLength()).replace(0, tagLoc.getLength(), content);
                         while(start++ < tagLoc.getLength()){
                             if(index < content.size())
                                 buffer[start] = content[index++];
@@ -108,24 +149,21 @@ namespace id3v2
                                 buffer[start] = 0x00;
                         }
 
-                        return true;
-                    };
-
-                return res;
+#endif
             }
 
-            std::optional<TagInfos> findTagInfos(const type& tag, const iD3Variant& TagVersion)
+            const std::optional<TagInfos> findTagInfos(std::string_view tag, const iD3Variant& TagVersion)
             {
                 uint32_t FrameSize = 0;
 
-                auto Offset = buffer
+                const auto Offset = buffer
                     | [](const std::vector<char>& buffer)
                     {
                         return GetTagArea(buffer);
                     }
                 | [&tag](const std::string& tagArea)
                 {
-                    auto searchTagPosition = search_tag<type>(tagArea);
+                    auto searchTagPosition = search_tag<std::string_view>(tagArea);
 #ifdef DEBUG
                     std::cout << "tag name " << tag << std::endl;
 #endif
@@ -158,13 +196,11 @@ namespace id3v2
                     return {};
             }
 
-            const std::optional<type> find_tag(const type& tag, const iD3Variant& TagVersion)
+            const std::optional<type> extractTag(std::string_view tag, const iD3Variant& TagVersion)
             {
-                using namespace id3v2;
+                const std::optional<TagInfos> tagLoc = findTagInfos(tag, TagVersion);
 
-                std::optional<TagInfos> tagLoc = findTagInfos(tag, TagVersion);
-
-                auto res = buffer
+                const auto res = buffer
                             | [=](const std::vector<char>& buff)
                             {
                                 return tagLoc
@@ -180,6 +216,7 @@ namespace id3v2
 
             private:
             //  std::once_flag m_once;
+            const std::string& FileName;
             std::optional<std::vector<char>> buffer;
         };
 
@@ -191,8 +228,6 @@ namespace id3v2
                         [&](std::string obj) { return name == obj; } ) 
                    );
         }
-
-
 
 }; //end namespace id3v2
 

@@ -9,20 +9,10 @@
 
 using iD3Variant = std::variant <id3v2::v30, id3v2::v00, id3v2::v40>;
 
-template <typename T>
-const std::optional<T> GetTag(const iD3Variant& tagVersion,
-     const std::string filename,
-    const std::string tagname)
-{
-        id3v2::RetrieveTagLocation<std::string> obj(filename);
-        return obj.find_tag(tagname, tagVersion);
-}
-
 
 template<typename tagType>
-const std::string GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, tagType>>& tags)
+const std::string GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, std::string_view>>& tags)
 {
-
     const auto ret = 
             id3v2::GetHeader(filename)
             | id3v2::check_for_ID3
@@ -51,7 +41,9 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
                             return std::optional<std::string>(std::string("version not supported"));
                         }
 
-                        return GetTag<tagType>(tagVersion, filename, tag.second);
+                        id3v2::TagReadWriter<std::string> obj(filename);
+
+                        return obj.extractTag(tag.second, tagVersion);
 
                     }
                 }
@@ -75,7 +67,7 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
 
 const std::string GetAlbum(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TALB"},
             {"0x0300", "TALB"},
@@ -85,9 +77,10 @@ const std::string GetAlbum(const std::string& filename)
     return  GetTheTag<std::string>(filename, tags);
 }
 
+#if 1
 const std::string GetComposer(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TCOM"},
         {"0x0300", "TCOM"},
@@ -99,7 +92,7 @@ const std::string GetComposer(const std::string& filename)
 
 const std::string GetDate(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0300", "TDAT"},
         {"0x0400", "TDRC"},
@@ -111,7 +104,7 @@ const std::string GetDate(const std::string& filename)
 
 const std::string GetContentType(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TCON"},
         {"0x0300", "TCON"},
@@ -123,7 +116,7 @@ const std::string GetContentType(const std::string& filename)
 
 const std::string GetTextWriter(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TEXT"},
         {"0x0300", "TEXT"},
@@ -135,7 +128,7 @@ const std::string GetTextWriter(const std::string& filename)
 
 const std::string GetYear(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TDRC"},
         {"0x0300", "TYER"},
@@ -147,7 +140,7 @@ const std::string GetYear(const std::string& filename)
 
 const std::string GetFileType(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0300", "TFLT"},
         {"0x0000", "TFT"},
@@ -158,7 +151,7 @@ const std::string GetFileType(const std::string& filename)
 
 const std::string GetTitle(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TIT2"},
         {"0x0300", "TIT2"},
@@ -170,7 +163,7 @@ const std::string GetTitle(const std::string& filename)
 
 const std::string GetContentGroupDescription(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TIT1"},
         {"0x0300", "TIT1"},
@@ -182,7 +175,7 @@ const std::string GetContentGroupDescription(const std::string& filename)
 
 const std::string GetTrackPosition(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TRCK"},
         {"0x0300", "TRCK"},
@@ -194,7 +187,7 @@ const std::string GetTrackPosition(const std::string& filename)
 
 const std::string GetLeadArtist(const std::string& filename)
 {
-    const std::vector<std::pair<std::string, std::string>> tags
+    const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0400", "TPE1"},
         {"0x0300", "TPE1"},
@@ -203,7 +196,7 @@ const std::string GetLeadArtist(const std::string& filename)
 
     return GetTheTag<std::string>(filename, tags);
 }
-
+#endif
 
 
 
