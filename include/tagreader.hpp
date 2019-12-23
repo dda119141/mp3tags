@@ -7,9 +7,6 @@
 #include <id3v2_v00.hpp>
 
 
-using iD3Variant = std::variant <id3v2::v30, id3v2::v00, id3v2::v40>;
-
-
 template<typename tagType>
 const std::string GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, std::string_view>>& tags)
 {
@@ -22,20 +19,20 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
             }
             | [&](const std::string& id3Version) {
                // std::cout << "id3version: " << id3Version << std::endl;
-                iD3Variant DefaultTagVersion, tagVersion;
+                id3v2::iD3Variant tagVersion;
 
                 for (auto& tag: tags)
                 {
                     if (id3Version == tag.first) //tag.first is the id3 Version
                     {
                         if(id3Version == "0x0300"){
-                            tagVersion = std::get<id3v2::v30>(DefaultTagVersion);
+                            tagVersion = id3v2::v30();
                         }
                         else if(id3Version == "0x0400"){
-                            tagVersion = std::get<id3v2::v40>(DefaultTagVersion);
+                            tagVersion = id3v2::v40();
                         }
                         else if(id3Version == "0x0000"){
-                            tagVersion = std::get<id3v2::v00>(DefaultTagVersion);
+                            tagVersion = id3v2::v00();
                         }
                         else{
                             return std::optional<std::string>(std::string("version not supported"));
@@ -44,7 +41,6 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
                         id3v2::TagReadWriter<std::string> obj(filename);
 
                         return obj.extractTag(tag.second, tagVersion);
-
                     }
                 }
             };
@@ -54,11 +50,8 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
     }else{
 
         auto val = ret.value();
-        auto it = val.begin();
 
-        while(it++ != val.end()){
-            val.erase(remove_if(val.begin(), it, [](char c) { return !isprint(c); } ), it);
-        }
+        val.erase(remove_if(val.begin(), val.end(), [](char c) { return !isprint(c); } ), val.end());
 
         return val;
     }

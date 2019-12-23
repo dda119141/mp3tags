@@ -12,6 +12,7 @@
 #include <time.h>
 #include "tagreader.hpp"
 #include "tagwriter.hpp"
+#include <boost/locale.hpp>
 
 
 namespace fs = std::experimental::filesystem;
@@ -53,13 +54,55 @@ int main() {
     using std::cout;
     using std::endl;
 
+#if 0
+    //std::string ccont = "Hello";
+    std::string ccont = "test1";
+
+    //const auto cContent = tagBase::utf8ToUtf16String(ccont);
+    const auto cContent = tagBase::getW16FromLatin<std::u16string>(ccont);
+
+    const auto buffer = reinterpret_cast<const char*>(cContent.data());
+    for (auto i = 0; i<10; i++)
+        cout << std::hex << (int)buffer[i] << ' ';
+#endif
+
+    cout <<  endl;
+#if 0
+    {
+        using namespace boost::locale::conv;
+        std::ofstream obj("out.bin", std::ios::binary);
+        std::vector<char> obj1 = {0x74, 0x00, 0x65, 0x0, 0x73, 0x00, 0x74, 0x00, 0x31};
+        //std::vector<char> obj2 = {0x72, 0x00, 0x72, 0x0, 0x7A, 0x00, 0x7A};
+        std::string exc1 = "test1";
+        //std::string exc1(obj1.data(), 9);
+
+        //std::string exc2 = exc1.replace(exc1.begin(), exc1.begin() + 3, 2, 'AA');
+        //exc1.replace(exc1.begin(), exc1.begin() + 6, "AA");
+     //   std::transform(exc1.begin(), exc1.end(), exc1.begin(),
+     //                              [](char c) -> std::string { return (std::string(&c) + "\0") ; });
+
+        cout << "iooooo: " << exc1 << endl;
+
+        //std::u16string exc2 = utf_to_utf<char16_t>(exc1);
+        std::string exc2{to_utf<char>(exc1, "ISO-8859-5")};
+        //std::string latin1_string = from_utf(wide_string,"UTF-16");
+//        std::string exc2 = utf_to_utf<char>(wide_string);
+        //std::locale loc (std::locale(), new std::codecvt_utf16<char>);
+        //obj << exc1;
+        obj << exc2.c_str();
+
+    }
+#endif
+
+#if 1
 //  print_header_infos(filename);
+  try{
     for (auto& filen : fs::directory_iterator("../files/"))
     {
         const std::string filename = filen.path().string();
 
-        cout << "Album: " << GetAlbum(filename) << endl;
-#if 1
+        cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
+#if 0
         cout << "Composer: " << GetComposer(filename) << endl;
         cout << "Date: " << GetDate(filename) << endl;
         cout << "Year: " << GetYear(filename) << endl;
@@ -70,14 +113,19 @@ int main() {
         cout << "Artist: " << GetLeadArtist(filename) << endl;
         cout << "Group Description: " << GetContentGroupDescription(filename) << endl;
 #endif
+        if(filename.find("test1.mp3") != std::string::npos)
+            cout << "\n\n change album: " << SetAlbum(filename, "test1");
+
         //std::for_each(id3v2::tag_names.cbegin(), id3v2::tag_names.cend(), 
         //      id3v2::RetrieveTag<std::string>(std::string("../file_example_MP3_700KB.mp3")) );
 
-
-        //printf("gcc version: %d.%d.%d\n",__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__);
         cout << endl;
     }
+  }catch (fs::filesystem_error) {
+        cout << "wrong path:" << endl;
+  }
 
+#endif
     return 0;
 }
 
