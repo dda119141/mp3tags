@@ -49,11 +49,11 @@ bool SetTag(const std::string& filename,
 
                         const auto ret1 = obj.SetTag(content, tagLoc);
                         return(
-                            ret1 |
-                            [&obj](const std::vector<char>& buf)
-                            {
+                                ret1 |
+                                [&obj](const std::vector<char>& buf)
+                                {
                                 return obj.ReWriteFile(buf);
-                            });
+                                });
                     }
                     else{
                         std::cerr << "Tag slot not found" << std::endl;
@@ -62,6 +62,8 @@ bool SetTag(const std::string& filename,
 
                 }
             }
+
+            return std::optional<bool>(false);
     };
 
     if(ret.has_value())
@@ -81,6 +83,19 @@ bool SetAlbum(const std::string& filename, std::string_view content)
 
     return  SetTag(filename, tags, content);
 }
+
+bool SetLeadArtist(const std::string& filename, std::string_view content)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TPE1"},
+        {"0x0300", "TPE1"},
+            {"0x0000", "TP1"},
+    };
+
+    return  SetTag(filename, tags, content);
+}
+
 
 bool SetComposer(const std::string& filename, std::string_view content)
 {
@@ -105,6 +120,19 @@ bool SetDate(const std::string& filename, std::string_view content)
 
     return  SetTag(filename, tags, content);
 }
+
+bool SetTextWriter(const std::string& filename, std::string_view content)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TEXT"},
+        {"0x0300", "TEXT"},
+        {"0x0000", "TXT"},
+    };
+
+    return SetTag(filename, tags, content);
+}
+
 
 #if 0
 const std::string_view GetContentType(const std::string_view& filename)

@@ -18,7 +18,7 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
                 return id3v2::GetID3Version(buffer);
             }
             | [&](const std::string& id3Version) {
-               // std::cout << "id3version: " << id3Version << std::endl;
+                // std::cout << "id3version: " << id3Version << std::endl;
                 id3v2::iD3Variant tagVersion;
 
                 for (auto& tag: tags)
@@ -43,6 +43,7 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
                         return obj.extractTag(tag.second, tagVersion);
                     }
                 }
+                return std::optional<std::string>(std::string("version not supported"));
             };
 
     if(!ret.has_value()){
@@ -67,10 +68,23 @@ const std::string GetAlbum(const std::string& filename)
             {"0x0000", "TAL"},
     };
 
-    return  GetTheTag<std::string>(filename, tags);
+    return GetTheTag<std::string>(filename, tags);
 }
 
 #if 1
+const std::string GetLeadArtist(const std::string& filename)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TPE1"},
+        {"0x0300", "TPE1"},
+            {"0x0000", "TP1"},
+    };
+
+    return GetTheTag<std::string>(filename, tags);
+}
+
+
 const std::string GetComposer(const std::string& filename)
 {
     const std::vector<std::pair<std::string, std::string_view>> tags
@@ -178,17 +192,6 @@ const std::string GetTrackPosition(const std::string& filename)
     return GetTheTag<std::string>(filename, tags);
 }
 
-const std::string GetLeadArtist(const std::string& filename)
-{
-    const std::vector<std::pair<std::string, std::string_view>> tags
-    {
-        {"0x0400", "TPE1"},
-        {"0x0300", "TPE1"},
-        {"0x0000", "TP1"},
-    };
-
-    return GetTheTag<std::string>(filename, tags);
-}
 #endif
 
 

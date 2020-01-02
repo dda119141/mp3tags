@@ -23,10 +23,12 @@ namespace tagBase
         utf16_t *dstBegin = reinterpret_cast<utf16_t*>(destStr.data());
         utf16_t *dstEnd   = dstBegin + destLen;
 
-        Unicode::ConversionResult result = Unicode::ConvertUTF8toUTF16(
+        //Unicode::ConversionResult result = Unicode::ConvertUTF8toUTF16(
+        //        &srcBegin, srcEnd, &dstBegin, dstEnd, Unicode::lenientConversion);
+        //        std::cout << "result: " << destStr << std::endl;
+        Unicode::ConvertUTF8toUTF16(
                 &srcBegin, srcEnd, &dstBegin, dstEnd, Unicode::lenientConversion);
 
-        //        std::cout << "result: " << destStr << std::endl;
         return destStr;
 
     }
@@ -36,9 +38,9 @@ namespace tagBase
         {
             type data;
 
-            const auto len = val.length() * 2;
+            const uint32_t len = val.length() * 2;
 
-            for(auto i=0; i < len; i+=2){
+            for(uint32_t i=0; i < len; i+=2){
                 data.push_back(val[i/2]);
                 data.push_back(0x0);
             }

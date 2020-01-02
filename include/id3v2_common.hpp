@@ -74,8 +74,6 @@ namespace id3v2
             explicit TagReadWriter(const std::string& filename)
                 : FileName(filename)
             {
-                const auto tags_size = GetHeader(FileName) | GetTagSize;
-
                 buffer = GetHeader(FileName)
                     | GetTagSize
                     | [&](uint32_t tags_size)
@@ -97,7 +95,7 @@ namespace id3v2
 
                 std::vector<char> bufRead;
 
-                const auto dataSize = filRead.tellg();
+                const unsigned int dataSize = filRead.tellg();
 
                 filRead.seekg(0);
                 bufRead.reserve(dataSize);

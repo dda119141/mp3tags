@@ -126,6 +126,7 @@ namespace id3v2
         const auto GetValFromBuffer(const std::vector<char>& buffer, T index, T num_of_bytes_in_hex)
         {
             integral_unsigned_asserts<T> eval;
+            eval();
 
             assert(buffer.size() > num_of_bytes_in_hex);
 
@@ -151,6 +152,7 @@ namespace id3v2
         const std::optional<std::string> GetHexFromBuffer(const std::vector<char>& buffer, T index, T num_of_bytes_in_hex)
         {
             integral_unsigned_asserts<T> eval;
+            eval();
 
             assert(buffer.size() > num_of_bytes_in_hex);
 
@@ -277,7 +279,7 @@ namespace id3v2
 
     std::optional<std::vector<char>> GetHeader(const std::string& FileName )
     {
-        auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>());
+        const auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>());
 
         if(!val.has_value()){
             std::cerr << "error " << __func__ << std::endl;
@@ -341,7 +343,7 @@ namespace id3v2
 
             std::optional<uint32_t> operator()(Type tag)
             {
-                auto it = std::search(mTagArea.cbegin(), mTagArea.cend(), 
+                const auto it = std::search(mTagArea.cbegin(), mTagArea.cend(), 
                         std::boyer_moore_searcher(tag.cbegin(), tag.cend()) );
 
                 if(it != mTagArea.cend()){

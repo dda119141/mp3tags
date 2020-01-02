@@ -38,6 +38,8 @@ void print_header_infos(const std::string& filename)
         return 0;
     };
 
+    assert(res == 0);
+
     int resi = buffer | [](const std::vector<char>& buff)
     {
         cout << "file identifier: " << id3v2::GetID3FileIdentifier(buff).value() << endl;
@@ -48,6 +50,7 @@ void print_header_infos(const std::string& filename)
         return 0;
     };
 
+    assert(resi == 0);
 }
 
 int main() {
