@@ -19,6 +19,8 @@
 
 namespace id3v2
 {
+    using UCharVec = std::vector<unsigned char>;
+
     class TagInfos
     {
         public:
@@ -81,10 +83,10 @@ template <typename T>
 using is_optional_string = std::is_same<std::decay_t<T>, std::optional<std::string>>;
 
 template <typename T>
-using is_optional_vector_char = std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>;
+using is_optional_vector_char = std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>;
 
 template <typename T,
-    typename = std::enable_if_t<(std::is_same<std::decay_t<T>, std::optional<std::vector<char>>>::value
+    typename = std::enable_if_t<(std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>::value
         || std::is_same<std::decay_t<T>, std::optional<std::string>>::value
         || std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value
         || std::is_same<std::decay_t<T>, std::optional<bool>>::value
@@ -107,17 +109,17 @@ struct integral_unsigned_asserts
     }
 };
 
-std::optional<std::vector<char>> GetStringFromFile(const std::string& FileName, uint32_t num )
+std::optional<id3v2::UCharVec> GetStringFromFile(const std::string& FileName, uint32_t num )
 {
     std::ifstream fil(FileName);
-    std::vector<char> buffer(num, '0');
+    std::vector<unsigned char> buffer(num, '0');
 
     if(!fil.good()){
         std::cerr << "mp3 file could not be read\n";
         return {};
     }
 
-    fil.read(buffer.data(), num);
+    fil.read(reinterpret_cast<char*>(buffer.data()), num);
 
     return buffer;
 }
@@ -126,7 +128,7 @@ namespace id3v2
 {
 
     template <typename T>
-        const auto GetValFromBuffer(const std::vector<char>& buffer, T index, T num_of_bytes_in_hex)
+        const auto GetValFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
         {
             integral_unsigned_asserts<T> eval;
             eval();
@@ -152,7 +154,7 @@ namespace id3v2
         }
 
     template <typename T>
-        const std::optional<std::string> GetHexFromBuffer(const std::vector<char>& buffer, T index, T num_of_bytes_in_hex)
+        const std::optional<std::string> GetHexFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
         {
             integral_unsigned_asserts<T> eval;
             eval();
@@ -179,7 +181,7 @@ namespace id3v2
         }
 
     template <typename T1, typename T2>
-        const std::optional<std::string> ExtractString(const std::vector<char>& buffer, T1 start, T1 end)
+        const std::optional<std::string> ExtractString(const UCharVec& buffer, T1 start, T1 end)
         {
             assert(end > start);
 
@@ -187,7 +189,7 @@ namespace id3v2
                 static_assert(std::is_integral<T1>::value, "second and third parameters should be integers");
                 static_assert(std::is_unsigned<T2>::value, "num of elements must be unsigned");
 
-                std::string obj(buffer.data(), end);
+                std::string obj(reinterpret_cast<const char*>(buffer.data()), end);
 
                 return obj.substr(start, (end - start));
             } else {
@@ -218,7 +220,7 @@ namespace id3v2
             return n;
         }
 
-    std::optional<uint32_t> GetTagSize(const std::vector<char>& buffer)
+    std::optional<uint32_t> GetTagSize(const UCharVec& buffer)
     {
         using paire = std::pair<uint32_t, uint32_t>;
 
@@ -266,21 +268,21 @@ namespace id3v2
 #endif
     }
 
-    std::optional<uint32_t> GetHeaderAndTagSize(const std::vector<char>& buffer)
+    std::optional<uint32_t> GetHeaderAndTagSize(const UCharVec& buffer)
     {
         return mbind(GetTagSize(buffer), [=](const uint32_t Tagsize){
                 return (Tagsize + GetHeaderSize<uint32_t>());
                 });
     }
 
-    const auto GetTagSizeExclusiveHeader(const std::vector<char>& buffer)
+    const auto GetTagSizeExclusiveHeader(const UCharVec& buffer)
     {
         return mbind(GetTagSize(buffer), [](const int tag_size){
                 return tag_size - GetHeaderSize<uint32_t>();}
                 );
     }
 
-    std::optional<std::vector<char>> GetHeader(const std::string& FileName )
+    std::optional<UCharVec> GetHeader(const std::string& FileName )
     {
         const auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>());
 
@@ -291,7 +293,7 @@ namespace id3v2
         return val;
     }
 
-    const std::optional<std::string> GetTagArea(const std::vector<char>& buffer)
+    const std::optional<std::string> GetTagArea(const UCharVec& buffer)
     {
         return  GetHeaderAndTagSize(buffer)
             | [&](uint32_t tagSize)
@@ -309,7 +311,7 @@ namespace id3v2
             return id3Type::tag_names;
         };
 
-    const std::optional<std::string> GetID3FileIdentifier(const std::vector<char>& buffer)
+    const std::optional<std::string> GetID3FileIdentifier(const UCharVec& buffer)
     {
         constexpr auto FileIdentifierStart = 0;
         constexpr auto FileIdentifierEnd = 3;
@@ -324,7 +326,7 @@ namespace id3v2
 #endif
     }
 
-    const std::optional<std::string> GetID3Version(const std::vector<char>& buffer)
+    const std::optional<std::string> GetID3Version(const UCharVec& buffer)
     {
         constexpr auto kID3IndexStart = 4;
         constexpr auto kID3VersionBytesLength = 2;

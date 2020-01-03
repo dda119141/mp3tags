@@ -13,7 +13,7 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
     const auto ret = 
             id3v2::GetHeader(filename)
             | id3v2::check_for_ID3
-            | [](const std::vector<char>& buffer)
+            | [](const std::vector<unsigned char>& buffer)
             {
                 return id3v2::GetID3Version(buffer);
             }

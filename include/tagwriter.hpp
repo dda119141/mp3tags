@@ -15,7 +15,7 @@ bool SetTag(const std::string& filename,
     const auto ret =
         id3v2::GetHeader(filename)
         | id3v2::check_for_ID3
-        | [](const std::vector<char>& buffer)
+        | [](const std::vector<unsigned char>& buffer)
         {
             return id3v2::GetID3Version(buffer);
         }
@@ -50,7 +50,7 @@ bool SetTag(const std::string& filename,
                         const auto ret1 = obj.SetTag(content, tagLoc);
                         return(
                                 ret1 |
-                                [&obj](const std::vector<char>& buf)
+                                [&obj](const std::vector<unsigned char>& buf)
                                 {
                                 return obj.ReWriteFile(buf);
                                 });

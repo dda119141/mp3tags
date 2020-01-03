@@ -31,7 +31,7 @@ void print_header_infos(const std::string& filename)
 
     auto buffer = id3v2::GetHeader(filename);
 
-    int res = buffer | [](const std::vector<char>& buff)
+    int res = buffer | [](const std::vector<unsigned char>& buff)
     {
         std::for_each(buff.cbegin(), buff.cend(), [](const char& n) { std::cout << std::hex << (int)n << ' '; });
         cout << endl;
@@ -40,7 +40,7 @@ void print_header_infos(const std::string& filename)
 
     assert(res == 0);
 
-    int resi = buffer | [](const std::vector<char>& buff)
+    int resi = buffer | [](const std::vector<unsigned char>& buff)
     {
         cout << "file identifier: " << id3v2::GetID3FileIdentifier(buff).value() << endl;
         cout << "version: " << id3v2::GetID3Version(buff).value() << endl;
@@ -74,8 +74,8 @@ int main() {
     {
         using namespace boost::locale::conv;
         std::ofstream obj("out.bin", std::ios::binary);
-        std::vector<char> obj1 = {0x74, 0x00, 0x65, 0x0, 0x73, 0x00, 0x74, 0x00, 0x31};
-        //std::vector<char> obj2 = {0x72, 0x00, 0x72, 0x0, 0x7A, 0x00, 0x7A};
+        UCharVec obj1 = {0x74, 0x00, 0x65, 0x0, 0x73, 0x00, 0x74, 0x00, 0x31};
+        //UCharVec obj2 = {0x72, 0x00, 0x72, 0x0, 0x7A, 0x00, 0x7A};
         std::string exc1 = "test1";
         //std::string exc1(obj1.data(), 9);
 

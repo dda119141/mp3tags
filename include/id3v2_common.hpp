@@ -21,10 +21,11 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 namespace id3v2
 {
     using iD3Variant = std::variant <id3v2::v00, id3v2::v30, id3v2::v40>;
+    using UCharVec = std::vector<unsigned char>;
 
 
     template <typename T>
-        std::optional<T> GetFrameSize(const std::vector<char>& buff, 
+        std::optional<T> GetFrameSize(const UCharVec& buff, 
                 const iD3Variant& TagVersion, uint32_t TagIndex)
         {
             return std::visit(overloaded {
@@ -55,7 +56,7 @@ namespace id3v2
                 }, TagVersion);
     }
 
-    std::optional<std::vector<char>> check_for_ID3(const std::vector<char>& buffer)
+    std::optional<UCharVec> check_for_ID3(const UCharVec& buffer)
     {
         auto tag = id3v2::GetID3FileIdentifier(buffer);
         if (tag != "ID3") {
@@ -67,7 +68,7 @@ namespace id3v2
         }
     }
     template <typename T>
-        T getTagPosFromEncodeByte(const std::vector<char>& buff, uint32_t tagOffset, uint32_t FrameSize)
+        T getTagPosFromEncodeByte(const UCharVec& buff, uint32_t tagOffset, uint32_t FrameSize)
         {
             switch(buff[tagOffset]){
                 case 0x1:{
@@ -124,7 +125,7 @@ namespace id3v2
                         };
                 }
 
-                std::optional<bool> ReWriteFile(const std::vector<char>& cBuffer)
+                std::optional<bool> ReWriteFile(const UCharVec& cBuffer)
                 {
                     std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
                     std::ofstream filWrite(FileName + ".mod", std::ios::binary | std::ios::app);
@@ -135,13 +136,13 @@ namespace id3v2
                         return {};
                     }
 
-                    std::vector<char> bufRead;
+                    UCharVec bufRead;
 
                     const unsigned int dataSize = filRead.tellg();
 
                     filRead.seekg(0);
                     bufRead.reserve(dataSize);
-                    filRead.read(&bufRead[0], dataSize);
+                    filRead.read(reinterpret_cast<char*>(&bufRead[0]), dataSize);
 
                     assert(cBuffer.size() <  dataSize);
 
@@ -158,7 +159,7 @@ namespace id3v2
                     return true;
                 }
 
-                std::optional<std::vector<char>> SetTag(std::string_view content, const TagInfos& tagLoc)
+                std::optional<UCharVec> SetTag(std::string_view content, const TagInfos& tagLoc)
                 {
                     assert (tagLoc.getLength() >= content.size());
 
@@ -179,7 +180,7 @@ namespace id3v2
                             },
 
                             [&](std::u16string arg) {
-                            std::string_view wcont = tagBase::getW16StringFromLatin<std::vector<char>>(content);
+                            std::string_view wcont = tagBase::getW16StringFromLatin<UCharVec>(content);
 
                             return prepareTagToWrite<std::string_view>(wcont, tagLoc);
                             },
@@ -194,12 +195,12 @@ namespace id3v2
                 }
 
                 template <typename T>
-                    std::optional<std::vector<char>> prepareTagToWrite(T content, const TagInfos& tagLoc)
+                    std::optional<UCharVec> prepareTagToWrite(T content, const TagInfos& tagLoc)
                     {
                         assert(tagLoc.getLength() >= content.size());
 
                         const auto res = buffer
-                            | [&](std::vector<char>& buffer)
+                            | [&](UCharVec& buffer)
                             {
                                 const auto PositionTagStart = tagLoc.getStartPos();
 
@@ -236,7 +237,7 @@ namespace id3v2
                     uint32_t FrameSize = 0;
 
                     const auto ret = buffer
-                        | [](const std::vector<char>& buffer)
+                        | [](const UCharVec& buffer)
                         {
                             return GetTagArea(buffer);
                         }
@@ -255,7 +256,7 @@ namespace id3v2
                         std::cout << "tag index " << TagIndex << std::endl;
 #endif
                         return buffer
-                            | [&TagIndex, &TagVersion](const std::vector<char>& buff)
+                            | [&TagIndex, &TagVersion](const UCharVec& buff)
                             {
                                 return GetFrameSize<uint32_t>(buff, TagVersion, TagIndex);
                             }
@@ -267,7 +268,7 @@ namespace id3v2
                             assert(tagOffset > 0);
 
                             return buffer
-                                | [&](const std::vector<char>& buff)
+                                | [&](const UCharVec& buff)
                                 {
                                     if(tag.find_first_of("T") == 0) // if tag starts with T
                                     {
@@ -290,7 +291,7 @@ namespace id3v2
                         std::cout << "eract tag index " << tagLoc.value().getStartPos() << std::endl;
 #endif
                     const auto res = buffer
-                        | [=](const std::vector<char>& buff)
+                        | [=](const UCharVec& buff)
                         {
                             return tagLoc
                                 | [&](const TagInfos& TagLoc)
@@ -306,7 +307,7 @@ namespace id3v2
             private:
                 //  std::once_flag m_once;
                 const std::string& FileName;
-                std::optional<std::vector<char>> buffer;
+                std::optional<UCharVec> buffer;
         };
 
     template <typename id3Type>
