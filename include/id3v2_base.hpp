@@ -22,16 +22,19 @@ namespace id3v2
     class TagInfos
     {
         public:
-            TagInfos(uint32_t StartPos, uint32_t Length):
+            TagInfos(uint32_t StartPos, uint32_t Length, 
+                    uint32_t _encodeFlag = 0, uint32_t _doSwap = 0):
                 startPos(StartPos)
                 ,length(Length)
-                ,encodeFlag(0)
+                ,encodeFlag(_encodeFlag)
+                ,doSwap(_doSwap)
             {
             }
             TagInfos():
                 startPos(0)
                 ,length(0)
                 ,encodeFlag(0)
+                ,doSwap(0)
              {
              }
 
@@ -47,16 +50,16 @@ namespace id3v2
             {
                 return encodeFlag;
             }
-            void doEncode(bool val)
+            void doEncode(uint32_t val)
             {
-                if(val)
-                    encodeFlag = 0x1;
+                encodeFlag = val;
             }
         private:
             // TagInfos() = delete;
             uint32_t startPos;
             uint32_t length;
             uint32_t encodeFlag;
+            uint32_t doSwap;
     };
 };
 

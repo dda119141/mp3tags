@@ -36,29 +36,27 @@ namespace tagBase
     template<typename type>
         std::string getW16StringFromLatin(std::string_view val)
         {
+#ifndef __OLD
+
+            std::string val_str = std::string(val);
+            return (std::accumulate(val_str.begin() + 1, val_str.end(), val_str.substr(0, 1),
+                    [](std::string arg, char ber)
+                    { return arg + '\0' + ber;}
+                    ) + '\0'
+                   );
+#else
+//e.g type = std::vector<char>
             type data;
 
             const uint32_t len = val.length() * 2;
 
             for(uint32_t i=0; i < len; i+=2){
-                data.push_back(val[i/2]);
+                data.push_back(static_cast<unsigned char>(val[i/2]));
                 data.push_back(0x0);
             }
 
             return std::string(&data[0], len);
-        }
-
-    template<typename type>
-        type getW16FromLatin(std::string_view val)
-        {
-            type data;
-
-            data.reserve(val.length());
-
-            for(auto i=0; i < val.length(); i++)
-                data.push_back(static_cast<unsigned char>(val[i]));
-
-            return data;
+#endif
         }
 
 }; // tagBase namespace
