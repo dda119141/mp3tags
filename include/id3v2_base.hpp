@@ -48,14 +48,8 @@ namespace id3v2
             {
                 return length;
             }
-            const uint32_t getEncodingValue() const
-            {
-                return encodeFlag;
-            }
-            void doEncode(uint32_t val)
-            {
-                encodeFlag = val;
-            }
+            const uint32_t getEncodingValue() const { return encodeFlag; }
+            const uint32_t getSwapValue() const { return doSwap; }
         private:
             // TagInfos() = delete;
             uint32_t startPos;

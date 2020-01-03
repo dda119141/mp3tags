@@ -86,21 +86,18 @@ namespace id3v2
                              return tagLoc;
                              break;
                          }
-                case 0x2:{
-                             T tagLoc(tagOffset, FrameSize);
-                             tagLoc.doEncode(0x02);
+                case 0x2:{ /* UTF-16BE [UTF-16] encoded Unicode [UNICODE] without BOM */
+                             const T tagLoc(tagOffset, FrameSize, 0x02);
                              return tagLoc;
                              break;
                          }
-                case 0x3:{
-                             T tagLoc(tagOffset + 3, FrameSize - 3);
-                             tagLoc.doEncode(0x03);
+                case 0x3:{ /* UTF-8 [UTF-8] encoded Unicode [UNICODE]. Terminated with $00 */
+                             const T tagLoc(tagOffset + 3, FrameSize - 3, 0x03);
                              return tagLoc;
                              break;
                          }
                 default:{
                             T tagLoc(tagOffset, FrameSize);
-                            tagLoc.doEncode(0x0);
                             return tagLoc;
                             break;
                         }
@@ -180,9 +177,16 @@ namespace id3v2
                             },
 
                             [&](std::u16string arg) {
-                            std::string_view wcont = tagBase::getW16StringFromLatin<UCharVec>(content);
 
-                            return prepareTagToWrite<std::string_view>(wcont, tagLoc);
+                            if(tagLoc.getSwapValue() == 0x01){
+                                std::string_view val = tagBase::getW16StringFromLatin<UCharVec>(content);
+                                std::string_view wcont = tagBase::swapW16String(val);
+
+                                return prepareTagToWrite<std::string_view>(wcont, tagLoc);
+                            }else{
+                                std::string_view wcont = tagBase::getW16StringFromLatin<UCharVec>(content);
+                                return prepareTagToWrite<std::string_view>(wcont, tagLoc);
+                            }
                             },
 
                             [&](std::string arg) {
@@ -191,7 +195,7 @@ namespace id3v2
                             return prepareTagToWrite<std::string_view>(wcont, tagLoc);
                             },
 
-                            }, varEncode);
+                    }, varEncode);
                 }
 
                 template <typename T>
@@ -286,18 +290,25 @@ namespace id3v2
                 const std::optional<type> extractTag(std::string_view tag, const iD3Variant& TagVersion)
                 {
                     const std::optional<TagInfos> tagLoc = findTagInfos(tag, TagVersion);
-#if 0
-                    if (tagLoc.has_value())
-                        std::cout << "eract tag index " << tagLoc.value().getStartPos() << std::endl;
-#endif
+
                     const auto res = buffer
                         | [=](const UCharVec& buff)
                         {
                             return tagLoc
                                 | [&](const TagInfos& TagLoc)
                                 {
-                                    return ExtractString<uint32_t, uint32_t>(buff, TagLoc.getStartPos(),
+                                    const auto val =  ExtractString<uint32_t, uint32_t>(buff, TagLoc.getStartPos(),
                                             TagLoc.getStartPos() + TagLoc.getLength());
+
+                                    return val
+                                        | [&TagLoc](const std::string& val_str)
+                                        {
+                                            if(TagLoc.getSwapValue() == 0x01){
+                                                return tagBase::swapW16String(std::string_view(val_str));
+                                            }else{
+                                                return val_str;
+                                            }
+                                        };
                                 };
                         };
                     return res;

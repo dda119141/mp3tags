@@ -59,6 +59,21 @@ namespace tagBase
 #endif
         }
 
+    std::string swapW16String(std::string_view val)
+    {
+        std::string val_str = std::string(val);
+
+        if (std::distance(val_str.begin(), val_str.end()) % 2 != 0)
+            val_str += '\0';
+
+        auto it = val_str.begin();
+        while(it < val_str.end()){
+            std::swap(*it, *(it + 1));
+            it += 2;
+        }
+
+        return val_str;
+    }
 }; // tagBase namespace
 
 
