@@ -17,6 +17,8 @@
 #include <range/v3/action/transform.hpp>
 #include <range/v3/view/filter.hpp>
 
+#include <result.hpp>
+
 namespace id3v2
 {
     using UCharVec = std::vector<unsigned char>;
@@ -32,7 +34,7 @@ namespace id3v2
                 ,doSwap(_doSwap)
             {
             }
-#if 0
+#if 1
             TagInfos():
                 startPos(0)
                 ,length(0)
@@ -40,6 +42,7 @@ namespace id3v2
                 ,doSwap(0)
              { }
 #endif
+
             const uint32_t getStartPos() const
             {
                 return startPos;
@@ -60,15 +63,18 @@ namespace id3v2
 };
 
 template <typename T, typename F>
-auto mbind(std::optional<T> obj, F&& function)
-    -> decltype(function(obj.value()))
+auto mbind(std::optional<T>&& _obj, F&& function)
+    -> decltype(function(_obj.value()))
 {
     auto fuc = std::forward<F>(function);
+    auto obj = std::forward<std::optional<T>>(_obj);
+
     if(obj.has_value()){
         return fuc(obj.value());
     }
     else{
         return {};
+        //return std::nullopt;
     }
 }
 
@@ -87,10 +93,18 @@ template <typename T,
         || std::is_same<std::decay_t<T>, std::optional<id3v2::TagInfos>>::value
         || std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value) >
     , typename F >
- auto operator | (T&& obj, F&& Function)
--> decltype(Function(obj.value()))
+ auto operator | (T&& _obj, F&& Function)
+    -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value()))
 {
-     return mbind(std::forward<T>(obj), Function);
+    auto fuc = std::forward<F>(Function);
+    auto obj = std::forward<T>(_obj);
+
+    if(obj.has_value()){
+        return fuc(obj.value());
+    }
+    else{
+        return {};
+    }
 }
 
 template <typename T>
@@ -120,7 +134,6 @@ std::optional<id3v2::UCharVec> GetStringFromFile(const std::string& FileName, ui
 
 namespace id3v2
 {
-
     template <typename T>
         const auto GetValFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
         {

@@ -14,10 +14,6 @@
 #include <string_conversion.hpp>
 
 
-
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
 namespace id3v2
 {
     using iD3Variant = std::variant <id3v2::v00, id3v2::v30, id3v2::v40>;
@@ -78,26 +74,26 @@ namespace id3v2
                                      doSwap = 1;
                              }
 
-                             const T tagLoc(tagOffset + 3
+                             const T tagLoc{tagOffset + 3
                                      , FrameSize - 3
                                      , 0x01 /* doEncode */
                                      , doSwap /* doSwap */
-                                     );
+                             };
                              return tagLoc;
                              break;
                          }
                 case 0x2:{ /* UTF-16BE [UTF-16] encoded Unicode [UNICODE] without BOM */
-                             const T tagLoc(tagOffset, FrameSize, 0x02);
+                             const T tagLoc{tagOffset, FrameSize, 0x02};
                              return tagLoc;
                              break;
                          }
                 case 0x3:{ /* UTF-8 [UTF-8] encoded Unicode [UNICODE]. Terminated with $00 */
-                             const T tagLoc(tagOffset + 3, FrameSize - 3, 0x03);
+                             const T tagLoc{tagOffset + 3, FrameSize - 3, 0x03};
                              return tagLoc;
                              break;
                          }
                 default:{
-                            T tagLoc(tagOffset, FrameSize);
+                            T tagLoc{tagOffset, FrameSize};
                             return tagLoc;
                             break;
                         }
@@ -269,26 +265,31 @@ namespace id3v2
                 {
                     uint32_t FrameSize = 0;
 
-                    const std::optional<TagInfos> ret = buffer
-                        | [](const UCharVec& buffer)
+                    const auto ret = buffer
+                        | [](const UCharVec& buffer) -> std::optional<std::string>
+
                         {
                             return GetTagArea(buffer);
                         }
-                    | [&tag](const std::string& tagArea)
+                    | [&tag](const std::string& tagArea) -> std::optional<uint32_t>
                     {
                         auto searchTagPosition = search_tag<std::string_view>(tagArea);
 #ifndef DEBUG
                         std::cout << "tag name " << tag << std::endl;
 #endif
                         const auto ret =  searchTagPosition(tag);
-                     if(ret.has_value()){
-                        std::cerr << "** Ret has value!!: \n";
-                    }
-                     return ret;
 
+                        if(ret.has_value()){
+                            return ret;
+                        }else{
+                            return 0;
+                        }
                     }
-                    | [&](uint32_t TagIndex)
+                    | [&](uint32_t TagIndex) -> std::optional<TagInfos>
                     {
+                        if(TagIndex == 0)
+                            return {};
+
                         assert(TagIndex >= GetHeaderSize<uint32_t>());
 #ifndef DEBUG
                         std::cout << "tag index " << TagIndex << std::endl;
@@ -298,7 +299,7 @@ namespace id3v2
                             {
                                 return GetFrameSize<uint32_t>(buff, TagVersion, TagIndex);
                             }
-                        | [&](uint32_t frameSize)
+                        | [&](uint32_t frameSize) -> std::optional<TagInfos>
                         {
                             const uint32_t tagOffset = TagIndex + GetFrameHeaderSize(TagVersion);
                             FrameSize = frameSize;

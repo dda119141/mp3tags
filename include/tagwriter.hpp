@@ -41,30 +41,17 @@ bool SetTag(const std::string& filename,
                     }
 
                     id3v2::TagReadWriter<std::string_view> obj(filename);
-
                     std::optional<id3v2::TagInfos> locs = obj.findTagInfos(tag.second, tagVersion);
                     if(locs.has_value())
                     {
-                        const auto &tagLoc = locs.value();
-
-#ifndef WRITE_NEW_FILE
+                        const id3v2::TagInfos& tagLoc = locs.value();
                         std::string_view tag_str = obj.prepareTagContent(content, tagLoc);
-
                         return obj.WriteFile(tag_str, tagLoc);
-#else
-                        const auto ret1 = obj.prepareBufferWithNewTagContent(content, tagLoc);
-                        return(
-                                ret1 |
-                                [&obj, &content, &tagLoc](const std::vector<unsigned char>& buf)
-                                {
-                                return obj.ReWriteFile(buf);
-                                });
-#endif
                     }
                     else{
-                        std::cerr << "Tag slot not found" << std::endl;
                         return std::optional<bool>(false);
                     }
+
                 }
             }
 
