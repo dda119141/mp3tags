@@ -104,9 +104,9 @@ int main() {
     {
         const std::string filename = filen.path().string();
 
-        cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
+//        cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
+        cout <<"file: " << filename <<  " Composer: " << GetComposer(filename) << endl;
 #if 0
-        cout << "Composer: " << GetComposer(filename) << endl;
         cout << "Date: " << GetDate(filename) << endl;
         cout << "Year: " << GetYear(filename) << endl;
         cout << "Text writer: " << GetTextWriter(filename) << endl;

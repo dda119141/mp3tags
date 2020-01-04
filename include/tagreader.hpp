@@ -47,6 +47,7 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
             };
 
     if(!ret.has_value()){
+        std::cout << "final Tag not found\n";
         return "Tag not found";
     }else{
 

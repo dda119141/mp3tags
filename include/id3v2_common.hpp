@@ -122,6 +122,30 @@ namespace id3v2
                         };
                 }
 
+                std::optional<bool> WriteFile(std::string_view content, const TagInfos& tagLoc)
+                {
+                    std::fstream filWrite(FileName, std::ios::binary | std::ios::in | std::ios::out);
+
+                    if(!filWrite.is_open())
+                    {
+                        std::cerr << "Error opening file: " << FileName << std::endl;
+                        return {};
+                    }
+
+                    filWrite.seekp(tagLoc.getStartPos());
+
+                    std::for_each(content.begin(), content.end(), [&filWrite](const char& n)
+                            {
+                            filWrite << n;
+                            });
+
+                    for (uint32_t i = 0; i < (tagLoc.getLength() - content.size()); ++i){
+                            filWrite << '\0';
+                    }
+
+                    return true;;
+                }
+
                 std::optional<bool> ReWriteFile(const UCharVec& cBuffer)
                 {
                     std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
@@ -156,46 +180,51 @@ namespace id3v2
                     return true;
                 }
 
-                std::optional<UCharVec> SetTag(std::string_view content, const TagInfos& tagLoc)
+                std::string prepareTagContent(std::string_view content, const TagInfos& tagLoc)
                 {
                     assert (tagLoc.getLength() >= content.size());
 
-                    std::variant<std::string_view, std::u16string, std::string> varEncode;
+                    std::variant<std::string_view, std::u16string, std::u32string> varEncode;
 
                     if(tagLoc.getEncodingValue() == 0x01){
                         varEncode = std::u16string();
                     }else if (tagLoc.getEncodingValue() == 0x02){ //unicode without BOM
                         varEncode = std::string_view("");
                     }else if (tagLoc.getEncodingValue() == 0x03){ //UTF8 unicode
-                        varEncode = std::string("");
+                        varEncode = std::u32string();
                     }
 
                     return std::visit(overloaded {
 
                             [&](std::string_view arg) {
-                            return prepareTagToWrite<std::string_view>(content, tagLoc);
+                            return std::string(content);
                             },
 
                             [&](std::u16string arg) {
 
                             if(tagLoc.getSwapValue() == 0x01){
                                 std::string_view val = tagBase::getW16StringFromLatin<UCharVec>(content);
-                                std::string_view wcont = tagBase::swapW16String(val);
-
-                                return prepareTagToWrite<std::string_view>(wcont, tagLoc);
+                                return tagBase::swapW16String(val);
                             }else{
-                                std::string_view wcont = tagBase::getW16StringFromLatin<UCharVec>(content);
-                                return prepareTagToWrite<std::string_view>(wcont, tagLoc);
+                                return tagBase::getW16StringFromLatin<UCharVec>(content);
                             }
                             },
 
-                            [&](std::string arg) {
-                            std::string_view wcont = std::string(content) + '\0';
+                            [&](std::u32string arg) {
+                            return std::string(content) + '\0';
 
-                            return prepareTagToWrite<std::string_view>(wcont, tagLoc);
                             },
 
                     }, varEncode);
+                }
+
+                std::optional<UCharVec> prepareBufferWithNewTagContent(std::string_view content, const TagInfos& tagLoc)
+                {
+                    assert (tagLoc.getLength() >= content.size());
+
+                    std::string_view tag_str = prepareTagContent(content, tagLoc);
+
+                    return prepareTagToWrite<std::string_view>(tag_str, tagLoc);
                 }
 
                 template <typename T>
@@ -240,7 +269,7 @@ namespace id3v2
                 {
                     uint32_t FrameSize = 0;
 
-                    const auto ret = buffer
+                    const std::optional<TagInfos> ret = buffer
                         | [](const UCharVec& buffer)
                         {
                             return GetTagArea(buffer);
@@ -248,15 +277,20 @@ namespace id3v2
                     | [&tag](const std::string& tagArea)
                     {
                         auto searchTagPosition = search_tag<std::string_view>(tagArea);
-#ifdef DEBUG
+#ifndef DEBUG
                         std::cout << "tag name " << tag << std::endl;
 #endif
-                        return searchTagPosition(tag);
+                        const auto ret =  searchTagPosition(tag);
+                     if(ret.has_value()){
+                        std::cerr << "** Ret has value!!: \n";
+                    }
+                     return ret;
+
                     }
                     | [&](uint32_t TagIndex)
                     {
                         assert(TagIndex >= GetHeaderSize<uint32_t>());
-#ifdef DEBUG
+#ifndef DEBUG
                         std::cout << "tag index " << TagIndex << std::endl;
 #endif
                         return buffer
@@ -269,6 +303,9 @@ namespace id3v2
                             const uint32_t tagOffset = TagIndex + GetFrameHeaderSize(TagVersion);
                             FrameSize = frameSize;
 
+#ifndef DEBUG
+                            std::cout << "tag offset " << tagOffset << " FrameSize: " << FrameSize << std::endl;
+#endif
                             assert(tagOffset > 0);
 
                             return buffer
@@ -284,19 +321,22 @@ namespace id3v2
                         };
                     };
 
+                    if(ret.has_value()){
+                        std::cerr << "Ret has value!!: " << ret.value().getStartPos() << "\n";
+                    }
+
                     return ret;
                 }
 
                 const std::optional<type> extractTag(std::string_view tag, const iD3Variant& TagVersion)
                 {
-                    const std::optional<TagInfos> tagLoc = findTagInfos(tag, TagVersion);
-
                     const auto res = buffer
                         | [=](const UCharVec& buff)
                         {
-                            return tagLoc
+                            return findTagInfos(tag, TagVersion)
                                 | [&](const TagInfos& TagLoc)
                                 {
+                                    std::cout << "** tag offset " << TagLoc.getStartPos() << " FrameSize: " << TagLoc.getLength() << std::endl;
                                     const auto val =  ExtractString<uint32_t, uint32_t>(buff, TagLoc.getStartPos(),
                                             TagLoc.getStartPos() + TagLoc.getLength());
 

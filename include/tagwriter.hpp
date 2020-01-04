@@ -47,19 +47,24 @@ bool SetTag(const std::string& filename,
                     {
                         const auto &tagLoc = locs.value();
 
-                        const auto ret1 = obj.SetTag(content, tagLoc);
+#ifndef WRITE_NEW_FILE
+                        std::string_view tag_str = obj.prepareTagContent(content, tagLoc);
+
+                        return obj.WriteFile(tag_str, tagLoc);
+#else
+                        const auto ret1 = obj.prepareBufferWithNewTagContent(content, tagLoc);
                         return(
                                 ret1 |
-                                [&obj](const std::vector<unsigned char>& buf)
+                                [&obj, &content, &tagLoc](const std::vector<unsigned char>& buf)
                                 {
                                 return obj.ReWriteFile(buf);
                                 });
+#endif
                     }
                     else{
                         std::cerr << "Tag slot not found" << std::endl;
                         return std::optional<bool>(false);
                     }
-
                 }
             }
 
@@ -128,6 +133,30 @@ bool SetTextWriter(const std::string& filename, std::string_view content)
         {"0x0400", "TEXT"},
         {"0x0300", "TEXT"},
         {"0x0000", "TXT"},
+    };
+
+    return SetTag(filename, tags, content);
+}
+
+bool GetFileType(const std::string& filename, std::string_view content)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TFLT"},
+        {"0x0300", "TFLT"},
+        {"0x0000", "TFT"},
+    };
+
+    return SetTag(filename, tags, content);
+}
+
+bool GetTitle(const std::string& filename, std::string_view content)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TIT2"},
+        {"0x0300", "TIT2"},
+        {"0x0000", "TT2"},
     };
 
     return SetTag(filename, tags, content);

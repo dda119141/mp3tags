@@ -32,14 +32,14 @@ namespace id3v2
                 ,doSwap(_doSwap)
             {
             }
+#if 0
             TagInfos():
                 startPos(0)
                 ,length(0)
                 ,encodeFlag(0)
                 ,doSwap(0)
-             {
-             }
-
+             { }
+#endif
             const uint32_t getStartPos() const
             {
                 return startPos;
@@ -177,7 +177,10 @@ namespace id3v2
     template <typename T1, typename T2>
         const std::optional<std::string> ExtractString(const UCharVec& buffer, T1 start, T1 end)
         {
-            assert(end > start);
+            //if(end < start){
+                std::cerr << __func__ << " error start: " << start << " end: " << end << std::endl;
+            //}
+           // assert(end > start);
 
             if(buffer.size() >= end) {
                 static_assert(std::is_integral<T1>::value, "second and third parameters should be integers");
@@ -348,8 +351,9 @@ namespace id3v2
                 if(it != mTagArea.cend()){
                     return (it - mTagArea.cbegin());
                 }else{
-                    //            std::cout << "tag: "  << tag << " not found" << std::endl;
-                    return {};
+                    std::cerr << "tag: "  << tag << " not found" << std::endl;
+                    //return {};
+                    return std::nullopt;
                 }
             }
         };
