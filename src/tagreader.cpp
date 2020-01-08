@@ -31,7 +31,7 @@ void print_header_infos(const std::string& filename)
 
     auto buffer = id3v2::GetHeader(filename);
 
-    int res = buffer || [](const std::vector<unsigned char>& buff)
+    int res = buffer | [](const std::vector<unsigned char>& buff) -> int
     {
         std::for_each(buff.cbegin(), buff.cend(), [](const char& n) { std::cout << std::hex << (int)n << ' '; });
         cout << endl;
@@ -40,17 +40,16 @@ void print_header_infos(const std::string& filename)
 
     assert(res == 0);
 
-    int resi = buffer || [](const std::vector<unsigned char>& buff)
+    buffer | [](const std::vector<unsigned char>& buff)
     {
         cout << "file identifier: " << id3v2::GetID3FileIdentifier(buff).value() << endl;
         cout << "version: " << id3v2::GetID3Version(buff).value() << endl;
         cout << "Tag size: " << std::dec << id3v2::GetTagSize(buff).value() << endl;
         cout << "HeaderTag size: " << std::dec << id3v2::GetHeaderAndTagSize(buff).value() << endl;
 
-        return 0;
+        return;
     };
 
-    assert(resi == 0);
 }
 
 int main() {

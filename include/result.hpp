@@ -155,6 +155,7 @@ namespace expected {
             }
     }
 #endif
+#if 0
     template <typename T, typename E, typename Transform,
             typename Ret = typename std::result_of<Transform(T)>::type>
         Ret operator | (expected::Result_t<T, E>&& r, Transform f)
@@ -170,12 +171,12 @@ namespace expected {
                // return Ret();
             }
     }
+#endif
 
     template <typename T, typename E, typename Transform,
-            typename Ret = typename std::result_of<Transform(T)>::type,
-            typename = std::enable_if_t<not std::is_integral<Ret>::value>> 
-
-        Ret operator | (const expected::Result_t<T, E>& r, Transform f)
+            typename Ret = typename std::result_of<Transform(T)>::type>
+        auto operator | (const expected::Result_t<T, E>& r, Transform f)
+            -> typename std::enable_if_t<not std::is_integral<Ret>::value && not std::is_void<Ret>::value, Ret>
     {
             auto fuc = std::forward<Transform>(f);
 
@@ -187,10 +188,10 @@ namespace expected {
             }
      }
 
-    template <typename T, typename E, typename Transform,
-            typename Ret = typename std::result_of<Transform(T)>::type,
-            typename = std::enable_if_t<std::is_integral<Ret>::value> >
-        Ret operator || (const expected::Result_t<T, E>& r, Transform f)
+ template <typename T, typename E, typename Transform,
+            typename Ret = typename std::result_of<Transform(T)>::type>
+        auto operator | (const expected::Result_t<T, E>& r, Transform f)
+            -> typename std::enable_if_t<std::is_integral<Ret>::value, Ret>
     {
             auto fuc = std::forward<Transform>(f);
 
@@ -201,6 +202,19 @@ namespace expected {
             }
      }
 
+ template <typename T, typename E, typename Transform,
+            typename Ret = typename std::result_of<Transform(T)>::type>
+        auto operator | (const expected::Result_t<T, E>& r, Transform f)
+            -> typename std::enable_if_t<std::is_void<Ret>::value, Ret>
+    {
+            auto fuc = std::forward<Transform>(f);
+
+            if (r.has_value()) {
+                return fuc(r.value());
+            } else {
+                return;
+            }
+     }
 
 
 }  // namespace expected
