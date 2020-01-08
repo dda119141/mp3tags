@@ -1,128 +1,251 @@
-/**
- * Copyright Soramitsu Co., Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #ifndef TAGBASE_RESULT_HPP
 #define TAGBASE_RESULT_HPP
 
+#include <type_traits>
+#include <functional>
 #include <optional>
 #include <variant>
 
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
- 
-/*
- * Result is a type which represents value or an error, and values and errors
- * are template parametrized. Working with value wrapped in result is done using
- * match() function, which accepts 2 functions: for value and error cases. No
- * accessor functions are provided.
- */
 
-namespace tagBase {
+namespace expected {
 
-    /*
-     * Value and error types can be constructed from any value or error, if
-     * underlying types are constructible. Example:
-     *
-     * @code
-     * Value<std::string> v = Value<const char *>("hello");
-     * @nocode
-     */
+    using uChar = std::vector<unsigned char>;
+    template <typename T, typename E>
+        class Result_t {
+            public:
+                Result_t()
+                {
+                }
+
+                auto moveError(const E& error) {
+                    //m_error = std::move(E(std::forward<E>(error)));
+                    m_error = std::move(error);
+                    m_value = {};
+
+                    return *this;
+                }
+
+                auto moveValue(const T& value) {
+                    m_value = std::move(value);
+                    m_error = {};
+
+                    return *this;
+                }
+
+                Result_t<T, E> operator()(const E& error)
+                {
+                    m_error = std::move(error);
+                    m_value = {};
+                    return *this;
+                }
+
+               bool has_value() const { return m_value.has_value(); }
+
+                bool has_error() const { return m_error.has_value(); }
+
+                T value() const {
+                    if (m_value.has_value())
+                        return m_value.value();
+                    else
+                        return {};
+                }
+
+                E error() const {
+                    if (m_error.has_value())
+                        return m_error.value();
+                    else
+                        return {};
+                }
+
+                template <typename V>
+                auto operator << (const V& error)
+                {
+                    std::stringstream ss;
+                    ss << error;
+                    if(m_error.has_value())
+                         m_error = m_error.value() +  ss.str();
+                    else
+                        m_error = ss.str();
+                    return *this;
+                }
+
+            private:
+                std::optional<E> m_error;
+                std::optional<T> m_value;
+        };
 
     template <typename T>
-    struct Value {
-      T value;
-      template <typename V>
-      operator Value<V>() {
-        return {value};
-      }
-    };
+        using Result = Result_t<T, std::string>;
 
-    template <>
-    struct Value<void> {};
+ template <typename T, typename E>
+        Result_t<T, E> makeError(const E& error) {
+            Result_t<T, E> obj;
+            obj.moveError(error);
+            return obj;
+        }
 
-    template <typename E>
-    struct Error {
-      E error;
-      template <typename V>
-      operator Error<V>() {
-        return {error};
-      }
-    };
+  template <typename T>
+        Result<T> makeError(const char* error) {
+            Result_t<T, std::string> obj;
+            obj.moveError(std::string(error));
+            return obj;
+        }
 
-    template <>
-    struct Error<void> {};
+  template <typename T>
+        Result<T> makeError() {
+            Result_t<T, std::string> obj;
+            obj.moveError(std::string("Error: "));
+            return obj;
+        }
+
+    template <typename T>
+        auto makeError(std::string_view error)
+        -> decltype(makeError<T, std::string_view>(std::forward<std::string_view>(error)))
+        {
+            return makeError<T, std::string_view>(std::forward<std::string_view>(error));
+        }
+
+    template <typename T, typename E>
+        Result_t<T, E> makeValue(T&& value) {
+            Result_t<T, E> obj;
+            obj.moveValue(std::forward<T>(value));
+            return obj;
+        }
+
+  template <typename T>
+        Result<T> makeValue(const T& value) {
+            Result_t<T, std::string> obj;
+            obj.moveValue(value);
+            return obj;
+        }
+
+
+    template <typename T, typename E>
+        std::string getOutput(const Result_t<T, E>& obj)
+        {
+            std::stringstream str_obj;
+            if(auto ret1 = std::get_if<T>(&obj)){
+                str_obj << *ret1;
+            }
+            else if(auto ret2 = std::get_if<E>(&obj)){
+                str_obj << *ret2;
+            }
+
+            str_obj << "\n";
+
+            return str_obj.str();
+        }
 
 #if 0
-    /**
-     * Result is a specialization of a variant type with value or error
-     * semantics.
-     * @tparam V type of value
-     * @tparam E error type
-     */
-    template <typename V, typename E>
-    class Result: public std::variant<Value<V>, Error<E>> {
+  template <typename T, typename E, typename Transform,
+            typename Ret = typename std::result_of<Transform(T)>::type,
+            typename std::enable_if_t<not std::is_object<Ret>::value> >
+        auto operator | (Result_t<T, E>&& r, Transform&& f)
+        -> decltype(std::forward<Transform>(f)(std::forward<Result_t<T, E>>(r).value()))
+    {
+            auto fuc = std::forward<Transform>(f);
+            auto obj = std::forward<Result_t<T, E> >(r);
 
-     public:
-      using ValueType = Value<V>;
-      using ErrorType = Error<E>;
-    };
+            if (obj.has_value()) {
+                return fuc(obj.value());
+            } else {
+                return;
+            }
+    }
 #endif
-    template <typename V, typename E>
-    using Result = std::variant<Value<V>, Error<E>>;
+    template <typename T, typename E, typename Transform,
+            typename Ret = typename std::result_of<Transform(T)>::type>
+        Ret operator | (expected::Result_t<T, E>&& r, Transform f)
+       // -> decltype(f(std::forward<expected::Result_t<T, E>>(r).value()))
+    {
+            auto fuc = std::forward<Transform>(f);
+            auto obj = std::forward<expected::Result_t<T, E> >(r);
 
-    template <typename ResultType>
-    using ValueOf = typename ResultType::ValueType;
-    template <typename ResultType>
-    using ErrorOf = typename ResultType::ErrorType;
-
-    // Factory methods for avoiding type specification
-    template <typename T>
-    Value<T> makeValue(T &&value) {
-      return Value<T>{std::forward<T>(value)};
+            if (obj.has_value()) {
+                return fuc(obj.value());
+            } else {
+                return Ret()(obj.error());
+               // return Ret();
+            }
     }
 
-    template <typename E>
-    Error<E> makeError(E &&error) {
-      return Error<E>{std::forward<E>(error)};
+    template <typename T, typename E, typename Transform,
+            typename Ret = typename std::result_of<Transform(T)>::type,
+            typename = std::enable_if_t<not std::is_integral<Ret>::value>> 
+
+        Ret operator | (const expected::Result_t<T, E>& r, Transform f)
+    {
+            auto fuc = std::forward<Transform>(f);
+
+            if (r.has_value()) {
+                return fuc(r.value());
+            } else {
+                return Ret()(r.error());
+               // return Ret();
+            }
+     }
+
+    template <typename T, typename E, typename Transform,
+            typename Ret = typename std::result_of<Transform(T)>::type,
+            typename = std::enable_if_t<std::is_integral<Ret>::value> >
+        Ret operator || (const expected::Result_t<T, E>& r, Transform f)
+    {
+            auto fuc = std::forward<Transform>(f);
+
+            if (r.has_value()) {
+                return fuc(r.value());
+            } else {
+                return 0;
+            }
+     }
+
+
+
+}  // namespace expected
+
+
+namespace expected
+{
+    using uChar = std::vector<unsigned char>;
+
+    Result<uChar> GetStringFromFile1(const std::string& FileName, uint32_t num )
+    {
+        std::ifstream fil(FileName);
+        std::vector<unsigned char> buffer(num, '0');
+
+        if(!fil.good()){
+            //std::cerr << "mp3 file could not be read\n";
+            //return {};
+            return makeError<uChar, std::string>("mp3 UUU file could not be read");
+        }
+
+        fil.read(reinterpret_cast<char*>(buffer.data()), num);
+
+        //return makeValue<uChar, std::string>(buffer);
+        return makeValue<uChar>(buffer);
     }
 
-    /**
-     * Bind operator allows chaining several functions which return result. If
-     * result contains error, it returns this error, if it contains value,
-     * function f is called.
-     * @param f function which return type must be compatible with original
-     * result
-     */
-    template <typename T, typename E, typename Transform>
-    constexpr auto operator|(Result<T, E> r, Transform &&f) ->
-        typename std::enable_if<
-            not std::is_same<decltype(f(std::declval<T>())), void>::value,
-            decltype(f(std::declval<T>()))>::type {
-      using return_type = decltype(f(std::declval<T>()));
-      return std::visit(overloaded {
-          [&f](const Value<T> &v) { return f(v.value); },
-          [](const Error<E> &e) { return return_type(makeError(e.error)); } 
-          }, r);
-    }
+    std::optional<uChar> GetHeader1(const std::string& FileName )
+//    std::string GetHeader1(const std::string& FileName )
+    {
+        auto ret =
+            GetStringFromFile1(FileName, 10) | [&]( const uChar& obj )
+        {
+            std::cerr << "error " << "GetHeader1" << std::endl;
 
-    /**
-     * Bind operator overload for functions which do not accept anything as a
-     * parameter. Allows execution of a sequence of unrelated functions, given
-     * that all of them return Result
-     * @param f function which accepts no parameters and returns result
-     */
-    template <typename T, typename E, typename Procedure>
-    constexpr auto operator|(Result<T, E> r, Procedure f) ->
-        typename std::enable_if<not std::is_same<decltype(f()), void>::value,
-                                decltype(f())>::type {
-      using return_type = decltype(f());
-      return std::visit(overloaded {
-          [&f](const Value<T> &v) { return f(); },
-          [](const Error<E> &e) { return return_type(makeError(e.error)); }
-      }, r);
-    }
+            //return makeValue<bool, std::string>(true);
+           // return makeError<bool, std::string>(" ******* ");
+            //return makeError<uChar>(" ******* ");
+            return makeValue<uChar>(obj);
+            //return true;
+        };
 
-}  // namespace tagBase
+       return std::make_optional(ret.value());
+        //return ret.error();
+       // return "OK";
+    }
+}
+
 #endif  // TAGBASE_RESULT_HPP

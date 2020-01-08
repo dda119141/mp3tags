@@ -31,7 +31,7 @@ void print_header_infos(const std::string& filename)
 
     auto buffer = id3v2::GetHeader(filename);
 
-    int res = buffer | [](const std::vector<unsigned char>& buff)
+    int res = buffer || [](const std::vector<unsigned char>& buff)
     {
         std::for_each(buff.cbegin(), buff.cend(), [](const char& n) { std::cout << std::hex << (int)n << ' '; });
         cout << endl;
@@ -40,7 +40,7 @@ void print_header_infos(const std::string& filename)
 
     assert(res == 0);
 
-    int resi = buffer | [](const std::vector<unsigned char>& buff)
+    int resi = buffer || [](const std::vector<unsigned char>& buff)
     {
         cout << "file identifier: " << id3v2::GetID3FileIdentifier(buff).value() << endl;
         cout << "version: " << id3v2::GetID3Version(buff).value() << endl;
@@ -105,8 +105,8 @@ int main() {
         const std::string filename = filen.path().string();
 
         cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
-        cout <<"file: " << filename <<  " Composer: " << GetComposer(filename) << endl;
-#if 0
+        cout <<"Composer: " << GetComposer(filename) << endl;
+#if 1
         cout << "Date: " << GetDate(filename) << endl;
         cout << "Year: " << GetYear(filename) << endl;
         cout << "Text writer: " << GetTextWriter(filename) << endl;
@@ -115,6 +115,7 @@ int main() {
         cout << "Title: " << GetTitle(filename) << endl;
         cout << "Artist: " << GetLeadArtist(filename) << endl;
         cout << "Group Description: " << GetContentGroupDescription(filename) << endl;
+        cout << "GetTrackPosition: " << GetTrackPosition(filename) << endl;
 #endif
         if(filename.find("test1.mp3") != std::string::npos)
             cout << "\n\n change album: " << SetAlbum(filename, "test1");
@@ -128,6 +129,7 @@ int main() {
         cout << "wrong path:" << endl;
   }
 
+//  std::cout << expected::GetHeader1("../files/test1.mp3") << "\n";
 #endif
     return 0;
 }

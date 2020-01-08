@@ -36,12 +36,11 @@ bool SetTag(const std::string& filename,
                         tagVersion = id3v2::v00();
                     }
                     else{
-                        std::cerr << "version not supported" << std::endl;
-                        return std::optional<bool>(false);
+                        return expected::makeError<bool>("id3 version not supported\n");
                     }
 
                     id3v2::TagReadWriter<std::string_view> obj(filename);
-                    std::optional<id3v2::TagInfos> locs = obj.findTagInfos(tag.second, tagVersion);
+                    expected::Result<id3v2::TagInfos> locs = obj.findTagInfos(tag.second, tagVersion);
                     if(locs.has_value())
                     {
                         const id3v2::TagInfos& tagLoc = locs.value();
@@ -49,13 +48,13 @@ bool SetTag(const std::string& filename,
                         return obj.WriteFile(tag_str, tagLoc);
                     }
                     else{
-                        return std::optional<bool>(false);
+                        return expected::makeError<bool>("findTagInfos: tag could not be located\n");
                     }
 
                 }
             }
 
-            return std::optional<bool>(false);
+            return expected::makeError<bool>() << __func__ << " failed\n";
     };
 
     if(ret.has_value())

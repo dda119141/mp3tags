@@ -35,7 +35,7 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
                             tagVersion = id3v2::v00();
                         }
                         else{
-                            return std::optional<std::string>(std::string("version not supported"));
+                            return expected::makeError<std::string>("version not supported");
                         }
 
                         id3v2::TagReadWriter<std::string> obj(filename);
@@ -43,12 +43,12 @@ const std::string GetTheTag(const std::string& filename, const std::vector<std::
                         return obj.extractTag(tag.second, tagVersion);
                     }
                 }
-                return std::optional<std::string>(std::string("version not supported"));
+                return expected::makeError<std::string>() << "id3 version not supported" << "\n";
             };
 
     if(!ret.has_value()){
-        std::cout << "final Tag not found\n";
-        return "Tag not found";
+        //return "Tag not found";
+        return ret.error();
     }else{
 
         auto val = ret.value();

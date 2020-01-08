@@ -17,7 +17,7 @@
 #include <range/v3/action/transform.hpp>
 #include <range/v3/view/filter.hpp>
 
-#include <result.hpp>
+#include "result.hpp"
 
 namespace id3v2
 {
@@ -34,14 +34,13 @@ namespace id3v2
                 ,doSwap(_doSwap)
             {
             }
-#if 1
+
             TagInfos():
                 startPos(0)
                 ,length(0)
                 ,encodeFlag(0)
                 ,doSwap(0)
              { }
-#endif
 
             const uint32_t getStartPos() const
             {
@@ -74,7 +73,6 @@ auto mbind(std::optional<T>&& _obj, F&& function)
     }
     else{
         return {};
-        //return std::nullopt;
     }
 }
 
@@ -85,6 +83,7 @@ using is_optional_string = std::is_same<std::decay_t<T>, std::optional<std::stri
 template <typename T>
 using is_optional_vector_char = std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>;
 
+#if 1
 template <typename T,
     typename = std::enable_if_t<(std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>::value
         || std::is_same<std::decay_t<T>, std::optional<std::string>>::value
@@ -106,30 +105,31 @@ template <typename T,
         return {};
     }
 }
+#endif
 
 template <typename T>
 struct integral_unsigned_asserts
 {
     void operator()()
     {
-        static_assert(std::is_integral<T>::value, "parameter should be integers");
-        static_assert(std::is_unsigned<T>::value, "parameter should be unsigned");
+        static_assert((std::is_integral<T>::value
+                    || std::is_unsigned<T>::value) , "parameter should be integers");
     }
 };
 
-std::optional<id3v2::UCharVec> GetStringFromFile(const std::string& FileName, uint32_t num )
+//std::optional<id3v2::UCharVec> GetStringFromFile(const std::string& FileName, uint32_t num )
+const auto GetStringFromFile(const std::string& FileName, uint32_t num )
 {
     std::ifstream fil(FileName);
     std::vector<unsigned char> buffer(num, '0');
 
     if(!fil.good()){
-        std::cerr << "mp3 file could not be read\n";
-        return {};
+        return expected::makeError<id3v2::UCharVec>() << __func__ << (":failed\n");
     }
 
     fil.read(reinterpret_cast<char*>(buffer.data()), num);
 
-    return buffer;
+    return expected::makeValue<id3v2::UCharVec>(buffer);
 }
 
 namespace id3v2
@@ -161,7 +161,7 @@ namespace id3v2
         }
 
     template <typename T>
-        const std::optional<std::string> GetHexFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
+        expected::Result<std::string> GetHexFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
         {
             integral_unsigned_asserts<T> eval;
             eval();
@@ -180,20 +180,20 @@ namespace id3v2
 
                 stream_obj << std::hex << version;
 
-                return stream_obj.str();
+                return expected::makeValue<std::string>(stream_obj.str());
 
             }else{
-                return {};
-            }
+                return expected::makeError<std::string>() << __func__ << (":failed\n");
+           }
         }
 
     template <typename T1, typename T2>
-        const std::optional<std::string> ExtractString(const UCharVec& buffer, T1 start, T1 end)
+        expected::Result<std::string> ExtractString(const UCharVec& buffer, T1 start, T1 end)
         {
-            //if(end < start){
+            if(end < start){
                 std::cerr << __func__ << " error start: " << start << " end: " << end << std::endl;
-            //}
-           // assert(end > start);
+            }
+            assert(end > start);
 
             if(buffer.size() >= end) {
                 static_assert(std::is_integral<T1>::value, "second and third parameters should be integers");
@@ -201,10 +201,9 @@ namespace id3v2
 
                 std::string obj(reinterpret_cast<const char*>(buffer.data()), end);
 
-                return obj.substr(start, (end - start));
+                return expected::makeValue<std::string>(obj.substr(start, (end - start)));
             } else {
-                std::cerr << __func__ << " error start: " << start << " end: " << end << std::endl;
-                return {};
+                return expected::makeError<std::string>() << __func__ <<":failed" << " start: " << start << " end: " << end << "\n";
             }
         }
 
@@ -230,7 +229,7 @@ namespace id3v2
             return n;
         }
 
-    std::optional<uint32_t> GetTagSize(const UCharVec& buffer)
+    expected::Result<uint32_t> GetTagSize(const UCharVec& buffer)
     {
         using paire = std::pair<uint32_t, uint32_t>;
 
@@ -256,7 +255,7 @@ namespace id3v2
 
         assert(val > GetHeaderSize<uint32_t>());
 
-        return val;
+        return expected::makeValue<uint32_t>(val);
 
 #if 0
         if(buffer.size() >= GetHeaderSize<uint32_t>())
@@ -278,32 +277,34 @@ namespace id3v2
 #endif
     }
 
-    std::optional<uint32_t> GetHeaderAndTagSize(const UCharVec& buffer)
+    auto GetHeaderAndTagSize(const UCharVec& buffer)
     {
-        return mbind(GetTagSize(buffer), [=](const uint32_t Tagsize){
-                return (Tagsize + GetHeaderSize<uint32_t>());
-                });
+        return GetTagSize(buffer) | [=](const uint32_t Tagsize){
+                return expected::makeValue<uint32_t>(Tagsize + GetHeaderSize<uint32_t>());
+                };
     }
 
     const auto GetTagSizeExclusiveHeader(const UCharVec& buffer)
     {
-        return mbind(GetTagSize(buffer), [](const int tag_size){
-                return tag_size - GetHeaderSize<uint32_t>();}
-                );
+        return GetTagSize(buffer) | [](const int tag_size){
+                return expected::makeValue<uint32_t>(tag_size - GetHeaderSize<uint32_t>());
+               };
     }
 
-    std::optional<UCharVec> GetHeader(const std::string& FileName )
+    expected::Result<UCharVec> GetHeader(const std::string& FileName )
     {
-        const auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>());
+        auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>())           |
+            [&] (const UCharVec& _val){
+                return expected::makeValue<UCharVec>(_val);
+            };
 
-        if(!val.has_value()){
-            std::cerr << "error " << __func__ << std::endl;
-        }
-
-        return val;
+        if(!val.has_value())
+             return expected::makeError<UCharVec>() << "Error: " << __func__ << "\n";
+        else
+            return val;
     }
 
-    const std::optional<std::string> GetTagArea(const UCharVec& buffer)
+    expected::Result<std::string> GetTagArea(const UCharVec& buffer)
     {
         return  GetHeaderAndTagSize(buffer)
             | [&](uint32_t tagSize)
@@ -321,7 +322,7 @@ namespace id3v2
             return id3Type::tag_names;
         };
 
-    const std::optional<std::string> GetID3FileIdentifier(const UCharVec& buffer)
+    expected::Result<std::string> GetID3FileIdentifier(const UCharVec& buffer)
     {
         constexpr auto FileIdentifierStart = 0;
         constexpr auto FileIdentifierEnd = 3;
@@ -336,7 +337,7 @@ namespace id3v2
 #endif
     }
 
-    const std::optional<std::string> GetID3Version(const UCharVec& buffer)
+    expected::Result<std::string> GetID3Version(const UCharVec& buffer)
     {
         constexpr auto kID3IndexStart = 4;
         constexpr auto kID3VersionBytesLength = 2;
@@ -356,17 +357,15 @@ namespace id3v2
             {
             }
 
-            std::optional<uint32_t> operator()(Type tag)
+            expected::Result<uint32_t> operator()(Type tag)
             {
-                const auto it = std::search(mTagArea.cbegin(), mTagArea.cend(), 
+                const auto it = std::search(mTagArea.cbegin(), mTagArea.cend(),
                         std::boyer_moore_searcher(tag.cbegin(), tag.cend()) );
 
                 if(it != mTagArea.cend()){
-                    return (it - mTagArea.cbegin());
+                    return expected::makeValue<uint32_t>(it - mTagArea.cbegin());
                 }else{
-                    std::cerr << "tag: "  << tag << " not found" << std::endl;
-                    //return {};
-                    return std::nullopt;
+                    return expected::makeError<uint32_t>() << "tag: " << tag << " not found";
                 }
             }
         };
