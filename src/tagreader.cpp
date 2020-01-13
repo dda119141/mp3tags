@@ -103,9 +103,9 @@ int main() {
     {
         const std::string filename = filen.path().string();
 
-        cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
-        cout <<"Composer: " << GetComposer(filename) << endl;
-#if 1
+ //       cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
+     //   cout <<"Composer: " << GetComposer(filename) << endl;
+#if 0
         cout << "Date: " << GetDate(filename) << endl;
         cout << "Year: " << GetYear(filename) << endl;
         cout << "Text writer: " << GetTextWriter(filename) << endl;
@@ -116,12 +116,18 @@ int main() {
         cout << "Group Description: " << GetContentGroupDescription(filename) << endl;
         cout << "GetTrackPosition: " << GetTrackPosition(filename) << endl;
 #endif
-        if(filename.find("test1.mp3") != std::string::npos)
-            cout << "\n\n change album: " << SetAlbum(filename, "test1");
+#if 1
+        if(filename.find("test1.mp3") != std::string::npos){
+            cout << "Title: " << GetTitle(filename) << endl;
+            cout << "\n/*********************************/ \n";
+            cout << "Change title: " << filename << SetTitle(filename, "testYingTitle") << endl;
+            //cout << "Change album: " << SetAlbum(filename, "test1");
+
+         }
 
         //std::for_each(id3v2::tag_names.cbegin(), id3v2::tag_names.cend(), 
         //      id3v2::RetrieveTag<std::string>(std::string("../file_example_MP3_700KB.mp3")) );
-
+#endif
         cout << endl;
     }
   }catch (fs::filesystem_error) {

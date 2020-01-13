@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.1.2)
 
 project(tagreader VERSION 1.3.6)
 
-list( APPEND CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS} -g -ftest-coverage -fprofile-arcs")
+list( APPEND CMAKE_CXX_FLAGS "-std=c++17 ${CMAKE_CXX_FLAGS} -g -ftest-coverage -pthread -fprofile-arcs")
 
 add_definitions(
         -Wall

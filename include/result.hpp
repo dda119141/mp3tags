@@ -139,23 +139,6 @@ namespace expected {
         }
 
 #if 0
-  template <typename T, typename E, typename Transform,
-            typename Ret = typename std::result_of<Transform(T)>::type,
-            typename std::enable_if_t<not std::is_object<Ret>::value> >
-        auto operator | (Result_t<T, E>&& r, Transform&& f)
-        -> decltype(std::forward<Transform>(f)(std::forward<Result_t<T, E>>(r).value()))
-    {
-            auto fuc = std::forward<Transform>(f);
-            auto obj = std::forward<Result_t<T, E> >(r);
-
-            if (obj.has_value()) {
-                return fuc(obj.value());
-            } else {
-                return;
-            }
-    }
-#endif
-#if 0
     template <typename T, typename E, typename Transform,
             typename Ret = typename std::result_of<Transform(T)>::type>
         Ret operator | (expected::Result_t<T, E>&& r, Transform f)
@@ -215,7 +198,6 @@ namespace expected {
                 return;
             }
      }
-
 
 }  // namespace expected
 

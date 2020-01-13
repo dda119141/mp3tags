@@ -39,13 +39,25 @@ bool SetTag(const std::string& filename,
                         return expected::makeError<bool>("id3 version not supported\n");
                     }
 
+                              std::cout << "prepare tag content top: " << std::string(content) << std::endl;;
                     id3v2::TagReadWriter<std::string_view> obj(filename);
                     expected::Result<id3v2::TagInfos> locs = obj.findTagInfos(tag.second, tagVersion);
                     if(locs.has_value())
                     {
                         const id3v2::TagInfos& tagLoc = locs.value();
-                        std::string_view tag_str = obj.prepareTagContent(content, tagLoc);
-                        return obj.WriteFile(tag_str, tagLoc);
+                        const std::string tag_str = prepareTagContent(content, tagLoc);
+//                              std::cout << "prepare tag content2: " << tag_str << std::endl;;
+//                        assert (tagLoc.getLength() >= tag_str.size());
+                        if (tagLoc.getLength() < tag_str.size()) //resize whole header
+                        {
+                            const uint32_t extraLength = (tag_str.size() - tagLoc.getLength());
+                            struct id3v2::newTagArea NewTagArea{filename, tagLoc, tagVersion, extraLength};
+
+                            return NewTagArea.writeFile(tag_str);
+
+                        }else{
+                            return obj.WriteFile(tag_str, tagLoc);
+                        }
                     }
                     else{
                         return expected::makeError<bool>("findTagInfos: tag could not be located\n");
@@ -124,19 +136,7 @@ bool SetTextWriter(const std::string& filename, std::string_view content)
     return SetTag(filename, tags, content);
 }
 
-bool GetFileType(const std::string& filename, std::string_view content)
-{
-    const std::vector<std::pair<std::string, std::string_view>> tags
-    {
-        {"0x0400", "TFLT"},
-        {"0x0300", "TFLT"},
-        {"0x0000", "TFT"},
-    };
-
-    return SetTag(filename, tags, content);
-}
-
-bool GetTitle(const std::string& filename, std::string_view content)
+bool SetTitle(const std::string& filename, std::string_view content)
 {
     const std::vector<std::pair<std::string, std::string_view>> tags
     {

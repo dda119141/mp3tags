@@ -23,57 +23,47 @@ namespace id3v2
 {
     using UCharVec = std::vector<unsigned char>;
 
-    class TagInfos
-    {
-        public:
-            TagInfos(uint32_t StartPos, uint32_t Length, 
-                    uint32_t _encodeFlag = 0, uint32_t _doSwap = 0):
-                startPos(StartPos)
-                ,length(Length)
-                ,encodeFlag(_encodeFlag)
-                ,doSwap(_doSwap)
-            {
-            }
+    class TagInfos {
+    public:
+        TagInfos(uint32_t TagOffset, uint32_t TagContentOffset,
+                 uint32_t Length, uint32_t _encodeFlag = 0,
+                 uint32_t _doSwap = 0)
+            : tagContentStartPosition(TagContentOffset),
+              tagStartPosition(TagOffset),
+              length(Length),
+              encodeFlag(_encodeFlag),
+              doSwap(_doSwap) {}
 
-            TagInfos():
-                startPos(0)
-                ,length(0)
-                ,encodeFlag(0)
-                ,doSwap(0)
-             { }
+        TagInfos()
+            : tagContentStartPosition(0), tagStartPosition(0), length(0), encodeFlag(0), doSwap(0) {}
 
-            const uint32_t getStartPos() const
-            {
-                return startPos;
-            }
-            const uint32_t getLength() const
-            {
-                return length;
-            }
-            const uint32_t getEncodingValue() const { return encodeFlag; }
-            const uint32_t getSwapValue() const { return doSwap; }
-        private:
-            // TagInfos() = delete;
-            uint32_t startPos;
-            uint32_t length;
-            uint32_t encodeFlag;
-            uint32_t doSwap;
+        const uint32_t getTagOffset() const { return tagStartPosition; }
+        const uint32_t getTagContentOffset() const { return tagContentStartPosition; }
+        const uint32_t getLength() const { return length; }
+        const uint32_t getEncodingValue() const { return encodeFlag; }
+        const uint32_t getSwapValue() const { return doSwap; }
+
+    private:
+        // TagInfos() = delete;
+        uint32_t tagContentStartPosition;
+        uint32_t tagStartPosition;
+        uint32_t length;
+        uint32_t encodeFlag;
+        uint32_t doSwap;
     };
-};
+    };
 
-template <typename T, typename F>
-auto mbind(std::optional<T>&& _obj, F&& function)
-    -> decltype(function(_obj.value()))
-{
-    auto fuc = std::forward<F>(function);
-    auto obj = std::forward<std::optional<T>>(_obj);
+    template <typename T, typename F>
+    auto mbind(std::optional<T>&& _obj, F&& function)
+        -> decltype(function(_obj.value())) {
+        auto fuc = std::forward<F>(function);
+        auto obj = std::forward<std::optional<T>>(_obj);
 
-    if(obj.has_value()){
-        return fuc(obj.value());
-    }
-    else{
-        return {};
-    }
+        if (obj.has_value()) {
+            return fuc(obj.value());
+        } else {
+            return {};
+        }
 }
 
 
@@ -117,7 +107,6 @@ struct integral_unsigned_asserts
     }
 };
 
-//std::optional<id3v2::UCharVec> GetStringFromFile(const std::string& FileName, uint32_t num )
 const auto GetStringFromFile(const std::string& FileName, uint32_t num )
 {
     std::ifstream fil(FileName);
@@ -135,7 +124,7 @@ const auto GetStringFromFile(const std::string& FileName, uint32_t num )
 namespace id3v2
 {
     template <typename T>
-        const auto GetValFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
+        const uint32_t GetValFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
         {
             integral_unsigned_asserts<T> eval;
             eval();
@@ -174,7 +163,7 @@ namespace id3v2
                 << std::setfill('0')
                 << std::setw(num_of_bytes_in_hex * 2); 
 
-            const auto version = GetValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
+            const uint32_t version = GetValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
 
             if(version != 0){
 
@@ -203,6 +192,7 @@ namespace id3v2
 
                 return expected::makeValue<std::string>(obj.substr(start, (end - start)));
             } else {
+
                 return expected::makeError<std::string>() << __func__ <<":failed" << " start: " << start << " end: " << end << "\n";
             }
         }
@@ -216,7 +206,6 @@ namespace id3v2
                     );
         }
 
-
     template <typename T>
         constexpr T GetHeaderSize(void)
         {
@@ -229,33 +218,63 @@ namespace id3v2
             return n;
         }
 
-    expected::Result<uint32_t> GetTagSize(const UCharVec& buffer)
-    {
-        using paire = std::pair<uint32_t, uint32_t>;
+        expected::Result<bool> updateTagSize(UCharVec& buffer, uint32_t extraSize) {
+            constexpr uint32_t TagIndex = 6;
+            constexpr uint32_t NumberOfElements = 4;
+            constexpr uint32_t maxValue = 127;
+            auto it = std::begin(buffer) + TagIndex;
+            auto ExtraSize = extraSize;
+            auto extr = ExtraSize % 127;
 
-        const std::vector<uint32_t> pow_val = { 21, 14, 7, 0 };
+            /* reverse order of elements */
+            std::reverse(it, it + NumberOfElements);
 
-        std::vector<paire> result(pow_val.size());
-        constexpr uint32_t TagIndex = 6;
-        const auto it = std::begin(buffer) + TagIndex;
+            std::transform(
+                it, it + NumberOfElements, it, it, [&](uint32_t a, uint32_t b) {
+                    extr = ExtraSize % maxValue;
+                    a = (a >= maxValue) ? maxValue : a;
 
-        std::transform(it, it + pow_val.size(),
-                pow_val.begin(), result.begin(),
-                [](uint32_t a, uint32_t b){
-                return std::make_pair(a, b);
-                }
-                );
+                    if (ExtraSize >= maxValue) {
+                        const auto rest = maxValue - a;
+                        a = a + rest;
+                        ExtraSize -= rest;
+                    } else {
+                        auto rest2 = maxValue - a;
+                        a = (a + ExtraSize > maxValue) ? maxValue : (a + ExtraSize);
+                        ExtraSize = ((int)(ExtraSize - rest2) < 0)
+                                        ? 0
+                                        : (ExtraSize - rest2);
+                    }
+                    return a;
+                });
 
-        const uint32_t val = std::accumulate(result.begin(), result.end(), 0,
-                [](int a, paire b)
-                {
-                return ( a + (b.first * std::pow(2, b.second)) );
-                }
-                ); 
+            /* reverse back order of elements */
+            std::reverse(it, it + NumberOfElements);
 
-        assert(val > GetHeaderSize<uint32_t>());
+            return expected::makeValue<bool>(true);
+        }
 
-        return expected::makeValue<uint32_t>(val);
+        expected::Result<uint32_t> GetTagSize(const UCharVec& buffer) {
+            using paire = std::pair<uint32_t, uint32_t>;
+
+            const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
+
+            std::vector<paire> result(pow_val.size());
+            constexpr uint32_t TagIndex = 6;
+            const auto it = std::begin(buffer) + TagIndex;
+
+            std::transform(
+                it, it + pow_val.size(), pow_val.begin(), result.begin(),
+                [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
+
+            const uint32_t val = std::accumulate(
+                result.begin(), result.end(), 0, [](int a, paire b) {
+                    return (a + (b.first * std::pow(2, b.second)));
+                });
+
+            assert(val > GetHeaderSize<uint32_t>());
+
+            return expected::makeValue<uint32_t>(val);
 
 #if 0
         if(buffer.size() >= GetHeaderSize<uint32_t>())
