@@ -67,54 +67,54 @@ namespace id3v2
         }
 }
 
+template <typename T>
+using is_optional_string =
+    std::is_same<std::decay_t<T>, std::optional<std::string>>;
 
 template <typename T>
-using is_optional_string = std::is_same<std::decay_t<T>, std::optional<std::string>>;
-
-template <typename T>
-using is_optional_vector_char = std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>;
+using is_optional_vector_char =
+    std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>;
 
 #if 1
-template <typename T,
-    typename = std::enable_if_t<(std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>::value
-        || std::is_same<std::decay_t<T>, std::optional<std::string>>::value
-        || std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value
-        || std::is_same<std::decay_t<T>, std::optional<bool>>::value
-        || std::is_same<std::decay_t<T>, std::optional<id3v2::TagInfos>>::value
-        || std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value) >
-    , typename F >
- auto operator | (T&& _obj, F&& Function)
-    -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value()))
-{
+template <
+    typename T,
+    typename = std::enable_if_t<(
+        std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<id3v2::TagInfos>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value)>,
+    typename F>
+auto operator|(T&& _obj, F&& Function)
+    -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value())) {
     auto fuc = std::forward<F>(Function);
     auto obj = std::forward<T>(_obj);
 
-    if(obj.has_value()){
+    if (obj.has_value()) {
         return fuc(obj.value());
-    }
-    else{
+    } else {
         return {};
     }
 }
 #endif
 
 template <typename T>
-struct integral_unsigned_asserts
-{
-    void operator()()
-    {
-        static_assert((std::is_integral<T>::value
-                    || std::is_unsigned<T>::value) , "parameter should be integers");
+struct integral_unsigned_asserts {
+    void operator()() {
+        static_assert(
+            (std::is_integral<T>::value || std::is_unsigned<T>::value),
+            "parameter should be integers");
     }
 };
 
-const auto GetStringFromFile(const std::string& FileName, uint32_t num )
-{
+const auto GetStringFromFile(const std::string& FileName, uint32_t num) {
     std::ifstream fil(FileName);
     std::vector<unsigned char> buffer(num, '0');
 
-    if(!fil.good()){
-        return expected::makeError<id3v2::UCharVec>() << __func__ << (":failed\n");
+    if (!fil.good()) {
+        return expected::makeError<id3v2::UCharVec>() << __func__
+                                                      << (":failed\n");
     }
 
     fil.read(reinterpret_cast<char*>(buffer.data()), num);
@@ -122,160 +122,154 @@ const auto GetStringFromFile(const std::string& FileName, uint32_t num )
     return expected::makeValue<id3v2::UCharVec>(buffer);
 }
 
-namespace id3v2
-{
-    template <typename T>
-        const uint32_t GetValFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
-        {
-            integral_unsigned_asserts<T> eval;
-            eval();
+namespace id3v2 {
+template <typename T>
+const uint32_t GetValFromBuffer(const UCharVec& buffer, T index,
+                                T num_of_bytes_in_hex) {
+    integral_unsigned_asserts<T> eval;
+    eval();
 
-            assert(buffer.size() > num_of_bytes_in_hex);
+    assert(buffer.size() > num_of_bytes_in_hex);
 
-            auto version = 0;
-            auto remaining = 0;
-            auto bytes_to_add = num_of_bytes_in_hex;
-            auto byte_to_pad = index;
+    auto version = 0;
+    auto remaining = 0;
+    auto bytes_to_add = num_of_bytes_in_hex;
+    auto byte_to_pad = index;
 
-            while(bytes_to_add > 0)
-            {
-                remaining = (num_of_bytes_in_hex - bytes_to_add);
-                auto val = std::pow(2, 8 * remaining) * buffer[byte_to_pad];
-                version += val;
+    while (bytes_to_add > 0) {
+        remaining = (num_of_bytes_in_hex - bytes_to_add);
+        auto val = std::pow(2, 8 * remaining) * buffer[byte_to_pad];
+        version += val;
 
-                bytes_to_add--;
-                byte_to_pad--;
-            }
+        bytes_to_add--;
+        byte_to_pad--;
+    }
 
-            return version;
-        }
+    return version;
+}
 
-    template <typename T>
-        expected::Result<std::string> GetHexFromBuffer(const UCharVec& buffer, T index, T num_of_bytes_in_hex)
-        {
-            integral_unsigned_asserts<T> eval;
-            eval();
+template <typename T>
+expected::Result<std::string> GetHexFromBuffer(const UCharVec& buffer, T index,
+                                               T num_of_bytes_in_hex) {
+    integral_unsigned_asserts<T> eval;
+    eval();
 
-            assert(buffer.size() > num_of_bytes_in_hex);
+    assert(buffer.size() > num_of_bytes_in_hex);
 
-            std::stringstream stream_obj;
+    std::stringstream stream_obj;
 
-            stream_obj << "0x"
-                << std::setfill('0')
-                << std::setw(num_of_bytes_in_hex * 2); 
+    stream_obj << "0x" << std::setfill('0')
+               << std::setw(num_of_bytes_in_hex * 2);
 
-            const uint32_t version = GetValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
+    const uint32_t version =
+        GetValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
 
-            if(version != 0){
+    if (version != 0) {
+        stream_obj << std::hex << version;
 
-                stream_obj << std::hex << version;
+        return expected::makeValue<std::string>(stream_obj.str());
 
-                return expected::makeValue<std::string>(stream_obj.str());
+    } else {
+        return expected::makeError<std::string>() << __func__ << (":failed\n");
+    }
+}
 
-            }else{
-                return expected::makeError<std::string>() << __func__ << (":failed\n");
-           }
-        }
+template <typename T1, typename T2>
+expected::Result<std::string> ExtractString(const UCharVec& buffer, T1 start,
+                                            T1 end) {
+    if (end < start) {
+        ID3_LOG_WARN("error: start {} and end {}", start, end);
+    }
+    assert(end > start);
 
-    template <typename T1, typename T2>
-        expected::Result<std::string> ExtractString(const UCharVec& buffer, T1 start, T1 end)
-        {
-            if(end < start){
-                 ID3_LOG_WARN("error: start {} and end {}", start, end);
-            }
-            assert(end > start);
+    if (buffer.size() >= end) {
+        static_assert(std::is_integral<T1>::value,
+                      "second and third parameters should be integers");
+        static_assert(std::is_unsigned<T2>::value,
+                      "num of elements must be unsigned");
 
-            if(buffer.size() >= end) {
-                static_assert(std::is_integral<T1>::value, "second and third parameters should be integers");
-                static_assert(std::is_unsigned<T2>::value, "num of elements must be unsigned");
+        std::string obj(reinterpret_cast<const char*>(buffer.data()), end);
 
-                std::string obj(reinterpret_cast<const char*>(buffer.data()), end);
+        return expected::makeValue<std::string>(
+            obj.substr(start, (end - start)));
+    } else {
+        return expected::makeError<std::string>() << __func__ << ":failed"
+                                                  << " start: " << start
+                                                  << " end: " << end << "\n";
+    }
+}
 
-                return expected::makeValue<std::string>(obj.substr(start, (end - start)));
+template <typename T>
+std::string u8_to_u16_string(T val) {
+    return std::accumulate(
+        val.begin() + 1, val.end(), std::string(val.substr(0, 1)),
+        [](std::string arg1, char arg2) { return arg1 + '\0' + arg2; });
+}
+
+template <typename T>
+constexpr T GetHeaderSize(void) {
+    return 10;
+}
+
+template <typename T>
+constexpr T RetrieveSize(T n) {
+    return n;
+}
+
+expected::Result<bool> updateTagSize(UCharVec& buffer, uint32_t extraSize) {
+    constexpr uint32_t TagIndex = 6;
+    constexpr uint32_t NumberOfElements = 4;
+    constexpr uint32_t maxValue = 127;
+    auto it = std::begin(buffer) + TagIndex;
+    auto ExtraSize = extraSize;
+    auto extr = ExtraSize % 127;
+
+    /* reverse order of elements */
+    std::reverse(it, it + NumberOfElements);
+
+    std::transform(
+        it, it + NumberOfElements, it, it, [&](uint32_t a, uint32_t b) {
+            extr = ExtraSize % maxValue;
+            a = (a >= maxValue) ? maxValue : a;
+
+            if (ExtraSize >= maxValue) {
+                const auto rest = maxValue - a;
+                a = a + rest;
+                ExtraSize -= rest;
             } else {
-
-                return expected::makeError<std::string>() << __func__ <<":failed" << " start: " << start << " end: " << end << "\n";
+                auto rest2 = maxValue - a;
+                a = (a + ExtraSize > maxValue) ? maxValue : (a + ExtraSize);
+                ExtraSize =
+                    ((int)(ExtraSize - rest2) < 0) ? 0 : (ExtraSize - rest2);
             }
-        }
+            return a;
+        });
 
-    template <typename T>
-        std::string u8_to_u16_string(T val)
-        {
-            return std::accumulate(val.begin() + 1, val.end(), std::string(val.substr(0, 1)),
-                    [](std::string arg1, char arg2)
-                    { return arg1 + '\0' + arg2;}
-                    );
-        }
+    /* reverse back order of elements */
+    std::reverse(it, it + NumberOfElements);
 
-    template <typename T>
-        constexpr T GetHeaderSize(void)
-        {
-            return 10;
-        }
+    return expected::makeValue<bool>(true);
+}
 
-    template <typename T>
-        constexpr T RetrieveSize(T n)
-        {
-            return n;
-        }
+expected::Result<uint32_t> GetTagSize(const UCharVec& buffer) {
+    using paire = std::pair<uint32_t, uint32_t>;
 
-        expected::Result<bool> updateTagSize(UCharVec& buffer, uint32_t extraSize) {
-            constexpr uint32_t TagIndex = 6;
-            constexpr uint32_t NumberOfElements = 4;
-            constexpr uint32_t maxValue = 127;
-            auto it = std::begin(buffer) + TagIndex;
-            auto ExtraSize = extraSize;
-            auto extr = ExtraSize % 127;
+    const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
 
-            /* reverse order of elements */
-            std::reverse(it, it + NumberOfElements);
+    std::vector<paire> result(pow_val.size());
+    constexpr uint32_t TagIndex = 6;
+    const auto it = std::begin(buffer) + TagIndex;
 
-            std::transform(
-                it, it + NumberOfElements, it, it, [&](uint32_t a, uint32_t b) {
-                    extr = ExtraSize % maxValue;
-                    a = (a >= maxValue) ? maxValue : a;
+    std::transform(it, it + pow_val.size(), pow_val.begin(), result.begin(),
+                   [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
 
-                    if (ExtraSize >= maxValue) {
-                        const auto rest = maxValue - a;
-                        a = a + rest;
-                        ExtraSize -= rest;
-                    } else {
-                        auto rest2 = maxValue - a;
-                        a = (a + ExtraSize > maxValue) ? maxValue : (a + ExtraSize);
-                        ExtraSize = ((int)(ExtraSize - rest2) < 0)
-                                        ? 0
-                                        : (ExtraSize - rest2);
-                    }
-                    return a;
-                });
+    const uint32_t val = std::accumulate(
+        result.begin(), result.end(), 0,
+        [](int a, paire b) { return (a + (b.first * std::pow(2, b.second))); });
 
-            /* reverse back order of elements */
-            std::reverse(it, it + NumberOfElements);
+    assert(val > GetHeaderSize<uint32_t>());
 
-            return expected::makeValue<bool>(true);
-        }
-
-        expected::Result<uint32_t> GetTagSize(const UCharVec& buffer) {
-            using paire = std::pair<uint32_t, uint32_t>;
-
-            const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
-
-            std::vector<paire> result(pow_val.size());
-            constexpr uint32_t TagIndex = 6;
-            const auto it = std::begin(buffer) + TagIndex;
-
-            std::transform(
-                it, it + pow_val.size(), pow_val.begin(), result.begin(),
-                [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
-
-            const uint32_t val = std::accumulate(
-                result.begin(), result.end(), 0, [](int a, paire b) {
-                    return (a + (b.first * std::pow(2, b.second)));
-                });
-
-            assert(val > GetHeaderSize<uint32_t>());
-
-            return expected::makeValue<uint32_t>(val);
+    return expected::makeValue<uint32_t>(val);
 
 #if 0
         if(buffer.size() >= GetHeaderSize<uint32_t>())
@@ -295,100 +289,91 @@ namespace id3v2
 
         return {};
 #endif
-    }
+}
 
-    auto GetHeaderAndTagSize(const UCharVec& buffer)
-    {
-        return GetTagSize(buffer) | [=](const uint32_t Tagsize){
-                return expected::makeValue<uint32_t>(Tagsize + GetHeaderSize<uint32_t>());
-                };
-    }
+auto GetHeaderAndTagSize(const UCharVec& buffer) {
+    return GetTagSize(buffer) | [=](const uint32_t Tagsize) {
+        return expected::makeValue<uint32_t>(Tagsize +
+                                             GetHeaderSize<uint32_t>());
+    };
+}
 
-    const auto GetTagSizeExclusiveHeader(const UCharVec& buffer)
-    {
-        return GetTagSize(buffer) | [](const int tag_size){
-                return expected::makeValue<uint32_t>(tag_size - GetHeaderSize<uint32_t>());
+const auto GetTagSizeExclusiveHeader(const UCharVec& buffer) {
+    return GetTagSize(buffer) | [](const int tag_size) {
+        return expected::makeValue<uint32_t>(tag_size -
+                                             GetHeaderSize<uint32_t>());
+    };
+}
+
+expected::Result<UCharVec> GetHeader(const std::string& FileName) {
+    auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>()) |
+               [&](const UCharVec& _val) {
+                   return expected::makeValue<UCharVec>(_val);
                };
-    }
 
-    expected::Result<UCharVec> GetHeader(const std::string& FileName )
-    {
-        auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>())           |
-            [&] (const UCharVec& _val){
-                return expected::makeValue<UCharVec>(_val);
-            };
+    if (!val.has_value())
+        return expected::makeError<UCharVec>() << "Error: " << __func__ << "\n";
+    else
+        return val;
+}
 
-        if(!val.has_value())
-             return expected::makeError<UCharVec>() << "Error: " << __func__ << "\n";
-        else
-            return val;
-    }
+expected::Result<std::string> GetTagArea(const UCharVec& buffer) {
+    return GetHeaderAndTagSize(buffer) | [&](uint32_t tagSize) {
+        ID3_LOG_INFO("{}: tagsize: {}", __func__, tagSize);
 
-    expected::Result<std::string> GetTagArea(const UCharVec& buffer)
-    {
-        return  GetHeaderAndTagSize(buffer)
-            | [&](uint32_t tagSize)
-            {
-                ID3_LOG_INFO("{}: tagsize: {}", __func__, tagSize);
+        return ExtractString<uint32_t, uint32_t>(buffer, 0, tagSize);
+    };
+}
 
-                return ExtractString<uint32_t, uint32_t>(buffer, 0, tagSize);
-            };
-    }
+template <typename id3Type>
+void GetTagNames(void) {
+    return id3Type::tag_names;
+};
 
-    template <typename id3Type>
-        void GetTagNames(void)
-        {
-            return id3Type::tag_names;
-        };
+expected::Result<std::string> GetID3FileIdentifier(const UCharVec& buffer) {
+    constexpr auto FileIdentifierStart = 0;
+    constexpr auto FileIdentifierEnd = 3;
 
-    expected::Result<std::string> GetID3FileIdentifier(const UCharVec& buffer)
-    {
-        constexpr auto FileIdentifierStart = 0;
-        constexpr auto FileIdentifierEnd = 3;
-
-        return ExtractString<uint32_t, uint32_t>(buffer, FileIdentifierStart, FileIdentifierEnd);
+    return ExtractString<uint32_t, uint32_t>(buffer, FileIdentifierStart,
+                                             FileIdentifierEnd);
 
 #ifdef __TEST_CODE
-        auto y = [&buffer] () -> std::string {
-            return Get_ID3_header_element(buffer, 0, 3);
-        };
-        return y();
+    auto y = [&buffer]() -> std::string {
+        return Get_ID3_header_element(buffer, 0, 3);
+    };
+    return y();
 #endif
+}
+
+expected::Result<std::string> GetID3Version(const UCharVec& buffer) {
+    constexpr auto kID3IndexStart = 4;
+    constexpr auto kID3VersionBytesLength = 2;
+
+    return GetHexFromBuffer<uint8_t>(buffer, kID3IndexStart,
+                                     kID3VersionBytesLength);
+}
+
+template <typename Type>
+class search_tag {
+    const Type& mTagArea;
+
+public:
+    search_tag(const Type& tagArea) : mTagArea(tagArea) {}
+
+    expected::Result<uint32_t> operator()(Type tag) {
+        const auto it =
+            std::search(mTagArea.cbegin(), mTagArea.cend(),
+                        std::boyer_moore_searcher(tag.cbegin(), tag.cend()));
+
+        if (it != mTagArea.cend()) {
+            return expected::makeValue<uint32_t>(it - mTagArea.cbegin());
+        } else {
+            ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
+            return expected::makeError<uint32_t>() << "tag: " << tag
+                                                   << " not found";
+        }
     }
-
-    expected::Result<std::string> GetID3Version(const UCharVec& buffer)
-    {
-        constexpr auto kID3IndexStart = 4;
-        constexpr auto kID3VersionBytesLength = 2;
-
-        return GetHexFromBuffer<uint8_t>(buffer, kID3IndexStart, kID3VersionBytesLength);
-    }
-
-    template <typename Type>
-        class search_tag
-        {
-            const Type& mTagArea;
-
-            public:
-
-            search_tag(const Type& tagArea):
-                mTagArea(tagArea)
-            {
-            }
-
-            expected::Result<uint32_t> operator()(Type tag)
-            {
-                const auto it = std::search(mTagArea.cbegin(), mTagArea.cend(),
-                        std::boyer_moore_searcher(tag.cbegin(), tag.cend()) );
-
-                if(it != mTagArea.cend()){
-                    return expected::makeValue<uint32_t>(it - mTagArea.cbegin());
-                }else{
-                    ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
-                    return expected::makeError<uint32_t>() << "tag: " << tag << " not found";
-                }
-            }
-        };
+};
 
 }; //end namespace id3v2
 
