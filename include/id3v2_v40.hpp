@@ -71,11 +71,10 @@ class v40
         }
 
 
-        std::optional<uint32_t> GetFrameSize(const UCharVec& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(const cUchar& buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
-            //    std::cout << __func__ << ": index " << index << " start: " << start << std::endl;
             if(buffer.size() >= start)
             {
                 using paire = std::pair<uint32_t, uint32_t>;
@@ -96,55 +95,16 @@ class v40
                         {
                         return ( a + (b.first * std::pow(2, b.second)) );
                         }
-                        ); 
+                        );
 
                 return val;
 
             } else	{
-                std::cout << __func__ << ": Error " << buffer.size() << " start: " << start << std::endl;
+                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
             }
 
             return {};
         }
-
-       expected::Result<bool> UpdateFrameSize(UCharVec& buffer, uint32_t extraSize)
-        {
-            constexpr uint32_t TagIndex = 4;
-            constexpr uint32_t NumberOfElements = 4;
-            constexpr uint32_t maxValue = 127;
-            auto it = std::begin(buffer) + TagIndex;
-            auto ExtraSize = extraSize;
-            auto extr = ExtraSize % 127;
-
-            /* reverse order of elements */
-            std::reverse(it, it + NumberOfElements);
-
-            std::transform(
-                it, it + NumberOfElements, it, it, [&](uint32_t a, uint32_t b) {
-                    extr = ExtraSize % maxValue;
-                    a = (a >= maxValue) ? maxValue : a;
-
-                    if (ExtraSize >= maxValue) {
-                        const auto rest = maxValue - a;
-                        a = a + rest;
-                        ExtraSize -= rest;
-                    } else {
-                        auto rest2 = maxValue - a;
-                        a = (a + ExtraSize > maxValue) ? maxValue : (a + ExtraSize);
-                        ExtraSize = ((int)(ExtraSize - rest2) < 0)
-                                        ? 0
-                                        : (ExtraSize - rest2);
-                    }
-                    return a;
-                });
-
-            /* reverse back order of elements */
-            std::reverse(it, it + NumberOfElements);
-
-            return expected::makeValue<bool>(true);
-
-        }
-
 
 }; //v40
 

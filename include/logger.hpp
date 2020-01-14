@@ -46,5 +46,6 @@ auto log() {
 
 #define ID3_LOG_INFO(...) SPDLOG_LOGGER_CALL(id3v2::log(), spdlog::level::info, __VA_ARGS__)
 #define ID3_LOG_WARN(...) SPDLOG_LOGGER_CALL(id3v2::log(), spdlog::level::warn, __VA_ARGS__)
+#define ID3_LOG_ERROR(...) SPDLOG_LOGGER_CALL(id3v2::log(), spdlog::level::err, __VA_ARGS__)
 
 #endif //ID3V2_LOGGER

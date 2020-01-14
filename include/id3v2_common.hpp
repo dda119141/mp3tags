@@ -46,54 +46,25 @@ namespace id3v2
             TagVersion);
     }
 
-    expected::Result<bool> UpdateFrameSize(UCharVec& buffer, uint32_t extraSize,
-                                           uint32_t tagLocation) {
-        const uint32_t tagIndex = 4 + tagLocation;
-        constexpr uint32_t NumberOfElements = 4;
-        constexpr uint32_t maxValue = 127;
-        auto it = std::begin(buffer) + tagIndex;
-        auto ExtraSize = extraSize;
-        auto extr = ExtraSize % 127;
+    expected::Result<cUchar> UpdateFrameSize(const cUchar& buffer,
+                                             uint32_t extraSize,
+                                             uint32_t tagLocation) {
 
-        id3v2::log()->info(" Tag Index: {}", tagIndex);
+        const uint32_t frameSizePositionInArea = tagLocation + 4;
+        constexpr uint32_t frameSizeLengthInArea = 4;
+        constexpr uint32_t frameSizeMaxValuePerElement = 127;
 
+        id3v2::log()->info(" Tag Index: {}", tagLocation);
         id3v2::log()->info("Tag Frame Bytes before update : {}",
-                           spdlog::to_hex(std::begin(buffer) + tagIndex,
-                                          std::begin(buffer) + tagIndex + 4));
-
-        /* reverse order of elements */
-        std::reverse(it, it + NumberOfElements);
-
-        std::transform(it, it + NumberOfElements, it, it, [&](uint32_t a,
-                                                              uint32_t b) {
-            extr = ExtraSize % maxValue;
-            a = (a >= maxValue) ? maxValue : a;
-
-            if (ExtraSize >= maxValue) {
-                const auto rest = maxValue - a;
-                a = a + rest;
-                ExtraSize -= rest;
-            } else {
-                auto rest2 = maxValue - a;
-                a = (a + ExtraSize > maxValue) ? maxValue : (a + ExtraSize);
-                ExtraSize =
-                    ((int)(ExtraSize - rest2) < 0) ? 0 : (ExtraSize - rest2);
-            }
-            return a;
-        });
-
-        /* reverse back order of elements */
-        std::reverse(it, it + NumberOfElements);
-
-        id3v2::log()->info("Tag Frame Bytes after update : {}",
-                           spdlog::to_hex(std::begin(buffer) + tagIndex,
-                                          std::begin(buffer) + tagIndex + 4));
-
-        return expected::makeValue<bool>(true);
+                           spdlog::to_hex(std::begin(buffer) + frameSizePositionInArea,
+                                          std::begin(buffer) + frameSizePositionInArea + 4));
+        return updateAreaSize<uint32_t>(
+            buffer, extraSize, frameSizePositionInArea, frameSizeLengthInArea,
+            frameSizeMaxValuePerElement);
     }
 
     template <typename... Args>
-    expected::Result<bool> updateFrameSizeIndex(const iD3Variant& TagVersion,
+    expected::Result<cUchar> updateFrameSizeIndex(const iD3Variant& TagVersion,
                                                 Args... args) {
         return std::visit(
             overloaded{
@@ -167,16 +138,7 @@ namespace id3v2
         const auto PositionTagStart = tagLoc.getTagContentOffset();
 
         id3v2::log()->info(" PositionTagStart: {}", PositionTagStart);
-#if 0
-                                std::cout << "PositionTagStart: " << std::dec << PositionTagStart << std::endl;
-                                std::cout << "Content size: " << std::dec <<  content.size() << std::endl;
-                                std::cout << "prepare tag content: ";
 
-                            auto uffer = reinterpret_cast<const char*>(content.data());
-                            for(uint32_t i = 0; i<content.size(); i++)
-                            { std::cout << std::hex << *(uffer++)<< ' ';}
-                             std::cout <<  std::endl;
-#endif
         assert(PositionTagStart > 0);
 
         const auto iter = std::begin(buffer) + PositionTagStart;
@@ -186,7 +148,19 @@ namespace id3v2
         std::transform(iter + content.size(), iter + tagLoc.getLength(),
                        content.begin(), iter + content.size(),
                        [](char a, char b) { return 0x00; });
+
         return buffer;
+    }
+
+    bool replaceElementsInBuff(const cUchar& buffIn, cUchar& buffOut,
+                           uint32_t position) {
+
+        const auto iter = std::begin(buffOut) + position;
+
+        std::transform(iter, iter + buffIn.size(), buffIn.begin(), iter,
+                       [](char a, char b) { return b; });
+
+        return true;
     }
 
     std::string prepareTagContent(std::string_view content,
@@ -252,6 +226,8 @@ namespace id3v2
                             filename, tags_size + GetHeaderSize<uint32_t>());
                     };
                 if (ret.has_value()) {
+
+                    ID3_LOG_INFO("Buffer could be read - prepare to extend.");
                     mCBuffer = ret.value();
 
                     auto ret1 =
@@ -262,7 +238,6 @@ namespace id3v2
                                 tagLoc, additionalSize);
                         } |
                         [&](const TagInfos& tagloc) {
-                            // std::cout << "rewriting file...\n";
                             mTagLoc = tagloc;
                             mAdditionalSize = additionalSize;
 
@@ -303,32 +278,51 @@ namespace id3v2
             return expected::makeValue<T>(TagLoc);
         }
 
-        expected::Result<cUchar> extendBuffer(const TagInfos& tagLoc,
-                                              uint32_t additionalSize,
-                                              const iD3Variant& tagVersion) {
-            const auto ret = mCBuffer | [&](cUchar& cBuffer) {
+        const expected::Result<cUchar> extendBuffer(
+            const TagInfos& tagLoc, uint32_t additionalSize,
+            const iD3Variant& tagVersion) {
 
-                updateTagSize(cBuffer, additionalSize);
+            ID3_LOG_INFO("entering extendBuffer func...");
+            constexpr uint32_t tagsSizePositionInHeader = 6;
+            constexpr uint32_t frameSizePositionInFrameHeader = 4;
 
-                updateFrameSizeIndex<cUchar&, uint32_t, uint32_t>(
-                    tagVersion, cBuffer, additionalSize, tagLoc.getTagOffset());
-                assert(tagLoc.getTagOffset() + tagLoc.getLength() <
-                       cBuffer.size());
-
-                auto it = cBuffer.begin() + tagLoc.getTagOffset() +
-                          tagLoc.getLength();
+            const auto ret = mCBuffer | [&](const cUchar& cBuffer) {
 
                 ID3_LOG_INFO("FrameSize... length: {}, tag start: {}",
                              tagLoc.getLength(), tagLoc.getTagOffset());
 
+                ID3_LOG_INFO("Updating segments...");
+
+                const auto tagBuf1 = updateTagSize(cBuffer, additionalSize);
+
+                const auto tagBuf2 =
+                    updateFrameSizeIndex<const cUchar&, uint32_t, uint32_t>(
+                        tagVersion, cBuffer, additionalSize,
+                        tagLoc.getTagOffset());
+
+                assert(tagLoc.getTagOffset() + tagLoc.getLength() <
+                       cBuffer.size());
+
+                auto modBuff = std::move(cBuffer);
+                replaceElementsInBuff(tagBuf1.value(), modBuff,
+                                      tagsSizePositionInHeader);
+
+                replaceElementsInBuff(
+                    tagBuf2.value(), modBuff,
+                    tagLoc.getTagOffset() + frameSizePositionInFrameHeader);
+
                 ID3_LOG_INFO(
                     "Tag Frame Bytes after update : {}",
-                    spdlog::to_hex(
-                        std::begin(cBuffer) + tagLoc.getTagOffset() + 4,
-                        std::begin(cBuffer) + tagLoc.getTagOffset() + 7));
-                cBuffer.insert(it, additionalSize, 0);
+                    spdlog::to_hex(std::begin(modBuff) + tagLoc.getTagOffset() +
+                                       frameSizePositionInFrameHeader,
+                                   std::begin(modBuff) + tagLoc.getTagOffset() +
+                                       frameSizePositionInFrameHeader + 4));
 
-                return expected::makeValue<cUchar>(cBuffer);
+                auto it = modBuff.begin() + tagLoc.getTagOffset() +
+                          tagLoc.getLength();
+                modBuff.insert(it, additionalSize, 0);
+
+                return expected::makeValue<cUchar>(modBuff);
             };
 
             return ret;
@@ -342,7 +336,7 @@ namespace id3v2
                                                    << ": Error opening file";
             }
 
-            return mCBuffer | [&](cUchar& buff) {
+            return mCBuffer | [&](const cUchar& buff) {
                 auto _headerAndTagsSize = GetHeaderAndTagSize(buff);
 
                 return _headerAndTagsSize | [&](uint32_t headerAndTagsSize) {
@@ -363,8 +357,8 @@ namespace id3v2
 
                     assert(buff.size() < dataSize);
 
-                    std::cout << "datasize: " << dataSize
-                              << " buffer size: " << buff.size() << "...\n";
+                    ID3_LOG_INFO("datasize: {} - buffer size: {}", dataSize, buff.size());
+
                     std::ofstream filWrite(FileName + ".mod",
                                            std::ios::binary | std::ios::app);
 
@@ -388,6 +382,7 @@ namespace id3v2
     public:
         explicit TagReadWriter(const std::string& filename)
             : FileName(filename) {
+
             std::call_once(m_once, [this]() {
 #if 1
                 auto ret =
@@ -435,11 +430,10 @@ namespace id3v2
                                                    << ": Error opening file";
             }
 
-            cUchar bufRead;
-
             const unsigned int dataSize = filRead.tellg();
-
             filRead.seekg(0);
+
+            cUchar bufRead;
             bufRead.reserve(dataSize);
             filRead.read(reinterpret_cast<char*>(&bufRead[0]), dataSize);
 
@@ -468,16 +462,15 @@ namespace id3v2
                 return GetTagArea(buffer);
             } | [&tag](const std::string&
                            tagArea) -> expected::Result<uint32_t> {
-                auto searchTagPosition = search_tag<std::string_view>(tagArea);
-                //   id3v2::log()->info(" tag name: {}", tag);
-                // std::string erg = std::string(tag);
-                // std::string erg = "test";
-                // id3v2::log()->info(" tag name:");
 
+                auto searchTagPosition = search_tag<std::string_view>(tagArea);
                 const auto ret = searchTagPosition(tag);
+
+                ID3_LOG_INFO("tag name: #{}", std::string(tag));
 
                 return ret;
             } | [&](uint32_t tagIndex) -> expected::Result<TagInfos> {
+
                 if (tagIndex == 0)
                     return expected::makeError<TagInfos>("tagIndex = 0");
 
@@ -485,7 +478,7 @@ namespace id3v2
 
                 TagLocation = tagIndex;
 
-                ID3_LOG_INFO(" tag Index: {}", tagIndex);
+                ID3_LOG_INFO("tag Index: {}", tagIndex);
 
                 return buffer | [&tagIndex, &TagVersion](const cUchar& buff) {
                     return GetFrameSize<uint32_t>(buff, TagVersion, tagIndex);

@@ -61,11 +61,10 @@ class v30
         }
 
 
-        std::optional<uint32_t> GetFrameSize(const UCharVec& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(const cUchar& buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
-            //    std::cout << __func__ << ": index " << index << " start: " << start << std::endl;
             if(buffer.size() >= start)
             {
                 uint32_t val = buffer[start + 0] * std::pow(2, 24);
@@ -77,7 +76,7 @@ class v30
                 return val;
 
             } else	{
-                std::cout << __func__ << ": Error " << buffer.size() << " start: " << start << std::endl;
+                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
             }
 
             return {};

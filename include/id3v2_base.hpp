@@ -22,7 +22,7 @@
 
 namespace id3v2
 {
-    using UCharVec = std::vector<unsigned char>;
+    using cUchar = std::vector<unsigned char>;
 
     class TagInfos {
     public:
@@ -73,13 +73,13 @@ using is_optional_string =
 
 template <typename T>
 using is_optional_vector_char =
-    std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>;
+    std::is_same<std::decay_t<T>, std::optional<id3v2::cUchar>>;
 
 #if 1
 template <
     typename T,
     typename = std::enable_if_t<(
-        std::is_same<std::decay_t<T>, std::optional<id3v2::UCharVec>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<id3v2::cUchar>>::value ||
         std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
         std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
         std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
@@ -113,18 +113,18 @@ const auto GetStringFromFile(const std::string& FileName, uint32_t num) {
     std::vector<unsigned char> buffer(num, '0');
 
     if (!fil.good()) {
-        return expected::makeError<id3v2::UCharVec>() << __func__
+        return expected::makeError<id3v2::cUchar>() << __func__
                                                       << (":failed\n");
     }
 
     fil.read(reinterpret_cast<char*>(buffer.data()), num);
 
-    return expected::makeValue<id3v2::UCharVec>(buffer);
+    return expected::makeValue<id3v2::cUchar>(buffer);
 }
 
 namespace id3v2 {
 template <typename T>
-const uint32_t GetValFromBuffer(const UCharVec& buffer, T index,
+const uint32_t GetValFromBuffer(const cUchar& buffer, T index,
                                 T num_of_bytes_in_hex) {
     integral_unsigned_asserts<T> eval;
     eval();
@@ -149,7 +149,7 @@ const uint32_t GetValFromBuffer(const UCharVec& buffer, T index,
 }
 
 template <typename T>
-expected::Result<std::string> GetHexFromBuffer(const UCharVec& buffer, T index,
+expected::Result<std::string> GetHexFromBuffer(const cUchar& buffer, T index,
                                                T num_of_bytes_in_hex) {
     integral_unsigned_asserts<T> eval;
     eval();
@@ -175,7 +175,7 @@ expected::Result<std::string> GetHexFromBuffer(const UCharVec& buffer, T index,
 }
 
 template <typename T1, typename T2>
-expected::Result<std::string> ExtractString(const UCharVec& buffer, T1 start,
+expected::Result<std::string> ExtractString(const cUchar& buffer, T1 start,
                                             T1 end) {
     if (end < start) {
         ID3_LOG_WARN("error: start {} and end {}", start, end);
@@ -201,6 +201,7 @@ expected::Result<std::string> ExtractString(const UCharVec& buffer, T1 start,
 
 template <typename T>
 std::string u8_to_u16_string(T val) {
+
     return std::accumulate(
         val.begin() + 1, val.end(), std::string(val.substr(0, 1)),
         [](std::string arg1, char arg2) { return arg1 + '\0' + arg2; });
@@ -216,13 +217,20 @@ constexpr T RetrieveSize(T n) {
     return n;
 }
 
-expected::Result<bool> updateTagSize(UCharVec& buffer, uint32_t extraSize) {
-    constexpr uint32_t TagIndex = 6;
-    constexpr uint32_t NumberOfElements = 4;
-    constexpr uint32_t maxValue = 127;
-    auto it = std::begin(buffer) + TagIndex;
+template <typename T>
+expected::Result<cUchar> updateAreaSize(const cUchar& buffer, uint32_t extraSize
+        ,T tagIndex, T numberOfElements, T _maxValue) {
+
+    const uint32_t TagIndex = tagIndex;
+    const uint32_t NumberOfElements = numberOfElements;
+    const uint32_t maxValue = _maxValue;
+    auto itIn = std::begin(buffer) + TagIndex;
     auto ExtraSize = extraSize;
-    auto extr = ExtraSize % 127;
+    auto extr = ExtraSize % maxValue;
+
+    cUchar temp_vec(NumberOfElements);
+    std::copy(itIn, itIn + NumberOfElements, temp_vec.begin());
+    auto it = temp_vec.begin();
 
     /* reverse order of elements */
     std::reverse(it, it + NumberOfElements);
@@ -248,10 +256,24 @@ expected::Result<bool> updateTagSize(UCharVec& buffer, uint32_t extraSize) {
     /* reverse back order of elements */
     std::reverse(it, it + NumberOfElements);
 
-    return expected::makeValue<bool>(true);
+    ID3_LOG_INFO("success...");
+    return expected::makeValue<cUchar>(temp_vec);
+
 }
 
-expected::Result<uint32_t> GetTagSize(const UCharVec& buffer) {
+expected::Result<cUchar> updateTagSize(const cUchar& buffer,
+                                       uint32_t extraSize) {
+
+    constexpr uint32_t tagSizePositionInHeader = 6;
+    constexpr uint32_t tagSizeLengthInHeader = 4;
+    constexpr uint32_t tagSizeMaxValuePerElement = 127;
+
+    return updateAreaSize<uint32_t>(buffer, extraSize, tagSizePositionInHeader,
+                          tagSizeLengthInHeader, tagSizeMaxValuePerElement);
+}
+
+expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
+
     using paire = std::pair<uint32_t, uint32_t>;
 
     const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
@@ -291,33 +313,39 @@ expected::Result<uint32_t> GetTagSize(const UCharVec& buffer) {
 #endif
 }
 
-auto GetHeaderAndTagSize(const UCharVec& buffer) {
+auto GetHeaderAndTagSize(const cUchar& buffer) {
+
     return GetTagSize(buffer) | [=](const uint32_t Tagsize) {
+
         return expected::makeValue<uint32_t>(Tagsize +
                                              GetHeaderSize<uint32_t>());
     };
 }
 
-const auto GetTagSizeExclusiveHeader(const UCharVec& buffer) {
+const auto GetTagSizeExclusiveHeader(const cUchar& buffer) {
+
     return GetTagSize(buffer) | [](const int tag_size) {
+
         return expected::makeValue<uint32_t>(tag_size -
                                              GetHeaderSize<uint32_t>());
     };
 }
 
-expected::Result<UCharVec> GetHeader(const std::string& FileName) {
+expected::Result<cUchar> GetHeader(const std::string& FileName) {
+
     auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>()) |
-               [&](const UCharVec& _val) {
-                   return expected::makeValue<UCharVec>(_val);
+               [&](const cUchar& _val) {
+                   return expected::makeValue<cUchar>(_val);
                };
 
     if (!val.has_value())
-        return expected::makeError<UCharVec>() << "Error: " << __func__ << "\n";
+        return expected::makeError<cUchar>() << "Error: " << __func__ << "\n";
     else
         return val;
 }
 
-expected::Result<std::string> GetTagArea(const UCharVec& buffer) {
+expected::Result<std::string> GetTagArea(const cUchar& buffer) {
+
     return GetHeaderAndTagSize(buffer) | [&](uint32_t tagSize) {
         ID3_LOG_INFO("{}: tagsize: {}", __func__, tagSize);
 
@@ -330,7 +358,7 @@ void GetTagNames(void) {
     return id3Type::tag_names;
 };
 
-expected::Result<std::string> GetID3FileIdentifier(const UCharVec& buffer) {
+expected::Result<std::string> GetID3FileIdentifier(const cUchar& buffer) {
     constexpr auto FileIdentifierStart = 0;
     constexpr auto FileIdentifierEnd = 3;
 
@@ -345,7 +373,7 @@ expected::Result<std::string> GetID3FileIdentifier(const UCharVec& buffer) {
 #endif
 }
 
-expected::Result<std::string> GetID3Version(const UCharVec& buffer) {
+expected::Result<std::string> GetID3Version(const cUchar& buffer) {
     constexpr auto kID3IndexStart = 4;
     constexpr auto kID3VersionBytesLength = 2;
 
@@ -355,22 +383,35 @@ expected::Result<std::string> GetID3Version(const UCharVec& buffer) {
 
 template <typename Type>
 class search_tag {
+
+private:
     const Type& mTagArea;
+    std::once_flag m_once;
+    uint32_t loc;
 
 public:
-    search_tag(const Type& tagArea) : mTagArea(tagArea) {}
+    search_tag(const Type& tagArea) : mTagArea(tagArea), loc(0) {}
 
     expected::Result<uint32_t> operator()(Type tag) {
-        const auto it =
-            std::search(mTagArea.cbegin(), mTagArea.cend(),
-                        std::boyer_moore_searcher(tag.cbegin(), tag.cend()));
 
-        if (it != mTagArea.cend()) {
-            return expected::makeValue<uint32_t>(it - mTagArea.cbegin());
-        } else {
-            ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
-            return expected::makeError<uint32_t>() << "tag: " << tag
-                                                   << " not found";
+        std::call_once(m_once, [this, &tag]() {
+
+            const auto it = std::search(
+                mTagArea.cbegin(), mTagArea.cend(),
+                std::boyer_moore_searcher(tag.cbegin(), tag.cend()));
+
+            if (it != mTagArea.cend()) {
+                loc = (it - mTagArea.cbegin());
+            } else {
+                ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
+            }
+        });
+
+        if(loc != 0){
+                return expected::makeValue<uint32_t>(loc);
+        }else{
+                return expected::makeError<uint32_t>() << "tag: " << tag
+                                                       << " not found";
         }
     }
 };

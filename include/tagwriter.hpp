@@ -8,68 +8,71 @@
 #include <optional>
 #include <string_conversion.hpp>
 
-
 bool SetTag(const std::string& filename,
-        const std::vector<std::pair<std::string, std::string_view>>& tags, std::string_view content)
-{
+            const std::vector<std::pair<std::string, std::string_view>>& tags,
+            std::string_view content) {
     const auto ret =
-        id3v2::GetHeader(filename)
-        | id3v2::check_for_ID3
-        | [](const std::vector<unsigned char>& buffer)
-        {
+        id3v2::GetHeader(filename) | id3v2::check_for_ID3 |
+        [](const std::vector<unsigned char>& buffer) {
             return id3v2::GetID3Version(buffer);
-        }
-        | [&](std::string id3Version) {
+        } |
+        [&](std::string id3Version) {
             id3v2::iD3Variant tagVersion;
 
-            for (auto& tag: tags)
-            {
-                if (id3Version == tag.first) //tag.first is the id3 Version
+            for (auto& tag : tags) {
+                if (id3Version == tag.first)  // tag.first is the id3 Version
                 {
-                    if(id3Version == "0x0300"){
+                    if (id3Version == "0x0300") {
                         tagVersion = id3v2::v30();
-                    }
-                    else if(id3Version == "0x0400"){
+                    } else if (id3Version == "0x0400") {
                         tagVersion = id3v2::v40();
-                    }
-                    else if(id3Version == "0x0000"){
+                    } else if (id3Version == "0x0000") {
                         tagVersion = id3v2::v00();
-                    }
-                    else{
-                        return expected::makeError<bool>("id3 version not supported\n");
+                    } else {
+                        return expected::makeError<bool>(
+                            "id3 version not supported\n");
                     }
 
-                              std::cout << "prepare tag content top: " << std::string(content) << std::endl;;
+                    ID3_LOG_INFO("tag content to write: {}", std::string(content));
+
                     id3v2::TagReadWriter<std::string_view> obj(filename);
-                    expected::Result<id3v2::TagInfos> locs = obj.findTagInfos(tag.second, tagVersion);
-                    if(locs.has_value())
+                    expected::Result<id3v2::TagInfos> locs =
+                        obj.findTagInfos(tag.second, tagVersion);
+
+                    if (locs.has_value()) {
+
+                    const id3v2::TagInfos& tagLoc = locs.value();
+                    const std::string tag_str =
+                        prepareTagContent(content, tagLoc);
+
+                    ID3_LOG_INFO("Content write: {} prepared", tag_str);
+                    ID3_LOG_INFO("tag area length: {} ", tagLoc.getLength());
+                    if (tagLoc.getLength() <
+                        tag_str.size())  // resize whole header
                     {
-                        const id3v2::TagInfos& tagLoc = locs.value();
-                        const std::string tag_str = prepareTagContent(content, tagLoc);
-//                              std::cout << "prepare tag content2: " << tag_str << std::endl;;
-//                        assert (tagLoc.getLength() >= tag_str.size());
-                        if (tagLoc.getLength() < tag_str.size()) //resize whole header
-                        {
-                            const uint32_t extraLength = (tag_str.size() - tagLoc.getLength());
-                            struct id3v2::newTagArea NewTagArea{filename, tagLoc, tagVersion, extraLength};
+                        const uint32_t extraLength =
+                            (tag_str.size() - tagLoc.getLength());
+                        struct id3v2::newTagArea NewTagArea {
+                            filename, tagLoc, tagVersion, extraLength
+                        };
 
-                            return NewTagArea.writeFile(tag_str);
+                        return NewTagArea.writeFile(tag_str);
 
-                        }else{
-                            return obj.WriteFile(tag_str, tagLoc);
-                        }
+                    } else {
+                        return obj.WriteFile(tag_str, tagLoc);
                     }
-                    else{
-                        return expected::makeError<bool>("findTagInfos: tag could not be located\n");
+                    } else {
+                    return expected::makeError<bool>(
+                        "findTagInfos: tag could not be located\n");
                     }
-
                 }
             }
 
+            ID3_LOG_WARN("{} failed", __func__);
             return expected::makeError<bool>() << __func__ << " failed\n";
-    };
+        };
 
-    if(ret.has_value())
+    if (ret.has_value())
         return ret.value();
     else
         return false;

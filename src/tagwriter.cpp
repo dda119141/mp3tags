@@ -79,7 +79,7 @@ TEST_CASE("Read/Write from/to id2v3 tag") {
         REQUIRE(SetAlbum(filename, "testYing") == 1);
     }
     SECTION("Test writing title"){
-        REQUIRE(SetTitle(filename, "testYingTitle") == 1);
+        REQUIRE(SetTitle(filename, "teYY") == 1);
     }
     SECTION("Test writing artist"){
         REQUIRE(SetLeadArtist(filename, "TitTestYingTitle") == 1);
