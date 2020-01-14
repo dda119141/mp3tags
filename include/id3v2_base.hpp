@@ -18,6 +18,7 @@
 #include <range/v3/view/filter.hpp>
 
 #include "result.hpp"
+#include "logger.hpp"
 
 namespace id3v2
 {
@@ -180,7 +181,7 @@ namespace id3v2
         expected::Result<std::string> ExtractString(const UCharVec& buffer, T1 start, T1 end)
         {
             if(end < start){
-                std::cerr << __func__ << " error start: " << start << " end: " << end << std::endl;
+                 ID3_LOG_WARN("error: start {} and end {}", start, end);
             }
             assert(end > start);
 
@@ -328,9 +329,8 @@ namespace id3v2
         return  GetHeaderAndTagSize(buffer)
             | [&](uint32_t tagSize)
             {
-#ifdef DEBUG
-                std::cout << "tag__size: " << tagSize << std::endl;
-#endif
+                ID3_LOG_INFO("{}: tagsize: {}", __func__, tagSize);
+
                 return ExtractString<uint32_t, uint32_t>(buffer, 0, tagSize);
             };
     }
@@ -384,6 +384,7 @@ namespace id3v2
                 if(it != mTagArea.cend()){
                     return expected::makeValue<uint32_t>(it - mTagArea.cbegin());
                 }else{
+                    ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
                     return expected::makeError<uint32_t>() << "tag: " << tag << " not found";
                 }
             }

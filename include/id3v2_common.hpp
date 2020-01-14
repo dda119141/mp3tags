@@ -63,10 +63,10 @@ namespace id3v2
             auto ExtraSize = extraSize;
             auto extr = ExtraSize % 127;
 
-            std::cout << " Tag Index: " << tagIndex << "\n";
-            for(int i = 0; i < 5; i++)
-                std::cout << std::hex << (int)*( std::begin(buffer) + tagIndex + i) << " ";
-             std::cout << "\n";
+            id3v2::log()->info(" Tag Index: {}", tagIndex);
+
+            id3v2::log()->info("Tag Frame Bytes before update : {}",spdlog::to_hex(std::begin(buffer) + tagIndex, std::begin(buffer) + tagIndex + 4));
+
             /* reverse order of elements */
             std::reverse(it, it + NumberOfElements);
 
@@ -92,9 +92,8 @@ namespace id3v2
             /* reverse back order of elements */
             std::reverse(it, it + NumberOfElements);
 
-            for(int i = 0; i < 5; i++)
-                std::cout <<std::hex << (int)*( std::begin(buffer) + tagIndex + i) << " ";
-             std::cout << "\n";
+            id3v2::log()->info("Tag Frame Bytes after update : {}",spdlog::to_hex(std::begin(buffer) + tagIndex, std::begin(buffer) + tagIndex + 4));
+
             return expected::makeValue<bool>(true);
 
         }
@@ -173,6 +172,7 @@ namespace id3v2
 
                                 const auto PositionTagStart = tagLoc.getTagContentOffset();
 
+            id3v2::log()->info(" PositionTagStart: {}", PositionTagStart);
 #if 0
                                 std::cout << "PositionTagStart: " << std::dec << PositionTagStart << std::endl;
                                 std::cout << "Content size: " << std::dec <<  content.size() << std::endl;
@@ -305,8 +305,9 @@ namespace id3v2
             expected::Result<T> constructNewTagInfos(const T& tagLoc,
                                                      uint32_t newtagSize) {
                 const T TagLoc{
-                    tagLoc.getTagOffset(), tagLoc.getTagContentOffset(), tagLoc.getLength() + newtagSize,
-                    tagLoc.getEncodingValue(), tagLoc.getSwapValue()};
+                    tagLoc.getTagOffset(), tagLoc.getTagContentOffset(),
+                    tagLoc.getLength() + newtagSize, tagLoc.getEncodingValue(),
+                    tagLoc.getSwapValue()};
 
                 return expected::makeValue<T>(TagLoc);
             }
@@ -314,23 +315,27 @@ namespace id3v2
             expected::Result<cUchar> extendBuffer(
                 const TagInfos& tagLoc, uint32_t additionalSize,
                 const iD3Variant& tagVersion) {
-
                 const auto ret = mCBuffer | [&](cUchar& cBuffer) {
 
                     updateTagSize(cBuffer, additionalSize);
 
-                    updateFrameSizeIndex<cUchar&, uint32_t, uint32_t>(tagVersion, cBuffer, additionalSize, tagLoc.getTagOffset());
+                    updateFrameSizeIndex<cUchar&, uint32_t, uint32_t>(
+                        tagVersion, cBuffer, additionalSize,
+                        tagLoc.getTagOffset());
                     assert(tagLoc.getTagOffset() + tagLoc.getLength() <
                            cBuffer.size());
 
                     auto it = cBuffer.begin() + tagLoc.getTagOffset() +
                               tagLoc.getLength();
 
-                    std::cout << "FrameSize... length: " <<
-                     tagLoc.getLength() <<
-                     " start: " << tagLoc.getTagOffset() << " additionalsize: "
-                     <<
-                     additionalSize << " content " << (int)*(cBuffer.begin() + tagLoc.getTagOffset() + 7) << "\n";
+                    ID3_LOG_INFO("FrameSize... length: {}, tag start: {}",
+                                 tagLoc.getLength(), tagLoc.getTagOffset());
+
+                    ID3_LOG_INFO(
+                        "Tag Frame Bytes after update : {}",
+                        spdlog::to_hex(
+                            std::begin(cBuffer) + tagLoc.getTagOffset() + 4,
+                            std::begin(cBuffer) + tagLoc.getTagOffset() + 7));
                     cBuffer.insert(it, additionalSize, 0);
 
                     return expected::makeValue<cUchar>(cBuffer);
@@ -355,7 +360,8 @@ namespace id3v2
                     return _headerAndTagsSize |
                            [&](uint32_t headerAndTagsSize) {
 
-                                std::cout << "headerAndtagsize: " << headerAndTagsSize << "...\n";
+                               ID3_LOG_INFO("headerAndtagsize: {}",
+                                            headerAndTagsSize);
 
                                const uint32_t tagsSizeOld =
                                    headerAndTagsSize - extraSize;
@@ -373,21 +379,25 @@ namespace id3v2
 
                                assert(buff.size() < dataSize);
 
-                                std::cout << "datasize: " << dataSize << " buffer size: " << buff.size() << "...\n";
+                               std::cout << "datasize: " << dataSize
+                                         << " buffer size: " << buff.size()
+                                         << "...\n";
                                std::ofstream filWrite(
-                                   FileName + ".mod", std::ios::binary | std::ios::app);
+                                   FileName + ".mod",
+                                   std::ios::binary | std::ios::app);
 
                                std::for_each(std::begin(buff), std::end(buff),
                                              [&filWrite](const char& n) {
                                                  filWrite << n;
                                              });
 
-                               std::for_each(bufRead.begin(), bufRead.begin() + dataSize,
+                               std::for_each(bufRead.begin(),
+                                             bufRead.begin() + dataSize,
                                              [&filWrite](const char& n) {
                                                  filWrite << n;
                                              });
 
-                  //              std::cout << "inserdfft done...\n";
+                               ID3_LOG_INFO("success: {}", __func__);
                                return expected::makeValue<bool>(true);
                            };
                 };
@@ -395,191 +405,175 @@ namespace id3v2
     };
 
     template <typename type>
-        class TagReadWriter
-        {
-            public:
-
-                explicit TagReadWriter(const std::string& filename)
-                    : FileName(filename)
-                {
-                    std::call_once(m_once, [this]()
-                            {
+    class TagReadWriter {
+    public:
+        explicit TagReadWriter(const std::string& filename)
+            : FileName(filename) {
+            std::call_once(m_once, [this]() {
 #if 1
-                            auto ret = GetHeader(FileName)
-                            | GetTagSize
-                            | [&](uint32_t tags_size)
-                            {
-                            return GetStringFromFile(FileName, tags_size + GetHeaderSize<uint32_t>());
-                            };
-                            if(ret.has_value())
-                            {
-                            buffer = ret.value();
-                            }
-#endif
-                            });
-                }
-
-
-                expected::Result<bool> WriteFile(const std::string& content, const TagInfos& tagLoc)
-                {
-                    std::fstream filWrite(FileName, std::ios::binary | std::ios::in | std::ios::out);
-
-                    if(!filWrite.is_open())
-                    {
-                        return expected::makeError<bool>() << __func__ << ": Error opening file\n";
-                    }
-
-                    filWrite.seekp(tagLoc.getTagContentOffset());
-
-                    std::for_each(content.begin(), content.end(), [&filWrite](const char& n)
-                            {
-                            filWrite << n;
-                            });
-
-                    for (uint32_t i = 0; i < (tagLoc.getLength() - content.size()); ++i){
-                        filWrite << '\0';
-                    }
-
-                    return expected::makeValue<bool>(true);
-                }
-
-                expected::Result<bool> ReWriteFile(const cUchar& cBuffer)
-                {
-                    std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
-                    std::ofstream filWrite(FileName + ".mod", std::ios::binary | std::ios::app);
-
-                    if(!filRead.good())
-                    {
-                        return expected::makeError<bool>()<< "__func__" << ": Error opening file";
-                    }
-
-                    cUchar bufRead;
-
-                    const unsigned int dataSize = filRead.tellg();
-
-                    filRead.seekg(0);
-                    bufRead.reserve(dataSize);
-                    filRead.read(reinterpret_cast<char*>(&bufRead[0]), dataSize);
-
-                    assert(cBuffer.size() <  dataSize);
-
-                    std::for_each(std::begin(cBuffer), std::end(cBuffer), [&filWrite](const char& n)
-                            {
-                            filWrite << n;
-                            });
-
-                    std::for_each(bufRead.begin() + cBuffer.size(), bufRead.begin() + dataSize, [&filWrite](const char& n)
-                            {
-                            filWrite << n;
-                            });
-
-                    return expected::makeValue<bool>(true);
-                }
-
-                const expected::Result<TagInfos> findTagInfos(std::string_view tag, const iD3Variant& TagVersion)
-                {
-                    uint32_t FrameSize = 0;
-                    uint32_t TagLocation = 0;
-
-                    const auto ret = buffer
-                        | [](const cUchar& buffer) -> expected::Result<std::string>
-
-                        {
-                            return GetTagArea(buffer);
-                        }
-                    | [&tag](const std::string& tagArea) -> expected::Result<uint32_t>
-                    {
-                        auto searchTagPosition = search_tag<std::string_view>(tagArea);
-#ifdef DEBUG
-                        std::cout << "tag name " << tag << std::endl;
-#endif
-                        const auto ret =  searchTagPosition(tag);
-
-                        return ret;
-                    }
-                    | [&](uint32_t tagIndex) -> expected::Result<TagInfos>
-                    {
-                        if(tagIndex == 0)
-                            return expected::makeError<TagInfos>("tagIndex = 0");
-
-                        assert(tagIndex >= GetHeaderSize<uint32_t>());
-
-                        TagLocation = tagIndex;
-#ifdef DEBUG
-                        std::cout << "tag index " << tagIndex << std::endl;
-#endif
-                        return buffer
-                            | [&tagIndex, &TagVersion](const cUchar& buff)
-                            {
-                                return GetFrameSize<uint32_t>(buff, TagVersion, tagIndex);
-                            }
-                        | [&](uint32_t frameSize) -> expected::Result<TagInfos>
-                        {
-                            const uint32_t tagContentOffset = tagIndex + GetFrameHeaderSize(TagVersion);
-                            FrameSize = frameSize;
-
-#ifdef DEBUG
-                            std::cout << "tag offset " << tagContentOffset << " FrameSize: " << FrameSize << std::endl;
-#endif
-                            assert(tagContentOffset > 0);
-
-                            return buffer
-                                | [&](const cUchar& buff)
-                                {
-                                    if(tag.find_first_of("T") == 0) // if tag starts with T
-                                    {
-                                        return getTagPosFromEncodeByte<TagInfos>(buff, TagLocation, tagContentOffset, FrameSize);
-                                    }
-
-                                    const auto ret1 = TagInfos(TagLocation, tagContentOffset, FrameSize);
-                                    return expected::makeValue<TagInfos>(ret1);
-                                };
-                        };
+                auto ret =
+                    GetHeader(FileName) | GetTagSize | [&](uint32_t tags_size) {
+                        return GetStringFromFile(
+                            FileName, tags_size + GetHeaderSize<uint32_t>());
                     };
-
-                    if(ret.has_value()){
-#ifdef DEBUG
-                        std::cerr << "Ret has value!!: " << ret.value().getTagContentOffset() << "\n";
-#endif
-                    }
-
-                    return ret;
+                if (ret.has_value()) {
+                    buffer = ret.value();
                 }
+#endif
+            });
+        }
 
-                const expected::Result<std::string> extractTag(std::string_view tag, const iD3Variant& TagVersion)
-                {
-                    const auto res = buffer
-                        | [=](const cUchar& buff)
+        expected::Result<bool> WriteFile(const std::string& content,
+                                         const TagInfos& tagLoc) {
+            std::fstream filWrite(
+                FileName, std::ios::binary | std::ios::in | std::ios::out);
+
+            if (!filWrite.is_open()) {
+                return expected::makeError<bool>() << __func__
+                                                   << ": Error opening file\n";
+            }
+
+            filWrite.seekp(tagLoc.getTagContentOffset());
+
+            std::for_each(content.begin(), content.end(),
+                          [&filWrite](const char& n) { filWrite << n; });
+
+            for (uint32_t i = 0; i < (tagLoc.getLength() - content.size());
+                 ++i) {
+                filWrite << '\0';
+            }
+
+            return expected::makeValue<bool>(true);
+        }
+
+        expected::Result<bool> ReWriteFile(const cUchar& cBuffer) {
+            std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
+            std::ofstream filWrite(FileName + ".mod",
+                                   std::ios::binary | std::ios::app);
+
+            if (!filRead.good()) {
+                return expected::makeError<bool>() << "__func__"
+                                                   << ": Error opening file";
+            }
+
+            cUchar bufRead;
+
+            const unsigned int dataSize = filRead.tellg();
+
+            filRead.seekg(0);
+            bufRead.reserve(dataSize);
+            filRead.read(reinterpret_cast<char*>(&bufRead[0]), dataSize);
+
+            assert(cBuffer.size() < dataSize);
+
+            std::for_each(std::begin(cBuffer), std::end(cBuffer),
+                          [&filWrite](const char& n) { filWrite << n; });
+
+            std::for_each(bufRead.begin() + cBuffer.size(),
+                          bufRead.begin() + dataSize,
+                          [&filWrite](const char& n) { filWrite << n; });
+
+            return expected::makeValue<bool>(true);
+        }
+
+        const expected::Result<TagInfos> findTagInfos(
+            std::string_view tag, const iD3Variant& TagVersion) {
+            uint32_t FrameSize = 0;
+            uint32_t TagLocation = 0;
+
+            const auto ret =
+                buffer |
+                [](const cUchar& buffer) -> expected::Result<std::string>
+
+            {
+                return GetTagArea(buffer);
+            } | [&tag](const std::string&
+                           tagArea) -> expected::Result<uint32_t> {
+                auto searchTagPosition = search_tag<std::string_view>(tagArea);
+                //   id3v2::log()->info(" tag name: {}", tag);
+                // std::string erg = std::string(tag);
+                // std::string erg = "test";
+                // id3v2::log()->info(" tag name:");
+
+                const auto ret = searchTagPosition(tag);
+
+                return ret;
+            } | [&](uint32_t tagIndex) -> expected::Result<TagInfos> {
+                if (tagIndex == 0)
+                    return expected::makeError<TagInfos>("tagIndex = 0");
+
+                assert(tagIndex >= GetHeaderSize<uint32_t>());
+
+                TagLocation = tagIndex;
+
+                ID3_LOG_INFO(" tag Index: {}", tagIndex);
+
+                return buffer | [&tagIndex, &TagVersion](const cUchar& buff) {
+                    return GetFrameSize<uint32_t>(buff, TagVersion, tagIndex);
+                } | [&](uint32_t frameSize) -> expected::Result<TagInfos> {
+                    const uint32_t tagContentOffset =
+                        tagIndex + GetFrameHeaderSize(TagVersion);
+                    FrameSize = frameSize;
+
+                    ID3_LOG_INFO("tag content offset: {}", tagContentOffset);
+                    assert(tagContentOffset > 0);
+
+                    return buffer | [&](const cUchar& buff) {
+                        if (tag.find_first_of("T") ==
+                            0)  // if tag starts with T
                         {
-                            return findTagInfos(tag, TagVersion)
-                                | [&](const TagInfos& TagLoc)
-                                {
-#ifdef DEBUG
-                                    std::cout << "** tag offset " << TagLoc.getTagContentOffset() << " FrameSize: " << TagLoc.getLength() << std::endl;
-#endif
-                                    const auto val =  ExtractString<uint32_t, uint32_t>(buff, TagLoc.getTagContentOffset(),
-                                            TagLoc.getTagContentOffset() + TagLoc.getLength());
+                            return getTagPosFromEncodeByte<TagInfos>(
+                                buff, TagLocation, tagContentOffset, FrameSize);
+                        }
 
-                                    return val
-                                        | [&TagLoc](const std::string& val_str) -> expected::Result<std::string>
-                                        {
-                                            if(TagLoc.getSwapValue() == 0x01){
-                                                const auto cont = tagBase::swapW16String(std::string_view(val_str));
-                                                return expected::makeValue<std::string>(cont);
-                                            }else{
-                                                return expected::makeValue<std::string>(val_str);
-                                            }
-                                        };
-                                };
-                        };
-                    return res;
-                }
+                        const auto ret1 =
+                            TagInfos(TagLocation, tagContentOffset, FrameSize);
+                        return expected::makeValue<TagInfos>(ret1);
+                    };
+                };
+            };
 
-            private:
-                mutable std::once_flag m_once;
-                const std::string& FileName;
-                std::optional<cUchar> buffer;
-        };
+            ID3_LOG_INFO("return val: {}", ret.has_value());
+
+            return ret;
+        }
+
+        const expected::Result<std::string> extractTag(
+            std::string_view tag, const iD3Variant& TagVersion) {
+            const auto res = buffer | [=](const cUchar& buff) {
+                return findTagInfos(tag, TagVersion) | [&](const TagInfos&
+                                                               TagLoc) {
+
+                    ID3_LOG_INFO("tag content offset: {}, framesize {}",
+                                 TagLoc.getTagContentOffset(),
+                                 TagLoc.getLength());
+
+                    const auto val = ExtractString<uint32_t, uint32_t>(
+                        buff, TagLoc.getTagContentOffset(),
+                        TagLoc.getTagContentOffset() + TagLoc.getLength());
+
+                    return val | [&TagLoc](const std::string& val_str)
+                               -> expected::Result<std::string> {
+                                   if (TagLoc.getSwapValue() == 0x01) {
+                                       const auto cont = tagBase::swapW16String(
+                                           std::string_view(val_str));
+                                       return expected::makeValue<std::string>(
+                                           cont);
+                                   } else {
+                                       return expected::makeValue<std::string>(
+                                           val_str);
+                                   }
+                               };
+                };
+            };
+            return res;
+        }
+
+    private:
+        mutable std::once_flag m_once;
+        const std::string& FileName;
+        std::optional<cUchar> buffer;
+    };
 
     template <typename id3Type>
         const auto is_tag(std::string name)

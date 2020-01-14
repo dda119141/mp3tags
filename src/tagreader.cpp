@@ -119,8 +119,8 @@ int main() {
 #if 1
         if(filename.find("test1.mp3") != std::string::npos){
             cout << "Title: " << GetTitle(filename) << endl;
-            cout << "\n/*********************************/ \n";
-            cout << "Change title: " << filename << SetTitle(filename, "testYingTitle") << endl;
+//            cout << "\n/*********************************/ \n";
+//            cout << "Change title: " << filename << SetTitle(filename, "testYingTitle") << endl;
             //cout << "Change album: " << SetAlbum(filename, "test1");
 
          }
