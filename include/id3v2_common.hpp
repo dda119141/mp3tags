@@ -221,9 +221,9 @@ namespace id3v2
             std::call_once(m_once, [&filename, &tagLoc, &tagVersion,
                                     additionalSize, this]() {
                 auto ret =
-                    GetHeader(filename) | GetTagSize | [&](uint32_t tags_size) {
+                    GetTagHeader(filename) | GetTagSize | [&](uint32_t tags_size) {
                         return GetStringFromFile(
-                            filename, tags_size + GetHeaderSize<uint32_t>());
+                            filename, tags_size + GetTagHeaderSize<uint32_t>());
                     };
                 if (ret.has_value()) {
 
@@ -337,7 +337,7 @@ namespace id3v2
             }
 
             return mCBuffer | [&](const cUchar& buff) {
-                const auto _headerAndTagsSize = GetHeaderAndTagSize(buff);
+                const auto _headerAndTagsSize = GetTotalTagSize(buff);
 
                 return _headerAndTagsSize | [&](uint32_t headerAndTagsSize) {
 
@@ -359,7 +359,7 @@ namespace id3v2
 
                     ID3_LOG_INFO("datasize: {} - buffer size: {}", dataSize, buff.size());
 
-                    std::ofstream filWrite(FileName + ".mod",
+                    std::ofstream filWrite(FileName + modifiedEnding,
                                            std::ios::binary | std::ios::app);
 
                     std::for_each(
@@ -386,9 +386,9 @@ namespace id3v2
             std::call_once(m_once, [this]() {
 
                 const auto ret =
-                    GetHeader(FileName) | GetTagSize | [&](uint32_t tags_size) {
+                    GetTagHeader(FileName) | GetTagSize | [&](uint32_t tags_size) {
                         return GetStringFromFile(
-                            FileName, tags_size + GetHeaderSize<uint32_t>());
+                            FileName, tags_size + GetTagHeaderSize<uint32_t>());
                     };
                 if (ret.has_value()) {
                     buffer = ret.value();
@@ -421,7 +421,7 @@ namespace id3v2
 
         expected::Result<bool> ReWriteFile(const cUchar& cBuffer) {
             std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
-            std::ofstream filWrite(FileName + ".mod",
+            std::ofstream filWrite(FileName + id3v2::modifiedEnding,
                                    std::ios::binary | std::ios::app);
 
             if (!filRead.good()) {
@@ -473,7 +473,7 @@ namespace id3v2
                 if (tagIndex == 0)
                     return expected::makeError<TagInfos>("tagIndex = 0");
 
-                assert(tagIndex >= GetHeaderSize<uint32_t>());
+                assert(tagIndex >= GetTagHeaderSize<uint32_t>());
 
                 TagLocation = tagIndex;
 

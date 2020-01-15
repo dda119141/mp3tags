@@ -25,6 +25,8 @@ namespace id3v2
 {
     using cUchar = std::vector<unsigned char>;
 
+    static const std::string modifiedEnding(".mod");
+
     class TagInfos {
     public:
         TagInfos(uint32_t TagOffset, uint32_t TagContentOffset,
@@ -144,6 +146,7 @@ const auto GetStringFromFile(const std::string& FileName, uint32_t num) {
 }
 
 namespace id3v2 {
+
 template <typename T>
 const uint32_t GetValFromBuffer(const cUchar& buffer, T index,
                                 T num_of_bytes_in_hex) {
@@ -229,7 +232,7 @@ std::string u8_to_u16_string(T val) {
 }
 
 template <typename T>
-constexpr T GetHeaderSize(void) {
+constexpr T GetTagHeaderSize(void) {
     return 10;
 }
 
@@ -310,12 +313,12 @@ expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
         result.begin(), result.end(), 0,
         [](int a, paire b) { return (a + (b.first * std::pow(2, b.second))); });
 
-    assert(val > GetHeaderSize<uint32_t>());
+    assert(val > GetTagHeaderSize<uint32_t>());
 
     return expected::makeValue<uint32_t>(val);
 
 #if 0
-        if(buffer.size() >= GetHeaderSize<uint32_t>())
+        if(buffer.size() >= GetTagHeaderSize<uint32_t>())
         {
             auto val = buffer[6] * std::pow(2, 21);
 
@@ -323,7 +326,7 @@ expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
             val += buffer[8] * std::pow(2, 7);
             val += buffer[9] * std::pow(2, 0);
 
-            if(val > GetHeaderSize<uint32_t>()){
+            if(val > GetTagHeaderSize<uint32_t>()){
                 return val;
             }
         } else
@@ -334,12 +337,12 @@ expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
 #endif
 }
 
-const auto GetHeaderAndTagSize(const cUchar& buffer) {
+const auto GetTotalTagSize(const cUchar& buffer) {
 
     return GetTagSize(buffer) | [=](const uint32_t Tagsize) {
 
         return expected::makeValue<uint32_t>(Tagsize +
-                                             GetHeaderSize<uint32_t>());
+                                             GetTagHeaderSize<uint32_t>());
     };
 }
 
@@ -348,13 +351,13 @@ const auto GetTagSizeExclusiveHeader(const cUchar& buffer) {
     return GetTagSize(buffer) | [](const int tag_size) {
 
         return expected::makeValue<uint32_t>(tag_size -
-                                             GetHeaderSize<uint32_t>());
+                                             GetTagHeaderSize<uint32_t>());
     };
 }
 
-expected::Result<cUchar> GetHeader(const std::string& FileName) {
+expected::Result<cUchar> GetTagHeader(const std::string& FileName) {
 
-    auto val = GetStringFromFile(FileName, GetHeaderSize<uint32_t>()) |
+    auto val = GetStringFromFile(FileName, GetTagHeaderSize<uint32_t>()) |
                [&](const cUchar& _val) {
                    return expected::makeValue<cUchar>(_val);
                };
@@ -367,11 +370,37 @@ expected::Result<cUchar> GetHeader(const std::string& FileName) {
 
 expected::Result<std::string> GetTagArea(const cUchar& buffer) {
 
-    return GetHeaderAndTagSize(buffer) | [&](uint32_t tagSize) {
+    return GetTotalTagSize(buffer) | [&](uint32_t tagSize) {
         ID3_LOG_INFO("{}: tagsize: {}", __func__, tagSize);
 
         return ExtractString<uint32_t, uint32_t>(buffer, 0, tagSize);
     };
+}
+
+template <typename T>
+expected::Result<cUchar> processFrameHeaderFlags(
+    const cUchar& buffer, uint32_t frameHeaderFlagsPosition, std::string_view tag) {
+    constexpr uint32_t frameHeaderFlagsLength = 2;
+
+    const auto it = buffer.begin() + frameHeaderFlagsPosition;
+
+    cUchar temp_vec(frameHeaderFlagsLength);
+    std::copy(it, it + 2, temp_vec.begin());
+
+    std::bitset<8> frameStatusFlag(temp_vec[0]);
+    std::bitset<8> frameDescriptionFlag(temp_vec[1]);
+
+    if(frameStatusFlag[1]){
+        ID3_LOG_WARN("frame {} should be discarded", std::string(tag));
+    }
+    if(frameStatusFlag[2]){
+        ID3_LOG_WARN("frame {} should be discarded", std::string(tag));
+    }
+    if(frameStatusFlag[3]){
+        ID3_LOG_WARN("frame {} is read-only and is not meant to be changed", std::string(tag));
+    }
+
+    return expected::makeValue<cUchar>(temp_vec);
 }
 
 template <typename id3Type>

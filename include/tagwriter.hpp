@@ -12,7 +12,7 @@ bool SetTag(const std::string& filename,
             const std::vector<std::pair<std::string, std::string_view>>& tags,
             std::string_view content) {
     const auto ret =
-        id3v2::GetHeader(filename) | id3v2::check_for_ID3 |
+        id3v2::GetTagHeader(filename) | id3v2::check_for_ID3 |
         [](const std::vector<unsigned char>& buffer) {
             return id3v2::GetID3Version(buffer);
         } |
@@ -59,7 +59,8 @@ bool SetTag(const std::string& filename,
                         return (NewTagArea.writeFile(tag_str) |
                                 [&](const bool& val)
                                 {
-                            return renameFile(filename + ".mod", filename);
+                            return renameFile(filename + id3v2::modifiedEnding
+                                    , filename);
                             });
 
                     } else {
@@ -106,6 +107,17 @@ bool SetLeadArtist(const std::string& filename, std::string_view content)
     return  SetTag(filename, tags, content);
 }
 
+bool SetBandOrchestra(const std::string& filename, std::string_view content)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TPE2"},
+        {"0x0300", "TPE2"},
+            {"0x0000", "TP2"},
+    };
+
+    return  SetTag(filename, tags, content);
+}
 
 bool SetComposer(const std::string& filename, std::string_view content)
 {

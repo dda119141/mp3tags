@@ -223,13 +223,13 @@ namespace expected
         return makeValue<uChar>(buffer);
     }
 
-    std::optional<uChar> GetHeader1(const std::string& FileName )
-//    std::string GetHeader1(const std::string& FileName )
+    std::optional<uChar> GetTagHeader1(const std::string& FileName )
+//    std::string GetTagHeader1(const std::string& FileName )
     {
         auto ret =
             GetStringFromFile1(FileName, 10) | [&]( const uChar& obj )
         {
-            std::cerr << "error " << "GetHeader1" << std::endl;
+            std::cerr << "error " << "GetTagHeader1" << std::endl;
 
             //return makeValue<bool, std::string>(true);
            // return makeError<bool, std::string>(" ******* ");

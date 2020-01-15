@@ -11,7 +11,7 @@ template<typename tagType>
 const std::string GetTheTag(const std::string& filename, const std::vector<std::pair<std::string, std::string_view>>& tags)
 {
     const auto ret = 
-            id3v2::GetHeader(filename)
+            id3v2::GetTagHeader(filename)
             | id3v2::check_for_ID3
             | [](const std::vector<unsigned char>& buffer)
             {
@@ -188,6 +188,18 @@ const std::string GetTrackPosition(const std::string& filename)
         {"0x0400", "TRCK"},
         {"0x0300", "TRCK"},
         {"0x0000", "TRK"},
+    };
+
+    return GetTheTag<std::string>(filename, tags);
+}
+
+const std::string GetBandOrchestra(const std::string& filename)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TPE2"},
+        {"0x0300", "TPE2"},
+        {"0x0000", "TP2"},
     };
 
     return GetTheTag<std::string>(filename, tags);

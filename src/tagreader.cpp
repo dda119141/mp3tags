@@ -22,14 +22,14 @@ void print_header_infos(const std::string& filename)
     using std::cout;
     using std::endl;
 
-    auto bufferO = id3v2::GetHeader(filename);
+    auto bufferO = id3v2::GetTagHeader(filename);
 
     if (!bufferO.has_value()) {
         cout << "file identifier: \n";
         return;
     }
 
-    auto buffer = id3v2::GetHeader(filename);
+    auto buffer = id3v2::GetTagHeader(filename);
 
     int res = buffer | [](const std::vector<unsigned char>& buff) -> int
     {
@@ -45,7 +45,7 @@ void print_header_infos(const std::string& filename)
         cout << "file identifier: " << id3v2::GetID3FileIdentifier(buff).value() << endl;
         cout << "version: " << id3v2::GetID3Version(buff).value() << endl;
         cout << "Tag size: " << std::dec << id3v2::GetTagSize(buff).value() << endl;
-        cout << "HeaderTag size: " << std::dec << id3v2::GetHeaderAndTagSize(buff).value() << endl;
+        cout << "HeaderTag size: " << std::dec << id3v2::GetTotalTagSize(buff).value() << endl;
 
         return;
     };
@@ -134,7 +134,7 @@ int main() {
         cout << "wrong path:" << endl;
   }
 
-//  std::cout << expected::GetHeader1("../files/test1.mp3") << "\n";
+//  std::cout << expected::GetTagHeader1("../files/test1.mp3") << "\n";
 #endif
     return 0;
 }
