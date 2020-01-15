@@ -11,6 +11,7 @@
 #include <cmath>
 #include <variant>
 #include <type_traits>
+#include <experimental/filesystem>
 //#include <range/v3/all.hpp>
 #include <range/v3/view.hpp>
 #include <range/v3/action.hpp>
@@ -98,6 +99,26 @@ auto operator|(T&& _obj, F&& Function)
     }
 }
 #endif
+
+expected::Result<bool> renameFile(const std::string& fileToRename,
+                                  const std::string& renamedFile) {
+    namespace fs = std::experimental::filesystem;
+
+    const fs::path FileToRenamePath =
+        fs::path(fs::system_complete(fileToRename));
+    const fs::path RenamedFilePath = fs::path(fs::system_complete(renamedFile));
+
+    try {
+        fs::rename(FileToRenamePath, RenamedFilePath);
+        return expected::makeValue<bool>(true);
+    } catch (fs::filesystem_error& e) {
+        ID3_LOG_ERROR("could not rename modified audio file: {}", e.what());
+    } catch (const std::bad_alloc& e) {
+        ID3_LOG_ERROR("Renaming: Allocation failed: ", e.what());
+    }
+
+    return expected::makeError<bool>("could rename the modified audio file");
+}
 
 template <typename T>
 struct integral_unsigned_asserts {
@@ -313,7 +334,7 @@ expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
 #endif
 }
 
-auto GetHeaderAndTagSize(const cUchar& buffer) {
+const auto GetHeaderAndTagSize(const cUchar& buffer) {
 
     return GetTagSize(buffer) | [=](const uint32_t Tagsize) {
 

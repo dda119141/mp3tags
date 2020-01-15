@@ -56,7 +56,11 @@ bool SetTag(const std::string& filename,
                             filename, tagLoc, tagVersion, extraLength
                         };
 
-                        return NewTagArea.writeFile(tag_str);
+                        return (NewTagArea.writeFile(tag_str) |
+                                [&](const bool& val)
+                                {
+                            return renameFile(filename + ".mod", filename);
+                            });
 
                     } else {
                         return obj.WriteFile(tag_str, tagLoc);

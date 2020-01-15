@@ -337,7 +337,7 @@ namespace id3v2
             }
 
             return mCBuffer | [&](const cUchar& buff) {
-                auto _headerAndTagsSize = GetHeaderAndTagSize(buff);
+                const auto _headerAndTagsSize = GetHeaderAndTagSize(buff);
 
                 return _headerAndTagsSize | [&](uint32_t headerAndTagsSize) {
 
@@ -384,8 +384,8 @@ namespace id3v2
             : FileName(filename) {
 
             std::call_once(m_once, [this]() {
-#if 1
-                auto ret =
+
+                const auto ret =
                     GetHeader(FileName) | GetTagSize | [&](uint32_t tags_size) {
                         return GetStringFromFile(
                             FileName, tags_size + GetHeaderSize<uint32_t>());
@@ -393,7 +393,6 @@ namespace id3v2
                 if (ret.has_value()) {
                     buffer = ret.value();
                 }
-#endif
             });
         }
 
@@ -512,6 +511,7 @@ namespace id3v2
 
         const expected::Result<std::string> extractTag(
             std::string_view tag, const iD3Variant& TagVersion) {
+
             const auto res = buffer | [=](const cUchar& buff) {
                 return findTagInfos(tag, TagVersion) | [&](const TagInfos&
                                                                TagLoc) {
@@ -526,6 +526,7 @@ namespace id3v2
 
                     return val | [&TagLoc](const std::string& val_str)
                                -> expected::Result<std::string> {
+
                                    if (TagLoc.getSwapValue() == 0x01) {
                                        const auto cont = tagBase::swapW16String(
                                            std::string_view(val_str));
@@ -538,6 +539,7 @@ namespace id3v2
                                };
                 };
             };
+
             return res;
         }
 
@@ -548,17 +550,13 @@ namespace id3v2
     };
 
     template <typename id3Type>
-        const auto is_tag(std::string name)
-        {
-            return (
-                    std::any_of(id3v2::GetTagNames<id3Type>().cbegin(), id3v2::GetTagNames<id3Type>().cend(), 
-                        [&](std::string obj) { return name == obj; } ) 
-                   );
-        }
+    const auto is_tag(std::string name) {
+        return (std::any_of(id3v2::GetTagNames<id3Type>().cbegin(),
+                            id3v2::GetTagNames<id3Type>().cend(),
+                            [&](std::string obj) { return name == obj; }));
+    }
 
 }; //end namespace id3v2
-
-
 
 
 #endif //_ID3V2_COMMON
