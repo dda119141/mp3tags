@@ -103,7 +103,7 @@ int main() {
     {
         const std::string filename = filen.path().string();
 
- //       cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
+        cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
      //   cout <<"Composer: " << GetComposer(filename) << endl;
 #if 0
         cout << "Date: " << GetDate(filename) << endl;
@@ -117,11 +117,11 @@ int main() {
         cout << "GetTrackPosition: " << GetTrackPosition(filename) << endl;
 #endif
 #if 1
-        if(filename.find("test1.mp3") != std::string::npos){
+        if(filename.find("test") == 0){
 //            cout << "Title: " << GetTitle(filename) << endl;
 //            cout << "\n/*********************************/ \n";
             cout << "Change title: " << filename << " " << SetTitle(filename, "expletestYingTitle") << endl;
-            //cout << "Change album: " << SetAlbum(filename, "test1");
+            cout << "Change album: " << SetAlbum(filename, "tzuuAlbin13");
 
          }
 

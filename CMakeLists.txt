@@ -15,6 +15,10 @@ set(TEST_SOURCES
   tagwriter.cpp
 )
 
+set(EXAMPLES_SOURCES
+  change_dir.cpp
+)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party/catch2)
@@ -24,5 +28,11 @@ foreach(APP ${TEST_SOURCES})
     string( REPLACE ".cpp" "" APP_BIN "${APP}" )
     add_executable(${APP_BIN} src/${APP})
     target_link_libraries(${APP_BIN} stdc++fs)
+endforeach()
+
+foreach(APP ${EXAMPLES_SOURCES})
+    string( REPLACE ".cpp" "" APP_EXPLE "${APP}" )
+    add_executable(${APP_EXPLE} examples/${APP})
+    target_link_libraries(${APP_EXPLE} stdc++fs)
 endforeach()
 

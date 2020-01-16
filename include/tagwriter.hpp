@@ -24,51 +24,22 @@ bool SetTag(const std::string& filename,
                 {
                     if (id3Version == "0x0300") {
                         tagVersion = id3v2::v30();
+                        return id3v2::setTag<std::string_view,
+                                             std::string_view>(
+                            filename, tagVersion, content, tag.second);
                     } else if (id3Version == "0x0400") {
                         tagVersion = id3v2::v40();
+                        return id3v2::setTag<std::string_view,
+                                             std::string_view>(
+                            filename, tagVersion, content, tag.second);
                     } else if (id3Version == "0x0000") {
                         tagVersion = id3v2::v00();
+                        return id3v2::setTag<std::string_view,
+                                             std::string_view>(
+                            filename, tagVersion, content, tag.second);
                     } else {
                         return expected::makeError<bool>(
                             "id3 version not supported\n");
-                    }
-
-                    ID3_LOG_INFO("tag content to write: {}", std::string(content));
-
-                    id3v2::TagReadWriter<std::string_view> obj(filename);
-                    expected::Result<id3v2::TagInfos> locs =
-                        obj.findTagInfos(tag.second, tagVersion);
-
-                    if (locs.has_value()) {
-
-                    const id3v2::TagInfos& tagLoc = locs.value();
-                    const std::string tag_str =
-                        prepareTagContent(content, tagLoc);
-
-                    ID3_LOG_INFO("Content write: {} prepared", tag_str);
-                    ID3_LOG_INFO("tag area length: {} ", tagLoc.getLength());
-                    if (tagLoc.getLength() <
-                        tag_str.size())  // resize whole header
-                    {
-                        const uint32_t extraLength =
-                            (tag_str.size() - tagLoc.getLength());
-                        struct id3v2::newTagArea NewTagArea {
-                            filename, tagLoc, tagVersion, extraLength
-                        };
-
-                        return (NewTagArea.writeFile(tag_str) |
-                                [&](const bool& val)
-                                {
-                            return renameFile(filename + id3v2::modifiedEnding
-                                    , filename);
-                            });
-
-                    } else {
-                        return obj.WriteFile(tag_str, tagLoc);
-                    }
-                    } else {
-                    return expected::makeError<bool>(
-                        "findTagInfos: tag could not be located\n");
                     }
                 }
             }
