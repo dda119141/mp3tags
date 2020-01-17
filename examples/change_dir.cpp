@@ -13,16 +13,15 @@ bool changeTags(const std::string& directory, std::string& album) {
     cout << "current file path:" << currentFilePath << endl;
     const fs::path mp3Path = fs::path(currentFilePath);
     if (!fs::exists(mp3Path)) {
-        std::cerr << "Path: " << currentFilePath << " does not exist"
-                  << endl;
+        std::cerr << "Path: " << currentFilePath << " does not exist" << endl;
         return false;
     }
 
     try {
         for (auto& filen : fs::directory_iterator(mp3Path.string())) {
             const std::string filename = filen.path().string();
-            cout << "Change album: of file: "<< filename << "\n";
-            if(SetAlbum(filename, album) == 1)
+            cout << "Change album: of file: " << filename << "\n";
+            if (SetAlbum(filename, album) == 1)
                 cout << __func__ << " Success\n";
         }
     } catch (fs::filesystem_error& e) {
@@ -39,14 +38,13 @@ int main(int argc, const char** argv) {
 
     auto parser =
         lyra::help(show_help).description(
-            "This is an utility for changing tag across all mp3 files \nwithin a directory.")
-        | lyra::opt(directory, "dir")["--directory"]["-d"](
+            "This is an utility for changing tag across all mp3 files \nwithin "
+            "a directory.") |
+        lyra::opt(directory, "dir")["--directory"]["-d"](
             "specify directory to use for changing the tag.")
-            .required()
-        | lyra::opt([&](std::string album)
-                { changeTags(directory, album);}, "album")["--album"]["-a"](
-            "Change the album frame content.")
-        ;
+            .required() |
+        lyra::opt([&](std::string album) { changeTags(directory, album); },
+                  "album")["--album"]["-a"]("Change the album frame content.");
 
     // Parse the program arguments:
     auto result = parser.parse({argc, argv});
@@ -59,8 +57,10 @@ int main(int argc, const char** argv) {
         std::exit(1);
     } else {
         std::cout << "Need to add tag to change as well as contents\n";
-//        std::cout << parser << std::endl;
+        //        std::cout << parser << std::endl;
     }
 
-  //  changeTags(directory, album);
+    return 0;
 }
+
+

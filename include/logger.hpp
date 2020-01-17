@@ -5,7 +5,7 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include "spdlog/sinks/ostream_sink.h"
 
-namespace id3v2
+namespace id3
 {
 class Logger {
 public:
@@ -33,19 +33,19 @@ private:
 
 template <typename... Args>
 auto log(Args... args) {
-    static id3v2::Logger tLogger;
+    static id3::Logger tLogger;
     return tLogger.GetLog()->info(args...);
 }
 
 auto log() {
-    static id3v2::Logger tLogger("id3v2.log");
+    static id3::Logger tLogger("id3.log");
     return tLogger.GetLog();
 }
 
-};  // end namespace id3v2
+};  // end namespace id3
 
-#define ID3_LOG_INFO(...) SPDLOG_LOGGER_CALL(id3v2::log(), spdlog::level::info, __VA_ARGS__)
-#define ID3_LOG_WARN(...) SPDLOG_LOGGER_CALL(id3v2::log(), spdlog::level::warn, __VA_ARGS__)
-#define ID3_LOG_ERROR(...) SPDLOG_LOGGER_CALL(id3v2::log(), spdlog::level::err, __VA_ARGS__)
+#define ID3_LOG_INFO(...) SPDLOG_LOGGER_CALL(id3::log(), spdlog::level::info, __VA_ARGS__)
+#define ID3_LOG_WARN(...) SPDLOG_LOGGER_CALL(id3::log(), spdlog::level::warn, __VA_ARGS__)
+#define ID3_LOG_ERROR(...) SPDLOG_LOGGER_CALL(id3::log(), spdlog::level::err, __VA_ARGS__)
 
 #endif //ID3V2_LOGGER

@@ -52,12 +52,12 @@ class v30
 #endif
         constexpr auto FrameIDSize(void)
         {
-            return ::id3v2::RetrieveSize(4);
+            return ::id3::RetrieveSize(4);
         }
 
         constexpr auto FrameHeaderSize(void)
         {
-            return ::id3v2::RetrieveSize(10);
+            return ::id3::RetrieveSize(10);
         }
 
 
