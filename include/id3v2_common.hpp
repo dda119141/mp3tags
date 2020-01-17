@@ -404,29 +404,6 @@ namespace id3v2
             });
         }
 
-        expected::Result<bool> WriteFile(const std::string& content,
-                                         const TagInfos& frameInformations) {
-            std::fstream filWrite(
-                FileName, std::ios::binary | std::ios::in | std::ios::out);
-
-            if (!filWrite.is_open()) {
-                return expected::makeError<bool>() << __func__
-                                                   << ": Error opening file\n";
-            }
-
-            filWrite.seekp(frameInformations.getTagContentOffset());
-
-            std::for_each(content.begin(), content.end(),
-                          [&filWrite](const char& n) { filWrite << n; });
-
-            for (uint32_t i = 0; i < (frameInformations.getLength() - content.size());
-                 ++i) {
-                filWrite << '\0';
-            }
-
-            return expected::makeValue<bool>(true);
-        }
-
         expected::Result<bool> ReWriteFile(const cUchar& cBuffer) {
             std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
             std::ofstream filWrite(FileName + id3::modifiedEnding,
@@ -580,13 +557,19 @@ namespace id3v2
 
         if (locs.has_value()) {
             const id3::TagInfos& frameInformations = locs.value();
-            const std::string tag_str = prepareTagContent(content, frameInformations);
+            const std::string tag_str =
+                prepareTagContent(content, frameInformations);
 
             ID3_LOG_INFO("Content write: {} prepared", tag_str);
-            ID3_LOG_INFO("tag content offset: {}", frameInformations.getTagContentOffset());
+            ID3_LOG_INFO("tag content offset: {}",
+                         frameInformations.getTagContentOffset());
             ID3_LOG_INFO("tag area length: {} ", frameInformations.getLength());
-
-            if (frameInformations.getLength() < tag_str.size())  // resize whole header
+            if (frameInformations.getLength() == 0) {
+                ID3_LOG_ERROR("findFrameInfos: Error, framesize = 0\n");
+                return expected::makeError<bool>(
+                    "findFrameInfos: Error, framesize = 0\n");
+            } else if (frameInformations.getLength() <
+                       tag_str.size())  // resize whole header
             {
                 const uint32_t extraLength =
                     (tag_str.size() - frameInformations.getLength());
@@ -595,18 +578,16 @@ namespace id3v2
                 };
 
                 return (NewTagArea.writeFile(tag_str) | [&](const bool& val) {
-                    return renameFile(filename + id3::modifiedEnding,
-                                      filename);
+                    return renameFile(filename + id3::modifiedEnding, filename);
                 });
             } else {
-                return obj.WriteFile(tag_str, frameInformations);
+                return id3::WriteFile(filename, tag_str, frameInformations);
             }
         } else {
             return expected::makeError<bool>(
                 "findFrameInfos: tag could not be located\n");
         }
     }
-
 
 }; //end namespace id3v2
 

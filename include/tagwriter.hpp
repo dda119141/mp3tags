@@ -5,6 +5,7 @@
 #include <id3v2_v40.hpp>
 #include <id3v2_v30.hpp>
 #include <id3v2_v00.hpp>
+#include <id3v1.hpp>
 #include <optional>
 #include <string_conversion.hpp>
 
@@ -63,7 +64,14 @@ bool SetAlbum(const std::string& filename, std::string_view content)
             {"0x0000", "TAL"},
     };
 
-    return  SetTag(filename, tags, content);
+    const auto ret = id3v1::SetAlbum(filename, content);
+
+    if(ret.has_value()){
+        SetTag(filename, tags, content);
+        return ret.value();
+    }else{
+        return SetTag(filename, tags, content);
+    }
 }
 
 bool SetLeadArtist(const std::string& filename, std::string_view content)
@@ -74,8 +82,14 @@ bool SetLeadArtist(const std::string& filename, std::string_view content)
         {"0x0300", "TPE1"},
             {"0x0000", "TP1"},
     };
+    const auto ret = id3v1::SetLeadArtist(filename, content);
 
-    return  SetTag(filename, tags, content);
+    if(ret.has_value()){
+        SetTag(filename, tags, content);
+        return ret.value();
+    }else{
+        return SetTag(filename, tags, content);
+    }
 }
 
 bool SetBandOrchestra(const std::string& filename, std::string_view content)
@@ -134,9 +148,34 @@ bool SetTitle(const std::string& filename, std::string_view content)
         {"0x0300", "TIT2"},
         {"0x0000", "TT2"},
     };
+    const auto ret = id3v1::SetTitle(filename, content);
 
-    return SetTag(filename, tags, content);
+    if(ret.has_value()){
+        SetTag(filename, tags, content);
+        return ret.value();
+    }else{
+        return SetTag(filename, tags, content);
+    }
 }
+
+bool SetYear(const std::string& filename, std::string_view content)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TDRC"},
+        {"0x0300", "TYER"},
+        {"0x0000", "TYE"},
+    };
+    const auto ret = id3v1::SetYear(filename, content);
+
+    if(ret.has_value()){
+        SetTag(filename, tags, content);
+        return ret.value();
+    }else{
+        return SetTag(filename, tags, content);
+    }
+}
+
 
 
 #if 0

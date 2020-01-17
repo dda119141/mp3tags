@@ -117,7 +117,9 @@ int main() {
         cout << "GetTrackPosition: " << GetTrackPosition(filename) << endl;
 #endif
 #if 1
-        if(filename.find("test") == 0){
+        const auto ret = filen.path().filename().string().find("test");
+//        cout << "******" << ret << "...\n";
+        if(ret == 0){
 //            cout << "Title: " << GetTitle(filename) << endl;
 //            cout << "\n/*********************************/ \n";
             cout << "Change title: " << filename << " " << SetTitle(filename, "expletestYingTitle") << endl;

@@ -121,6 +121,31 @@ auto operator|(T&& _obj, F&& Function)
     }
 }
 
+expected::Result<bool> WriteFile(const std::string& FileName, const std::string& content,
+                                 const TagInfos& frameInformations) {
+    std::fstream filWrite(FileName,
+                          std::ios::binary | std::ios::in | std::ios::out);
+
+    if (!filWrite.is_open()) {
+        return expected::makeError<bool>() << __func__
+                                           << ": Error opening file\n";
+    }
+
+    filWrite.seekp(frameInformations.getTagContentOffset());
+
+    std::for_each(content.begin(), content.end(),
+                  [&filWrite](const char& n) { filWrite << n; });
+
+    assert(frameInformations.getLength() >= content.size());
+
+    for (uint32_t i = 0; i < (frameInformations.getLength() - content.size());
+         ++i) {
+        filWrite << '\0';
+    }
+
+    return expected::makeValue<bool>(true);
+}
+
 expected::Result<bool> renameFile(const std::string& fileToRename,
                                   const std::string& renamedFile) {
     namespace fs = std::experimental::filesystem;
