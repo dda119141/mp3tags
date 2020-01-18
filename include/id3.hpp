@@ -216,6 +216,57 @@ expected::Result<std::string> ExtractString(const cUchar& buffer, T1 start,
     }
 }
 
+uint32_t GetTagSizeDefault(const cUchar& buffer,
+                    uint32_t length) {
+    using paire = std::pair<uint32_t, uint32_t>;
+
+    std::vector<uint32_t> power_values(length);
+    uint32_t n = 0;
+    std::generate(power_values.begin(), power_values.end(), [&n]{ return n+=8; });
+    std::reverse(power_values.begin(), power_values.begin() + power_values.size());
+
+    std::vector<paire> result(power_values.size());
+    const auto it = std::begin(buffer);
+
+    std::transform(it, it + length, power_values.begin(),
+                   result.begin(),
+                   [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
+
+    const uint32_t val = std::accumulate(
+        result.begin(), result.end(), 0,
+        [](int a, paire b) { return (a + (b.first * std::pow(2, b.second))); });
+
+    return val;
+}
+
+bool replaceElementsInBuff(const cUchar& buffIn, cUchar& buffOut,
+                           uint32_t position) {
+    const auto iter = std::begin(buffOut) + position;
+
+    std::transform(iter, iter + buffIn.size(), buffIn.begin(), iter,
+                   [](char a, char b) { return b; });
+
+    return true;
+}
+
+uint32_t GetTagSize(const cUchar& buffer,
+                    const std::vector<unsigned int>& power_values,
+                    uint32_t index) {
+    using paire = std::pair<uint32_t, uint32_t>;
+    std::vector<paire> result(power_values.size());
+    const auto it = std::begin(buffer) + index;
+
+    std::transform(it, it + power_values.size(), power_values.begin(),
+                   result.begin(),
+                   [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
+
+    const uint32_t val = std::accumulate(
+        result.begin(), result.end(), 0,
+        [](int a, paire b) { return (a + (b.first * std::pow(2, b.second))); });
+
+    return val;
+}
+
 template <typename T>
 expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
                                         uint32_t extraSize, T tagIndex,
@@ -258,6 +309,40 @@ expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
     ID3_LOG_INFO("success...");
     return expected::makeValue<cUchar>(temp_vec);
 }
+
+template <typename Type>
+class search_tag {
+private:
+    const Type& mTagArea;
+    std::once_flag m_once;
+    uint32_t loc;
+
+public:
+    search_tag(const Type& tagArea) : mTagArea(tagArea), loc(0) {}
+
+    expected::Result<uint32_t> operator()(Type tag) {
+        std::call_once(m_once, [this, &tag]() {
+
+            const auto it = std::search(
+                mTagArea.cbegin(), mTagArea.cend(),
+                std::boyer_moore_searcher(tag.cbegin(), tag.cend()));
+
+            if (it != mTagArea.cend()) {
+                loc = (it - mTagArea.cbegin());
+            } else {
+                ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
+            }
+        });
+
+        if (loc != 0) {
+            return expected::makeValue<uint32_t>(loc);
+        } else {
+            return expected::makeError<uint32_t>() << "tag: " << tag
+                                                   << " not found";
+        }
+    }
+};
+
 
 };  // end namespace id3
 

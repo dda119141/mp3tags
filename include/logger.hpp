@@ -44,6 +44,7 @@ auto log() {
 
 };  // end namespace id3
 
+#define ID3_LOG_TRACE(...) SPDLOG_LOGGER_CALL(id3::log(), spdlog::level::trace, __VA_ARGS__)
 #define ID3_LOG_INFO(...) SPDLOG_LOGGER_CALL(id3::log(), spdlog::level::info, __VA_ARGS__)
 #define ID3_LOG_WARN(...) SPDLOG_LOGGER_CALL(id3::log(), spdlog::level::warn, __VA_ARGS__)
 #define ID3_LOG_ERROR(...) SPDLOG_LOGGER_CALL(id3::log(), spdlog::level::err, __VA_ARGS__)

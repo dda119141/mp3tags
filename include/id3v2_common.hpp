@@ -160,17 +160,6 @@ namespace id3v2
         return buffer;
     }
 
-    bool replaceElementsInBuff(const cUchar& buffIn, cUchar& buffOut,
-                           uint32_t position) {
-
-        const auto iter = std::begin(buffOut) + position;
-
-        std::transform(iter, iter + buffIn.size(), buffIn.begin(), iter,
-                       [](char a, char b) { return b; });
-
-        return true;
-    }
-
     std::string prepareTagContent(std::string_view content,
                                   const TagInfos& frameInformations) {
         std::variant<std::string_view, std::u16string, std::u32string>
@@ -214,9 +203,8 @@ namespace id3v2
 
     std::optional<cUchar> prepareBufferWithNewTagContent(
         cUchar& buff, const std::string& content, const TagInfos& frameInformations) {
+
         assert(frameInformations.getLength() >= content.size());
-        //                    std::string_view tag_str =
-        //                    prepareTagContent(content, frameInformations);
         return prepareTagToWrite<std::string_view>(content, frameInformations, buff);
     }
 
@@ -298,7 +286,6 @@ namespace id3v2
 
                 ID3_LOG_INFO("FrameSize... length: {}, tag start: {}",
                              frameInformations.getLength(), frameInformations.getTagOffset());
-
                 ID3_LOG_INFO("Updating segments...");
 
                 const auto tagBuf1 = updateTagSize(cBuffer, additionalSize);
@@ -312,10 +299,10 @@ namespace id3v2
                        cBuffer.size());
 
                 auto modBuff = std::move(cBuffer);
-                replaceElementsInBuff(tagBuf1.value(), modBuff,
+                id3::replaceElementsInBuff(tagBuf1.value(), modBuff,
                                       tagsSizePositionInHeader);
 
-                replaceElementsInBuff(
+                id3::replaceElementsInBuff(
                     tagBuf2.value(), modBuff,
                     frameInformations.getTagOffset() + frameSizePositionInFrameHeader);
 
@@ -447,7 +434,7 @@ namespace id3v2
             } | [&tag](const std::string&
                            tagArea) -> expected::Result<uint32_t> {
 
-                auto searchTagPosition = search_tag<std::string_view>(tagArea);
+                auto searchTagPosition = id3::search_tag<std::string_view>(tagArea);
                 const auto ret = searchTagPosition(tag);
 
                 ID3_LOG_INFO("tag name: #{}", std::string(tag));
@@ -466,8 +453,10 @@ namespace id3v2
                 ID3_LOG_INFO("frame position: {}", tagIndex);
 
                 return buffer | [&tagIndex, &TagVersion](const cUchar& buff) {
+
                     return GetFrameSize<uint32_t>(buff, TagVersion, tagIndex);
                 } | [&](uint32_t frameSize) -> expected::Result<TagInfos> {
+
                     const uint32_t frameContentOffset =
                         tagIndex + GetFrameHeaderSize(TagVersion);
                     FrameSize = frameSize;
@@ -486,6 +475,7 @@ namespace id3v2
                         ID3_LOG_INFO("tag starts with T: {}", tag);
                         const auto ret1 =
                             TagInfos(FramePos, frameContentOffset, FrameSize);
+
                         return expected::makeValue<TagInfos>(ret1);
                     };
                 };
@@ -497,38 +487,39 @@ namespace id3v2
         }
 
         template <typename V>
-        const expected::Result<V> extractTag(
-            std::string_view tag, const iD3Variant& TagVersion) {
-
+        const expected::Result<V> extractTag(std::string_view tag,
+                                             const iD3Variant& TagVersion) {
             const auto res = buffer | [=](const cUchar& buff) {
-                return findFrameInfos(tag, TagVersion) | [&](const TagInfos&
-                                                               FrameConfig) {
-                    ID3_LOG_INFO("tag content offset: {}, framesize {}",
-                                 FrameConfig.getTagContentOffset(),
-                                 FrameConfig.getLength());
+                return findFrameInfos(tag, TagVersion) |
+                       [&](const TagInfos& FrameConfig) {
+                           ID3_LOG_INFO("tag content offset: {}, framesize {}",
+                                        FrameConfig.getTagContentOffset(),
+                                        FrameConfig.getLength());
 
-                    if(FrameConfig.getLength() == 0){
-                        ID3_LOG_ERROR("extractTag: Error: frame length = {}", FrameConfig.getLength());
-                        return expected::makeError<V>("extractTag: Error: frame length = 0");
-                    }
-                    const auto val = ExtractString<uint32_t, uint32_t>(
-                        buff, FrameConfig.getTagContentOffset(),
-                        FrameConfig.getTagContentOffset() + FrameConfig.getLength());
+                           if (FrameConfig.getLength() == 0) {
+                               ID3_LOG_ERROR(
+                                   "extractTag: Error: frame length = {}",
+                                   FrameConfig.getLength());
+                               return expected::makeError<V>(
+                                   "extractTag: Error: frame length = 0");
+                           }
+                           const auto val = ExtractString<uint32_t, uint32_t>(
+                               buff, FrameConfig.getTagContentOffset(),
+                               FrameConfig.getTagContentOffset() +
+                                   FrameConfig.getLength());
 
-                    return val | [&FrameConfig](const std::string& val_str)
-                               -> expected::Result<V> {
+                           return val | [&FrameConfig](
+                                            const std::string& val_str) {
 
-                                   if (FrameConfig.getSwapValue() == 0x01) {
-                                       const auto cont = tagBase::swapW16String(
-                                           std::string_view(val_str));
-                                       return expected::makeValue<V>(
-                                           cont);
-                                   } else {
-                                       return expected::makeValue<V>(
-                                           val_str);
-                                   }
-                               };
-                };
+                               if (FrameConfig.getSwapValue() == 0x01) {
+                                   const auto cont = tagBase::swapW16String(
+                                       std::string_view(val_str));
+                                   return expected::makeValue<V>(cont);
+                               } else {
+                                   return expected::makeValue<V>(val_str);
+                               }
+                           };
+                       };
             };
 
             return res;

@@ -95,20 +95,11 @@ expected::Result<cUchar> updateTagSize(const cUchar& buffer,
 }
 
 expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
-    using paire = std::pair<uint32_t, uint32_t>;
 
     const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
-
-    std::vector<paire> result(pow_val.size());
     constexpr uint32_t TagIndex = 6;
-    const auto it = std::begin(buffer) + TagIndex;
 
-    std::transform(it, it + pow_val.size(), pow_val.begin(), result.begin(),
-                   [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
-
-    const uint32_t val = std::accumulate(
-        result.begin(), result.end(), 0,
-        [](int a, paire b) { return (a + (b.first * std::pow(2, b.second))); });
+    const auto val = id3::GetTagSize(buffer, pow_val, TagIndex);
 
     assert(val > GetTagHeaderSize<uint32_t>());
 
@@ -224,39 +215,6 @@ expected::Result<std::string> GetID3Version(const cUchar& buffer) {
     return GetHexFromBuffer<uint8_t>(buffer, kID3IndexStart,
                                      kID3VersionBytesLength);
 }
-
-template <typename Type>
-class search_tag {
-private:
-    const Type& mTagArea;
-    std::once_flag m_once;
-    uint32_t loc;
-
-public:
-    search_tag(const Type& tagArea) : mTagArea(tagArea), loc(0) {}
-
-    expected::Result<uint32_t> operator()(Type tag) {
-        std::call_once(m_once, [this, &tag]() {
-
-            const auto it = std::search(
-                mTagArea.cbegin(), mTagArea.cend(),
-                std::boyer_moore_searcher(tag.cbegin(), tag.cend()));
-
-            if (it != mTagArea.cend()) {
-                loc = (it - mTagArea.cbegin());
-            } else {
-                ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
-            }
-        });
-
-        if (loc != 0) {
-            return expected::makeValue<uint32_t>(loc);
-        } else {
-            return expected::makeError<uint32_t>() << "tag: " << tag
-                                                   << " not found";
-        }
-    }
-};
 
 };  // end namespace id3v2
 

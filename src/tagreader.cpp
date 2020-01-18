@@ -13,7 +13,7 @@
 #include "tagreader.hpp"
 #include "tagwriter.hpp"
 #include <boost/locale.hpp>
-
+#include "ape.hpp"
 
 namespace fs = std::experimental::filesystem;
 
@@ -103,6 +103,9 @@ int main() {
     {
         const std::string filename = filen.path().string();
 
+        ape::tagReadWriter obj(filename, true);
+
+        break;
         cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
         cout <<"Composer: " << GetComposer(filename) << endl;
 #if 0
