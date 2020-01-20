@@ -223,7 +223,7 @@ namespace id3v2
                     };
                 if (ret.has_value()) {
 
-                    ID3_LOG_INFO("Buffer could be read - prepare to extend.");
+                    ID3_LOG_TRACE("Buffer could be read - prepare to extend.");
                     mCBuffer = ret.value();
 
                     auto ret1 =
@@ -278,19 +278,19 @@ namespace id3v2
             const TagInfos& frameInformations, uint32_t additionalSize,
             const iD3Variant& tagVersion) {
 
-            ID3_LOG_INFO("entering extendBuffer func...");
+            ID3_LOG_TRACE("entering extendBuffer func...");
             constexpr uint32_t tagsSizePositionInHeader = 6;
             constexpr uint32_t frameSizePositionInFrameHeader = 4;
 
             const auto ret = mCBuffer | [&](const cUchar& cBuffer) {
 
-                ID3_LOG_INFO("FrameSize... length: {}, tag start: {}",
+                ID3_LOG_TRACE("FrameSize... length: {}, tag start: {}",
                              frameInformations.getLength(), frameInformations.getTagOffset());
-                ID3_LOG_INFO("Updating segments...");
+                ID3_LOG_TRACE("Updating segments...");
 
-                const auto tagBuf1 = updateTagSize(cBuffer, additionalSize);
+                const auto tagSizeBuffer = updateTagSize(cBuffer, additionalSize);
 
-                const auto tagBuf2 =
+                const auto frameSizeBuff =
                     updateFrameSizeIndex<const cUchar&, uint32_t, uint32_t>(
                         tagVersion, cBuffer, additionalSize,
                         frameInformations.getTagOffset());
@@ -298,26 +298,26 @@ namespace id3v2
                 assert(frameInformations.getTagOffset() + frameInformations.getLength() <
                        cBuffer.size());
 
-                auto modBuff = std::move(cBuffer);
-                id3::replaceElementsInBuff(tagBuf1.value(), modBuff,
+                auto finalBuffer = std::move(cBuffer);
+                id3::replaceElementsInBuff(tagSizeBuffer.value(), finalBuffer,
                                       tagsSizePositionInHeader);
 
                 id3::replaceElementsInBuff(
-                    tagBuf2.value(), modBuff,
+                    frameSizeBuff.value(), finalBuffer,
                     frameInformations.getTagOffset() + frameSizePositionInFrameHeader);
 
-                ID3_LOG_INFO(
+                ID3_LOG_TRACE(
                     "Tag Frame Bytes after update : {}",
-                    spdlog::to_hex(std::begin(modBuff) + frameInformations.getTagOffset() +
+                    spdlog::to_hex(std::begin(finalBuffer) + frameInformations.getTagOffset() +
                                        frameSizePositionInFrameHeader,
-                                   std::begin(modBuff) + frameInformations.getTagOffset() +
+                                   std::begin(finalBuffer) + frameInformations.getTagOffset() +
                                        frameSizePositionInFrameHeader + 4));
 
-                auto it = modBuff.begin() + frameInformations.getTagOffset() +
+                auto it = finalBuffer.begin() + frameInformations.getTagOffset() +
                           frameInformations.getLength();
-                modBuff.insert(it, additionalSize, 0);
+                finalBuffer.insert(it, additionalSize, 0);
 
-                return expected::makeValue<cUchar>(modBuff);
+                return expected::makeValue<cUchar>(finalBuffer);
             };
 
             return ret;
@@ -336,7 +336,7 @@ namespace id3v2
 
                 return _headerAndTagsSize | [&](uint32_t headerAndTagsSize) {
 
-                    ID3_LOG_INFO("headerAndtagsize: {}", headerAndTagsSize);
+                    ID3_LOG_TRACE("headerAndtagsize: {}", headerAndTagsSize);
 
                     const uint32_t tagsSizeOld = headerAndTagsSize - extraSize;
 
@@ -352,7 +352,7 @@ namespace id3v2
 
                     assert(buff.size() < dataSize);
 
-                    ID3_LOG_INFO("datasize: {} - buffer size: {}", dataSize, buff.size());
+                    ID3_LOG_TRACE("datasize: {} - buffer size: {}", dataSize, buff.size());
 
                     std::ofstream filWrite(FileName + modifiedEnding,
                                            std::ios::binary | std::ios::app);
@@ -437,7 +437,7 @@ namespace id3v2
                 auto searchTagPosition = id3::search_tag<std::string_view>(tagArea);
                 const auto ret = searchTagPosition(tag);
 
-                ID3_LOG_INFO("tag name: #{}", std::string(tag));
+                ID3_LOG_TRACE("tag name: #{}", std::string(tag));
 
                 return ret;
             } | [&](uint32_t tagIndex) -> expected::Result<TagInfos> {
@@ -450,7 +450,7 @@ namespace id3v2
 
                 FramePos = tagIndex;
 
-                ID3_LOG_INFO("frame position: {}", tagIndex);
+                ID3_LOG_TRACE("frame position: {}", tagIndex);
 
                 return buffer | [&tagIndex, &TagVersion](const cUchar& buff) {
 
@@ -461,7 +461,7 @@ namespace id3v2
                         tagIndex + GetFrameHeaderSize(TagVersion);
                     FrameSize = frameSize;
 
-                    ID3_LOG_INFO("frame content offset: {}", frameContentOffset);
+                    ID3_LOG_TRACE("frame content offset: {}", frameContentOffset);
                     assert(frameContentOffset > 0);
 
                     return buffer | [&](const cUchar& buff) {
@@ -472,7 +472,7 @@ namespace id3v2
                                 buff, FramePos, frameContentOffset, FrameSize);
                         }
 
-                        ID3_LOG_INFO("tag starts with T: {}", tag);
+                        ID3_LOG_TRACE("tag starts with T: {}", tag);
                         const auto ret1 =
                             TagInfos(FramePos, frameContentOffset, FrameSize);
 
@@ -551,10 +551,10 @@ namespace id3v2
             const std::string tag_str =
                 prepareTagContent(content, frameInformations);
 
-            ID3_LOG_INFO("Content write: {} prepared", tag_str);
-            ID3_LOG_INFO("tag content offset: {}",
+            ID3_LOG_TRACE("Content write: {} prepared", tag_str);
+            ID3_LOG_TRACE("tag content offset: {}",
                          frameInformations.getTagContentOffset());
-            ID3_LOG_INFO("tag area length: {} ", frameInformations.getLength());
+            ID3_LOG_TRACE("tag area length: {} ", frameInformations.getLength());
             if (frameInformations.getLength() == 0) {
                 ID3_LOG_ERROR("findFrameInfos: Error, framesize = 0\n");
                 return expected::makeError<bool>(

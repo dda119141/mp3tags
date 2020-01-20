@@ -6,11 +6,13 @@
 #include <id3v2_v30.hpp>
 #include <id3v2_v00.hpp>
 #include <id3v1.hpp>
+#include <ape.hpp>
 
 template <typename tagType>
 const std::string GetTheTag(
     const std::string& filename,
     const std::vector<std::pair<std::string, std::string_view>>& tags) {
+
     const auto ret =
         id3v2::GetTagHeader(filename) | id3v2::check_for_ID3 |
         [](const std::vector<unsigned char>& buffer) {
@@ -57,13 +59,17 @@ const std::string GetAlbum(const std::string& filename) {
         {"0x0400", "TALB"}, {"0x0300", "TALB"}, {"0x0000", "TAL"},
     };
 
-    const auto ret = id3v1::GetAlbum(filename);
-
-    if(ret.has_value()){
-        return ret.value();
-    }else{
-        return GetTheTag<std::string>(filename, tags);
+    const auto retApe = ape::GetAlbum(filename);
+    if (retApe.has_value()) {
+        return retApe.value();
+    } else {
+        const auto retId3v1 = id3v1::GetAlbum(filename);
+        if(retId3v1.has_value()){
+            return retId3v1.value();
+        }
     }
+
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetLeadArtist(const std::string& filename) {
@@ -132,13 +138,17 @@ const std::string GetYear(const std::string& filename) {
         {"0x0400", "TDRC"}, {"0x0300", "TYER"}, {"0x0000", "TYE"},
     };
 
-    const auto ret = id3v1::GetYear(filename);
-
-    if(ret.has_value()){
-        return ret.value();
-    }else{
-        return GetTheTag<std::string>(filename, tags);
+    const auto retApe = ape::GetYear(filename);
+    if (retApe.has_value()) {
+        return retApe.value();
+    } else {
+        const auto retId3v1 = id3v1::GetYear(filename);
+        if(retId3v1.has_value()){
+            return retId3v1.value();
+        }
     }
+
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetFileType(const std::string& filename) {
@@ -154,13 +164,17 @@ const std::string GetTitle(const std::string& filename) {
         {"0x0400", "TIT2"}, {"0x0300", "TIT2"}, {"0x0000", "TT2"},
     };
 
-    const auto ret = id3v1::GetTitle(filename);
-
-    if(ret.has_value()){
-        return ret.value();
-    }else{
-        return GetTheTag<std::string>(filename, tags);
+    const auto retApe = ape::GetTitle(filename);
+    if (retApe.has_value()) {
+        return retApe.value();
+    } else {
+        const auto retId3v1 = id3v1::GetTitle(filename);
+        if(retId3v1.has_value()){
+            return retId3v1.value();
+        }
     }
+
+    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetContentGroupDescription(const std::string& filename) {

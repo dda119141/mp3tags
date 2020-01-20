@@ -154,7 +154,7 @@ expected::Result<cUchar> GetTagHeader(const std::string& FileName) {
 
 expected::Result<std::string> GetTagArea(const cUchar& buffer) {
     return GetTotalTagSize(buffer) | [&](uint32_t tagSize) {
-        ID3_LOG_INFO("{}: tagsize: {}", __func__, tagSize);
+        ID3_LOG_TRACE("{}: tagsize: {}", __func__, tagSize);
 
         return ExtractString<uint32_t, uint32_t>(buffer, 0, tagSize);
     };

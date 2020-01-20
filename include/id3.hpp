@@ -32,10 +32,10 @@ const std::string stripLeft(const std::string& valIn) {
 
 class TagInfos {
 public:
-    TagInfos(uint32_t TagOffset, uint32_t TagContentOffset, uint32_t Length,
+    TagInfos(uint32_t FrameKeyOffset, uint32_t FrameContentOffset, uint32_t Length,
              uint32_t _encodeFlag = 0, uint32_t _doSwap = 0)
-        : tagContentStartPosition(TagContentOffset),
-          tagStartPosition(TagOffset),
+        : tagContentStartPosition(FrameContentOffset),
+          tagStartPosition(FrameKeyOffset),
           length(Length),
           encodeFlag(_encodeFlag),
           doSwap(_doSwap) {}
@@ -217,16 +217,22 @@ expected::Result<std::string> ExtractString(const cUchar& buffer, T1 start,
 }
 
 uint32_t GetTagSizeDefault(const cUchar& buffer,
-                    uint32_t length) {
+                    uint32_t length, uint32_t startPosition = 0, bool BigEndian = false) {
+
+    assert((startPosition + length) <= buffer.size());
+
     using paire = std::pair<uint32_t, uint32_t>;
 
     std::vector<uint32_t> power_values(length);
     uint32_t n = 0;
-    std::generate(power_values.begin(), power_values.end(), [&n]{ return n+=8; });
-    std::reverse(power_values.begin(), power_values.begin() + power_values.size());
+    std::generate(power_values.begin(), power_values.end(), [&n]{ n+=8; return n-8; });
+
+    if(BigEndian){
+        std::reverse(power_values.begin(), power_values.begin() + power_values.size());
+    }
 
     std::vector<paire> result(power_values.size());
-    const auto it = std::begin(buffer);
+    const auto it = std::begin(buffer) + startPosition;
 
     std::transform(it, it + length, power_values.begin(),
                    result.begin(),

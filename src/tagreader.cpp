@@ -103,9 +103,8 @@ int main() {
     {
         const std::string filename = filen.path().string();
 
-        ape::tagReadWriter obj(filename, true);
-
-        break;
+//        ape::tagReadWriter obj(filename, true);
+//        break;
         cout << "file: " << filename << " Album: " << GetAlbum(filename) << endl;
         cout <<"Composer: " << GetComposer(filename) << endl;
 #if 0
@@ -120,8 +119,8 @@ int main() {
         cout << "GetTrackPosition: " << GetTrackPosition(filename) << endl;
 #endif
 #if 1
-        const auto ret = filen.path().filename().string().find("test");
-//        cout << "******" << ret << "...\n";
+        const auto ret = filen.path().filename().string().find("testToFix");
+        cout << "******" << ret << "...\n";
         if(ret == 0){
 //            cout << "Title: " << GetTitle(filename) << endl;
 //            cout << "\n/*********************************/ \n";
@@ -139,6 +138,7 @@ int main() {
         cout << "wrong path:" << endl;
   }
 
+        cout << "******<< ...\n";
 //  std::cout << expected::GetTagHeader1("../files/test1.mp3") << "\n";
 #endif
     return 0;
