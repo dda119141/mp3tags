@@ -1,18 +1,6 @@
 #ifndef ID3V1_BASE
 #define ID3V1_BASE
 
-#include <sstream>
-#include <fstream>
-#include <iomanip>
-#include <vector>
-#include <algorithm>
-#include <functional>
-#include <optional>
-#include <cmath>
-#include <variant>
-#include <type_traits>
-#include <experimental/filesystem>
-
 #include "id3.hpp"
 #include "result.hpp"
 #include "logger.hpp"
@@ -65,7 +53,7 @@ struct tagReadWriter
                         reinterpret_cast<char*>(tagHeaderBuffer.data()),
                         tagHeaderLength);
 
-                    const auto ret = id3::ExtractString<uint32_t, uint32_t>(
+                    const auto ret = id3::ExtractString<uint32_t>(
                                          tagHeaderBuffer, 0, tagHeaderLength) |
                                      [](const std::string& readTag) {
                                          return readTag == std::string("TAG");
@@ -109,7 +97,7 @@ const expected::Result<std::string> GetTheTag(const cUchar& buffer, uint32_t sta
                                            uint32_t end) {
     assert(end > start);
 
-    return id3::ExtractString<uint32_t, uint32_t>(buffer, start, end) |
+    return id3::ExtractString<uint32_t>(buffer, start, (end - start)) |
            [](const std::string& readTag) {
                return expected::makeValue<std::string>(id3::stripLeft(readTag));
            };

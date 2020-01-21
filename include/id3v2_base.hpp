@@ -156,7 +156,7 @@ expected::Result<std::string> GetTagArea(const cUchar& buffer) {
     return GetTotalTagSize(buffer) | [&](uint32_t tagSize) {
         ID3_LOG_TRACE("{}: tagsize: {}", __func__, tagSize);
 
-        return ExtractString<uint32_t, uint32_t>(buffer, 0, tagSize);
+        return ExtractString<uint32_t>(buffer, 0, tagSize);
     };
 }
 
@@ -195,10 +195,10 @@ void GetTagNames(void) {
 
 expected::Result<std::string> GetID3FileIdentifier(const cUchar& buffer) {
     constexpr auto FileIdentifierStart = 0;
-    constexpr auto FileIdentifierEnd = 3;
+    constexpr auto FileIdentifierLength = 3;
 
-    return ExtractString<uint32_t, uint32_t>(buffer, FileIdentifierStart,
-                                             FileIdentifierEnd);
+    return ExtractString<uint32_t>(buffer, FileIdentifierStart,
+                                             FileIdentifierLength);
 
 #ifdef __TEST_CODE
     auto y = [&buffer]() -> std::string {

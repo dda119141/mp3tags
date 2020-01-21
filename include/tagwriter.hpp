@@ -96,6 +96,26 @@ bool SetLeadArtist(const std::string& filename, std::string_view content)
     }
 }
 
+bool SetGenre(const std::string& filename, std::string_view content)
+{
+    const std::vector<std::pair<std::string, std::string_view>> tags
+    {
+        {"0x0400", "TCON"}, {"0x0300", "TCON"}, {"0x0000", "TCO"},
+    };
+    const auto ret1 = ape::SetGenre(filename, content);
+    const auto ret = id3v1::SetGenre(filename, content);
+
+    if(ret.has_value() || ret1.has_value()){
+        SetTag(filename, tags, content);
+        return ret1.value();
+    }else{
+        return SetTag(filename, tags, content);
+    }
+
+    return SetTag(filename, tags, content);
+}
+
+
 bool SetBandOrchestra(const std::string& filename, std::string_view content)
 {
     const std::vector<std::pair<std::string, std::string_view>> tags

@@ -65,6 +65,17 @@ private:
 };
 
 template <typename T>
+expected::Result<T> constructNewTagInfos(const T& frameConfig,
+                                         uint32_t newtagSize) {
+    const T FrameConfig{
+        frameConfig.getTagOffset(), frameConfig.getTagContentOffset(),
+        frameConfig.getLength() + newtagSize, frameConfig.getEncodingValue(),
+        frameConfig.getSwapValue()};
+
+    return expected::makeValue<T>(FrameConfig);
+}
+
+template <typename T>
 constexpr T RetrieveSize(T n) {
     return n;
 }
@@ -191,28 +202,24 @@ const uint32_t GetValFromBuffer(const cUchar& buffer, T index,
     return version;
 }
 
-template <typename T1, typename T2>
+template <typename T1>
 expected::Result<std::string> ExtractString(const cUchar& buffer, T1 start,
-                                            T1 end) {
-    if (end < start) {
-        ID3_LOG_WARN("error: start {} and end {}", start, end);
-    }
-    assert(end > start);
+                                            T1 length) {
+    assert((start + length) <= buffer.size());
 
-    if (buffer.size() >= end) {
+    if (buffer.size() >= (start + length)) {
         static_assert(std::is_integral<T1>::value,
                       "second and third parameters should be integers");
-        static_assert(std::is_unsigned<T2>::value,
-                      "num of elements must be unsigned");
 
-        std::string obj(reinterpret_cast<const char*>(buffer.data()), end);
+        std::string obj(reinterpret_cast<const char*>(buffer.data()), (start + length));
 
         return expected::makeValue<std::string>(
-            obj.substr(start, (end - start)));
+            obj.substr(start, (length)));
     } else {
+        ID3_LOG_ERROR("Buffer size {} < buffer length: {} ", buffer.size(), length);
         return expected::makeError<std::string>() << __func__ << ":failed"
                                                   << " start: " << start
-                                                  << " end: " << end << "\n";
+                                                  << " end: " << (start + length) << "\n";
     }
 }
 

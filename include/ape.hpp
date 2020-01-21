@@ -1,23 +1,12 @@
 #ifndef APE_BASE
 #define APE_BASE
 
-#include <algorithm>
-#include <cmath>
-#include <experimental/filesystem>
-#include <fstream>
-#include <functional>
-#include <iomanip>
-#include <optional>
-#include <sstream>
-#include <type_traits>
-#include <variant>
-#include <vector>
-
 #include "id3.hpp"
 #include "logger.hpp"
 #include "result.hpp"
 
 namespace ape {
+
 using cUchar = id3::cUchar;
 
 constexpr uint32_t GetTagFooterSize(void) { return 32; }
@@ -57,7 +46,7 @@ private:
         fRead.read(reinterpret_cast<char*>(Buffer.data()), bufferLength);
 
         const auto ret =
-            id3::ExtractString<uint32_t, uint32_t>(Buffer, 0, bufferLength) |
+            id3::ExtractString<uint32_t>(Buffer, 0, bufferLength) |
             [](const std::string& readTag) {
                 return expected::makeValue<std::string>(readTag);
             };
@@ -166,8 +155,7 @@ public:
 const expected::Result<std::string> extractTheTag(const cUchar& buffer,
                                                   uint32_t start,
                                                   uint32_t length) {
-    return id3::ExtractString<uint32_t, uint32_t>(buffer, start,
-                                                  start + length) |
+    return id3::ExtractString<uint32_t>(buffer, start, length) |
            [](const std::string& readTag) {
                return expected::makeValue<std::string>(id3::stripLeft(readTag));
            };
@@ -175,6 +163,7 @@ const expected::Result<std::string> extractTheTag(const cUchar& buffer,
 
 const expected::Result<frameConfig> getTag(const std::string& filename,
                                            std::string_view tagKey){
+
     auto tagRW = std::make_unique<tagReadWriter>(filename, true);
     if (!tagRW->IsValid()) {
         tagRW.reset(new tagReadWriter(filename, false));
@@ -193,7 +182,7 @@ const expected::Result<frameConfig> getTag(const std::string& filename,
 
     cUchar buffer = tagRW->GetBuffer().value();
 
-    return id3::ExtractString<uint32_t, uint32_t>(
+    return id3::ExtractString<uint32_t>(
                buffer, 0, buffer.size()) |
            [&](const std::string& tagArea) {
 
@@ -216,18 +205,17 @@ const expected::Result<frameConfig> getTag(const std::string& filename,
                                  frameContentPosition, std::string(tagKey));
                }
 
-               ID3_LOG_TRACE("kex position found: {} for tag name: #{}",
+               ID3_LOG_TRACE("key position found: {} for tag name: #{}",
                              frameKeyPosition.value(), std::string(tagKey));
 
                frameConfig fConfig = {0};
-               /* retrieve frame length */
                assert(frameKeyPosition.value() >= OffsetFromTagKey);
 
                const uint32_t frameStartPosition =
                    frameKeyPosition.value() - OffsetFromTagKey;
                const uint32_t frameLength =
                    id3::GetTagSizeDefault(buffer, 4, frameStartPosition);
-               ID3_LOG_TRACE("tag #{} length: {}", std::string(tagKey), frameLength);
+               ID3_LOG_TRACE("key #{} - Frame length: {}", std::string(tagKey), frameLength);
 
                fConfig.frameContentPosition =
                    frameContentPosition + tagRW->getTagPayloadPosition();
@@ -337,32 +325,31 @@ const expected::Result<bool> SetAlbum(const std::string& filename,
 }
 
 
-#if 0
 const expected::Result<bool> SetLeadArtist(
     const std::string& filename, std::string_view content) {
-    return ape::SetTheTag(filename, content, 30, 60);
-}
-
-const expected::Result<bool> SetAlbum(const std::string& filename,
-                                           std::string_view content) {
-    return ape::SetTheTag(filename, content, 60, 90);
+    return ape::SetTheTag(filename,std::string_view("ARTIST"), content, 0, content.size());
 }
 
 const expected::Result<bool> SetYear(const std::string& filename,
                                       std::string_view content) {
-    return ape::SetTheTag(filename, content, 90, 94);
+    return ape::SetTheTag(filename,std::string_view("YEAR"), content, 0, content.size());
 }
 
 const expected::Result<bool> SetComment(const std::string& filename,
                                              std::string_view content) {
-    return ape::SetTheTag(filename, content, 94, 124);
+    return ape::SetTheTag(filename,std::string_view("COMMENT"), content, 0, content.size());
 }
 
 const expected::Result<bool> SetGenre(const std::string& filename,
                                            std::string_view content) {
-    return ape::SetTheTag(filename, content, 124, 125);
+    return ape::SetTheTag(filename,std::string_view("GENRE"), content, 0, content.size());
 }
-#endif
+
+const expected::Result<bool> SetComposer(const std::string& filename,
+                                           std::string_view content) {
+    return ape::SetTheTag(filename,std::string_view("COMPOSER"), content, 0, content.size());
+}
+
 
 };  // end namespace ape
 

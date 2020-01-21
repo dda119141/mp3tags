@@ -54,22 +54,33 @@ const std::string GetTheTag(
     }
 }
 
+template <typename Function1, typename Function2>
+const std::string _getTag(const std::string& filename, Function1 fuc1, Function2 fuc2)
+{
+    const auto retApe = fuc1(filename);
+    if (retApe.has_value()) {
+        return retApe.value();
+    } else {
+        const auto retId3v1 = fuc2(filename);
+        if(retId3v1.has_value()){
+            return retId3v1.value();
+        }else{
+            return std::string("");
+        }
+    }
+}
+
 const std::string GetAlbum(const std::string& filename) {
     const std::vector<std::pair<std::string, std::string_view>> tags{
         {"0x0400", "TALB"}, {"0x0300", "TALB"}, {"0x0000", "TAL"},
     };
 
-    const auto retApe = ape::GetAlbum(filename);
-    if (retApe.has_value()) {
-        return retApe.value();
-    } else {
-        const auto retId3v1 = id3v1::GetAlbum(filename);
-        if(retId3v1.has_value()){
-            return retId3v1.value();
-        }
+    const auto ret = _getTag(filename, ape::GetAlbum, id3v1::GetAlbum);
+    if( ret != std::string("") ){
+            return ret;
+    }else{
+        return GetTheTag<std::string>(filename, tags);
     }
-
-    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetLeadArtist(const std::string& filename) {
@@ -77,10 +88,9 @@ const std::string GetLeadArtist(const std::string& filename) {
         {"0x0400", "TPE1"}, {"0x0300", "TPE1"}, {"0x0000", "TP1"},
     };
 
-    const auto ret = id3v1::GetLeadArtist(filename);
-
-    if(ret.has_value()){
-        return ret.value();
+    const auto ret = _getTag(filename, ape::GetLeadArtist, id3v1::GetLeadArtist);
+    if( ret != std::string("") ){
+            return ret;
     }else{
         return GetTheTag<std::string>(filename, tags);
     }
@@ -116,10 +126,9 @@ const std::string GetComment(const std::string& filename) {
         {"0x0400", "COMM"}, {"0x0300", "COMM"}, {"0x0000", "COM"},
     };
 
-    const auto ret = id3v1::GetComment(filename);
-
-    if(ret.has_value()){
-        return ret.value();
+    const auto ret = _getTag(filename, ape::GetComment, id3v1::GetComment);
+    if( ret != std::string("") ){
+            return ret;
     }else{
         return GetTheTag<std::string>(filename, tags);
     }
@@ -138,17 +147,12 @@ const std::string GetYear(const std::string& filename) {
         {"0x0400", "TDRC"}, {"0x0300", "TYER"}, {"0x0000", "TYE"},
     };
 
-    const auto retApe = ape::GetYear(filename);
-    if (retApe.has_value()) {
-        return retApe.value();
-    } else {
-        const auto retId3v1 = id3v1::GetYear(filename);
-        if(retId3v1.has_value()){
-            return retId3v1.value();
-        }
+    const auto ret = _getTag(filename, ape::GetYear, id3v1::GetYear);
+    if( ret != std::string("") ){
+            return ret;
+    }else{
+        return GetTheTag<std::string>(filename, tags);
     }
-
-    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetFileType(const std::string& filename) {
@@ -164,17 +168,12 @@ const std::string GetTitle(const std::string& filename) {
         {"0x0400", "TIT2"}, {"0x0300", "TIT2"}, {"0x0000", "TT2"},
     };
 
-    const auto retApe = ape::GetTitle(filename);
-    if (retApe.has_value()) {
-        return retApe.value();
-    } else {
-        const auto retId3v1 = id3v1::GetTitle(filename);
-        if(retId3v1.has_value()){
-            return retId3v1.value();
-        }
+    const auto ret = _getTag(filename, ape::GetTitle, id3v1::GetTitle);
+    if( ret != std::string("") ){
+            return ret;
+    }else{
+        return GetTheTag<std::string>(filename, tags);
     }
-
-    return GetTheTag<std::string>(filename, tags);
 }
 
 const std::string GetContentGroupDescription(const std::string& filename) {
