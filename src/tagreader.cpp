@@ -138,7 +138,7 @@ int main() {
         cout << "wrong path:" << endl;
   }
 
-        cout << "******<< ...\n";
+        cout << "******...\n";
 //  std::cout << expected::GetTagHeader1("../files/test1.mp3") << "\n";
 #endif
     return 0;

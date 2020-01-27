@@ -2,6 +2,6 @@
 
 pushd . 
 #cd out && make clean ../ && make && ./tagreader
-cd out && make && ./tagreader
-./tagwriter -s -o test.log
+#cd out && make && ./tagreader
+cd out && make && ./tagwriter -s -o test.log
 popd

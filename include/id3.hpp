@@ -33,23 +33,23 @@ const std::string stripLeft(const std::string& valIn) {
 class TagInfos {
 public:
     TagInfos(uint32_t FrameKeyOffset, uint32_t FrameContentOffset, uint32_t Length,
-             uint32_t _encodeFlag = 0, uint32_t _doSwap = 0)
-        : tagContentStartPosition(FrameContentOffset),
-          tagStartPosition(FrameKeyOffset),
+             uint32_t _encodeFlag = 0, uint32_t _doSwap = 0):
+          keyStartPosition(FrameKeyOffset),
+          frameContentStartPosition(FrameContentOffset),
           length(Length),
           encodeFlag(_encodeFlag),
           doSwap(_doSwap) {}
 
-    TagInfos()
-        : tagContentStartPosition(0),
-          tagStartPosition(0),
+    TagInfos():
+          keyStartPosition(0),
+          frameContentStartPosition(0),
           length(0),
           encodeFlag(0),
           doSwap(0) {}
 
-    const uint32_t getTagOffset() const { return tagStartPosition; }
+    const uint32_t getFrameKeyOffset() const { return keyStartPosition; }
     const uint32_t getTagContentOffset() const {
-        return tagContentStartPosition;
+        return frameContentStartPosition;
     }
     const uint32_t getLength() const { return length; }
     const uint32_t getEncodingValue() const { return encodeFlag; }
@@ -57,8 +57,8 @@ public:
 
 private:
     // TagInfos() = delete;
-    uint32_t tagContentStartPosition;
-    uint32_t tagStartPosition;
+    uint32_t keyStartPosition;
+    uint32_t frameContentStartPosition;
     uint32_t length;
     uint32_t encodeFlag;
     uint32_t doSwap;
@@ -68,7 +68,7 @@ template <typename T>
 expected::Result<T> constructNewTagInfos(const T& frameConfig,
                                          uint32_t newtagSize) {
     const T FrameConfig{
-        frameConfig.getTagOffset(), frameConfig.getTagContentOffset(),
+        frameConfig.getFrameKeyOffset(), frameConfig.getTagContentOffset(),
         frameConfig.getLength() + newtagSize, frameConfig.getEncodingValue(),
         frameConfig.getSwapValue()};
 
@@ -120,7 +120,7 @@ template <
         std::is_same<std::decay_t<T>, std::optional<id3::TagInfos>>::value ||
         std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value)>,
     typename F>
-auto operator|(T&& _obj, F&& Function)
+auto operator | (T&& _obj, F&& Function)
     -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value())) {
     auto fuc = std::forward<F>(Function);
     auto obj = std::forward<T>(_obj);

@@ -275,7 +275,7 @@ namespace id3v2
 
                 ID3_LOG_TRACE("FrameSize... length: {}, tag start: {}",
                               frameConfig.getLength(),
-                              frameConfig.getTagOffset());
+                              frameConfig.getFrameKeyOffset());
                 ID3_LOG_TRACE("Updating segments...");
 
                 const auto tagSizeBuffer =
@@ -284,9 +284,9 @@ namespace id3v2
                 const auto frameSizeBuff =
                     updateFrameSizeIndex<const cUchar&, uint32_t, uint32_t>(
                         tagVersion, cBuffer, additionalSize,
-                        frameConfig.getTagOffset());
+                        frameConfig.getFrameKeyOffset());
 
-                assert(frameConfig.getTagOffset() + frameConfig.getLength() <
+                assert(frameConfig.getFrameKeyOffset() + frameConfig.getLength() <
                        cBuffer.size());
 
                 auto finalBuffer = std::move(cBuffer);
@@ -294,18 +294,18 @@ namespace id3v2
                                            tagsSizePositionInHeader);
 
                 id3::replaceElementsInBuff(frameSizeBuff.value(), finalBuffer,
-                                           frameConfig.getTagOffset() +
+                                           frameConfig.getFrameKeyOffset() +
                                                frameSizePositionInFrameHeader);
 
                 ID3_LOG_TRACE(
                     "Tag Frame Bytes after update : {}",
                     spdlog::to_hex(
-                        std::begin(finalBuffer) + frameConfig.getTagOffset() +
+                        std::begin(finalBuffer) + frameConfig.getFrameKeyOffset() +
                             frameSizePositionInFrameHeader,
-                        std::begin(finalBuffer) + frameConfig.getTagOffset() +
+                        std::begin(finalBuffer) + frameConfig.getFrameKeyOffset() +
                             frameSizePositionInFrameHeader + 4));
 
-                auto it = finalBuffer.begin() + frameConfig.getTagOffset() +
+                auto it = finalBuffer.begin() + frameConfig.getFrameKeyOffset() +
                           frameConfig.getLength();
                 finalBuffer.insert(it, additionalSize, 0);
 
