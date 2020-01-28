@@ -337,14 +337,34 @@ public:
         }
     }
 
-    expected::Result<bool> ReWriteFile(const cUchar& buff) {
-        std::fstream filReadWrite(
-            filename, std::ios::binary | std::ios::in | std::ios::out | std::ios::ate);
 
-        if (!filReadWrite.good()) {
+    expected::Result<bool> ReWriteFile(const cUchar& buff) {
+        std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
+
+        const std::string writeFileName = filename + id3::modifiedEnding;
+        ID3_LOG_INFO("file to write: {}", writeFileName);
+
+        std::ofstream filWrite(writeFileName,
+                                   std::ios::binary | std::ios::out | std::ios::trunc | std::ios::app);
+
+        if (!filRead.good()) {
             return expected::makeError<bool>() << "__func__"
                                                << ": Error opening file";
         }
+
+        if (!filWrite.good()) {
+            return expected::makeError<bool>() << "__func__"
+                                               << ": Error opening file";
+        }
+
+        cUchar bufHeader;
+        bufHeader.reserve((tagRW->getTagStartPosition()));
+        filWrite.seekp(0);
+        filRead.read(reinterpret_cast<char*>(&bufHeader[0]),
+                              tagRW->getTagStartPosition());
+        std::for_each(std::begin(bufHeader), std::end(bufHeader),
+                      [&filWrite](const char& n) { filWrite << n; });
+
 
         const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
         const uint32_t fileSize = tagRW->getFileLength();
@@ -355,8 +375,8 @@ public:
         bufFooter.reserve((endLength));
 
         if (endLength > 0) {
-            filReadWrite.seekp(endOf);
-            filReadWrite.read(reinterpret_cast<char*>(&bufFooter[0]),
+            filRead.seekg(endOf);
+            filRead.read(reinterpret_cast<char*>(&bufFooter[0]),
                               endLength);
         }
 
@@ -368,13 +388,12 @@ public:
    
         ID3_LOG_INFO("endlength: {}", endLength);
         ID3_LOG_INFO("tag start pos: {}", tagRW->getTagStartPosition());
-        filReadWrite.seekp(tagRW->getTagStartPosition());
 
         std::for_each(std::begin(buff), std::end(buff),
-                      [&filReadWrite](const char& n) { filReadWrite << n; });
+                      [&filWrite](const char& n) { filWrite << n; });
 
         std::for_each(bufFooter.begin(), bufFooter.end(),
-                      [&filReadWrite](const char& n) { filReadWrite << n; });
+                      [&filWrite](const char& n) { filWrite << n; });
 
         ID3_LOG_INFO("success: {}", __func__);
 

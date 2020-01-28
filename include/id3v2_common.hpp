@@ -393,6 +393,11 @@ namespace id3v2
                 return expected::makeError<bool>() << "__func__"
                                                    << ": Error opening file";
             }
+            if (!filWrite.good()) {
+                return expected::makeError<bool>() << "__func__"
+                                                   << ": Error opening file";
+            }
+
 
             const unsigned int dataSize = filRead.tellg();
             filRead.seekg(0);
