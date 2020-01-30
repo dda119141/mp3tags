@@ -9,6 +9,8 @@ namespace ape {
 
 using cUchar = id3::cUchar;
 
+static const std::string modifiedEnding(".ape.mod");
+
 constexpr uint32_t GetTagFooterSize(void) { return 32; }
 
 constexpr uint32_t GetTagHeaderSize(void) { return 32; }
@@ -36,16 +38,18 @@ expected::Result<cUchar> UpdateFrameSize(const cUchar& buffer,
                                          uint32_t tagLocation) {
     const uint32_t frameSizePositionInArea = tagLocation;
     constexpr uint32_t frameSizeLengthInArea = 4;
-    constexpr uint32_t frameSizeMaxValuePerElement = 127;
+    constexpr uint32_t frameSizeMaxValuePerElement = 255;
 
     id3::log()->info(" Frame Index: {}", tagLocation);
     id3::log()->info(
         "Tag Frame Bytes before update : {}",
         spdlog::to_hex(std::begin(buffer) + frameSizePositionInArea,
                        std::begin(buffer) + frameSizePositionInArea + 4));
-    return id3::updateAreaSize<uint32_t>(
+    const auto ret =  id3::updateAreaSize<uint32_t>(
         buffer, extraSize, frameSizePositionInArea, frameSizeLengthInArea,
-        frameSizeMaxValuePerElement);
+        frameSizeMaxValuePerElement, false);
+
+    return ret;
 }
 
 struct tagReadWriter {
@@ -231,9 +235,9 @@ public:
         if (!mValid)
             return expected::makeError<frameConfig>("getTag object not valid");
 
-        ID3_LOG_TRACE("getTag object valid");
-
         cUchar buffer = tagRW->GetBuffer().value();
+
+        ID3_LOG_TRACE("getTag object valid - size: {}", buffer.size());
 
         return id3::ExtractString<uint32_t>(buffer, 0, buffer.size()) |
                [&](const std::string& tagArea) {
@@ -249,11 +253,11 @@ public:
                            : 0;
 
                    if (!frameContentPosition) {
+                       ID3_LOG_TRACE("position not found: {} for tag name: #{}",
+                                     frameContentPosition, std::string(tagKey));
                        return expected::makeError<frameConfig>()
                               << "frame Key: " << std::string(tagKey)
                               << " could not be found\n";
-                       ID3_LOG_TRACE("position not found: {} for tag name: #{}",
-                                     frameContentPosition, std::string(tagKey));
                    }
 
                    ID3_LOG_TRACE("key position found: {} for tag name: #{}",
@@ -329,22 +333,19 @@ public:
                     fConfig.value().frameLength);
 
                 const uint32_t additionalSize = content.size() - fConfig.value().frameLength;
-                return extendBuffer(frameGlobalConfig, content, additionalSize) |
+                const auto writeBackAction = extendBuffer(frameGlobalConfig, content, additionalSize) |
                     [&](const cUchar& buffer) {
                         return this->ReWriteFile(buffer);
                     };
+                return writeBackAction | [&](bool fileWritten) {
+                    return id3::renameFile(filename + ape::modifiedEnding, filename);
+                };
             }
         }
     }
 
-
     expected::Result<bool> ReWriteFile(const cUchar& buff) {
-
-      const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
-        const uint32_t fileSize = tagRW->getFileLength();
-        assert(fileSize >= endOf);
-
-        const uint32_t endLength = fileSize - endOf;
+        const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
 
         std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
         if (!filRead.good()) {
@@ -352,23 +353,30 @@ public:
                                                << ": Error opening file";
         }
 
+        const uint32_t fileSize = filRead.tellg();
+        assert(fileSize >= endOf);
+        const uint32_t endLength = fileSize - endOf;
+
+        ID3_LOG_INFO("APE start pos: {}", tagRW->getTagStartPosition());
+        ID3_LOG_INFO("file length: {}", fileSize);
+
         cUchar bufFooter;
         bufFooter.reserve((endLength));
         if (endLength > 0) {
             filRead.seekg(endOf);
-            filRead.read(reinterpret_cast<char*>(&bufFooter[0]),
-                              endLength);
+            filRead.read(reinterpret_cast<char*>(&bufFooter[0]), endLength);
         }
 
         cUchar bufHeader;
         bufHeader.reserve((tagRW->getTagStartPosition()));
         filRead.seekg(0);
         filRead.read(reinterpret_cast<char*>(&bufHeader[0]),
-                              tagRW->getTagStartPosition());
+                     tagRW->getTagStartPosition());
 
         filRead.close();
 
-        const std::string writeFileName = filename + id3::modifiedEnding;
+        const std::string writeFileName =
+            filename + ::ape::modifiedEnding;
         ID3_LOG_INFO("file to write: {}", writeFileName);
 
         std::ofstream filWrite(writeFileName, std::ios::binary | std::ios::app);
@@ -379,23 +387,22 @@ public:
                                                << ": Error opening file";
         }
 
-       filWrite.seekp(0);
-       std::for_each(std::begin(bufHeader), std::end(bufHeader),
+        filWrite.seekp(0);
+        std::for_each(std::begin(bufHeader),
+                      std::begin(bufHeader) + tagRW->getTagStartPosition(),
                       [&filWrite](const char& n) { filWrite << n; });
 
-       ID3_LOG_TRACE(
-            "buffer to write : {}",
-            spdlog::to_hex(
-                std::begin(buff),
-                std::begin(buff) + 8));
+        ID3_LOG_TRACE("buffer to write : {}",
+                      spdlog::to_hex(std::begin(buff), std::begin(buff) + 8));
 
         ID3_LOG_INFO("endlength: {}", endLength);
-        ID3_LOG_INFO("tag start pos: {}", tagRW->getTagStartPosition());
 
+        filWrite.seekp(tagRW->getTagStartPosition());
         std::for_each(std::begin(buff), std::end(buff),
                       [&filWrite](const char& n) { filWrite << n; });
 
-        std::for_each(bufFooter.begin(), bufFooter.end(),
+        filWrite.seekp(endOf);
+        std::for_each(bufFooter.begin(), bufFooter.begin() + endLength,
                       [&filWrite](const char& n) { filWrite << n; });
 
         ID3_LOG_INFO("success: {}", __func__);
@@ -406,7 +413,6 @@ public:
     const expected::Result<cUchar> extendBuffer(
         const id3::TagInfos& frameConfig, std::string_view content, uint32_t additionalSize) {
 
-        ID3_LOG_TRACE("entering extendBuffer func...");
         const uint32_t relativeBufferPosition = tagRW->getTagStartPosition();
         const uint32_t tagsSizePositionInHeader =
             tagRW->getTagStartPosition() - relativeBufferPosition + 12;

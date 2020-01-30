@@ -283,7 +283,8 @@ uint32_t GetTagSize(const cUchar& buffer,
 template <typename T>
 expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
                                         uint32_t extraSize, T tagIndex,
-                                        T numberOfElements, T _maxValue) {
+                                        T numberOfElements, T _maxValue
+                                        , bool littleEndian = true) {
     const uint32_t TagIndex = tagIndex;
     const uint32_t NumberOfElements = numberOfElements;
     const uint32_t maxValue = _maxValue;
@@ -295,8 +296,10 @@ expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
     std::copy(itIn, itIn + NumberOfElements, temp_vec.begin());
     auto it = temp_vec.begin();
 
-    /* reverse order of elements */
-    std::reverse(it, it + NumberOfElements);
+    if(littleEndian){
+        /* reverse order of elements */
+        std::reverse(it, it + NumberOfElements);
+    }
 
     std::transform(
         it, it + NumberOfElements, it, it, [&](uint32_t a, uint32_t b) {
@@ -316,10 +319,17 @@ expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
             return a;
         });
 
-    /* reverse back order of elements */
-    std::reverse(it, it + NumberOfElements);
+    if(littleEndian){
+        /* reverse back order of elements */
+         std::reverse(it, it + NumberOfElements);
+    }
 
-    ID3_LOG_INFO("success...");
+    id3::log()->trace(
+        "Tag Frame Bytes after update : {}",
+        spdlog::to_hex(std::begin(temp_vec) ,
+                       std::begin(temp_vec) + NumberOfElements));
+    ID3_LOG_TRACE("success...");
+
     return expected::makeValue<cUchar>(temp_vec);
 }
 
