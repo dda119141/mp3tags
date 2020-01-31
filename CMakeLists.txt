@@ -16,7 +16,7 @@ set(TEST_SOURCES
 )
 
 set(EXAMPLES_SOURCES
-  change_dir.cpp
+  changeTag.cpp
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)

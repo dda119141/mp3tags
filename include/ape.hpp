@@ -170,6 +170,7 @@ public:
                     ID3_LOG_WARN("APE tagReadWriter: No frame!");
                     Ok = false;
                 }
+            }
                 if (Ok) {
                     mTagStartPosition = mTagFooterBegin - mTagSize;
 
@@ -185,7 +186,6 @@ public:
                     mValid = true;
                     buffer = buffer1;
                 }
-            }
         });
     }
 
@@ -300,7 +300,7 @@ public:
     }
 
     const expected::Result<bool> setTag(std::string_view content,
-                                           uint32_t start, uint32_t length) {
+                                           uint32_t start, uint32_t length) const {
         if (content.size() > length) {
             ID3_LOG_ERROR("content length too big foe frame area");
             return expected::makeError<bool>(
@@ -310,7 +310,7 @@ public:
         const auto fConfig = this->getTag();
 
         if (!fConfig.has_value()) {
-            ID3_LOG_ERROR("Could not retrieve Key");
+            ID3_LOG_TRACE("Could not retrieve Key");
             return expected::makeError<bool>("Could not retrieve key");
         } else {
             const id3::TagInfos frameGlobalConfig(
@@ -344,7 +344,7 @@ public:
         }
     }
 
-    expected::Result<bool> ReWriteFile(const cUchar& buff) {
+    expected::Result<bool> ReWriteFile(const cUchar& buff) const {
         const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
 
         std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
@@ -411,7 +411,7 @@ public:
     }
 
     const expected::Result<cUchar> extendBuffer(
-        const id3::TagInfos& frameConfig, std::string_view content, uint32_t additionalSize) {
+        const id3::TagInfos& frameConfig, std::string_view content, uint32_t additionalSize) const {
 
         const uint32_t relativeBufferPosition = tagRW->getTagStartPosition();
         const uint32_t tagsSizePositionInHeader =
@@ -423,13 +423,11 @@ public:
         const uint32_t frameContentStart =
             frameConfig.getTagContentOffset() - relativeBufferPosition;
 
-        mBuffer = tagRW->GetBuffer();
-        if (!mBuffer.has_value()) {
+        if (!tagRW->GetBuffer().has_value()) {
             ID3_LOG_ERROR("No buffer!...");
             return expected::makeError<cUchar>("ape:extendBuffer - No buffer");
         }
-
-        const cUchar& cBuffer = mBuffer.value();
+        const cUchar cBuffer = tagRW->GetBuffer().value();
         ID3_LOG_TRACE("FrameSize... length: {}, frame start: {}",
                       frameConfig.getLength(), frameConfig.getFrameKeyOffset());
         ID3_LOG_TRACE("Updating segments...");
@@ -497,7 +495,7 @@ const expected::Result<std::string> GetTag(const std::string& filename,
 
 const expected::Result<bool> SetTheTag(const std::string& filename, std::string_view tagKey, std::string_view content) {
 
-    tagReader TagR{filename, tagKey};
+    const tagReader TagR{filename, tagKey};
 
     return TagR.setTag(content, 0, content.size());
 }

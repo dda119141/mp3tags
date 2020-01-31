@@ -92,7 +92,7 @@ namespace id3v2
                                        uint32_t frameContentOffset,
                                        uint32_t FrameSize) {
         switch (buff[frameContentOffset]) {
-        case 0x0: {
+            case 0x0: {
                 const T frameConfig{
                     tagOffset, frameContentOffset + 1, FrameSize - 1,
                 };
@@ -119,19 +119,20 @@ namespace id3v2
             }
             case 0x2: { /* UTF-16BE [UTF-16] encoded Unicode [UNICODE] without
                            BOM */
-                const T frameConfig{tagOffset, frameContentOffset + 1, FrameSize - 1, 0x02};
+                const T frameConfig{tagOffset, frameContentOffset + 1,
+                                    FrameSize - 1, 0x02};
                 return expected::makeValue<TagInfos>(frameConfig);
                 break;
             }
             case 0x3: { /* UTF-8 [UTF-8] encoded Unicode [UNICODE]. Terminated
                            with $00 */
-                const T frameConfig{tagOffset, frameContentOffset + 3, FrameSize - 3,
-                               0x03};
+                const T frameConfig{tagOffset, frameContentOffset + 3,
+                                    FrameSize - 3, 0x03};
                 return expected::makeValue<TagInfos>(frameConfig);
                 break;
             }
             default: {
-                T frameConfig{tagOffset, frameContentOffset+1, FrameSize-1};
+                T frameConfig{tagOffset, frameContentOffset + 1, FrameSize - 1};
                 return expected::makeValue<TagInfos>(frameConfig);
                 break;
             }
@@ -216,7 +217,7 @@ namespace id3v2
             : FileName(filename) {
             std::call_once(m_once, [&filename, &frameConfig, &tagVersion,
                                     additionalSize, this]() {
-                auto ret =
+                const auto ret =
                     GetTagHeader(filename) | GetTagSize | [&](uint32_t tags_size) {
                         return GetStringFromFile(
                             filename, tags_size + GetTagHeaderSize<uint32_t>());
@@ -226,7 +227,7 @@ namespace id3v2
                     ID3_LOG_TRACE("Buffer could be read - prepare to extend.");
                     mCBuffer = ret.value();
 
-                    auto ret1 =
+                    const auto ret1 =
                         extendBuffer(frameConfig, additionalSize, tagVersion) |
                         [&](const cUchar& buffer) {
                             mCBuffer = buffer;
@@ -305,7 +306,7 @@ namespace id3v2
                         std::begin(finalBuffer) + frameConfig.getFrameKeyOffset() +
                             frameSizePositionInFrameHeader + 4));
 
-                auto it = finalBuffer.begin() + frameConfig.getFrameKeyOffset() +
+                auto it = finalBuffer.begin() + frameConfig.getTagContentOffset() +
                           frameConfig.getLength();
                 finalBuffer.insert(it, additionalSize, 0);
 
@@ -459,8 +460,12 @@ namespace id3v2
                         tagIndex + GetFrameHeaderSize(TagVersion);
                     FrameSize = frameSize;
 
-                    ID3_LOG_TRACE("frame content offset: {}", frameContentOffset);
+                    ID3_LOG_TRACE("frame content offset: {} and Frame Size: {}", frameContentOffset, FrameSize);
                     assert(frameContentOffset > 0);
+
+                    if (FrameSize == 0){
+                        return expected::makeError<TagInfos>("framePosition = 0");
+                    }
 
                     return buffer | [&](const cUchar& buff) {
                         if (tag.find_first_of("T") ==
