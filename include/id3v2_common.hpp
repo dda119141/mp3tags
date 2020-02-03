@@ -320,6 +320,7 @@ namespace id3v2
             std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
 
             if (!filRead.good()) {
+                ID3_LOG_ERROR("Error opening file");
                 return expected::makeError<bool>() << "__func__"
                                                    << ": Error opening file";
             }
@@ -371,11 +372,11 @@ namespace id3v2
     public:
         explicit TagReadWriter(const std::string& filename)
             : FileName(filename) {
-
             std::call_once(m_once, [this]() {
 
                 const auto ret =
-                    GetTagHeader(FileName) | GetTagSize | [&](uint32_t tags_size) {
+                    GetTagHeader(FileName) | GetTagSize |
+                    [&](uint32_t tags_size) {
                         return GetStringFromFile(
                             FileName, tags_size + GetTagHeaderSize<uint32_t>());
                     };
@@ -383,40 +384,6 @@ namespace id3v2
                     buffer = ret.value();
                 }
             });
-        }
-
-        expected::Result<bool> ReWriteFile(const cUchar& cBuffer) {
-            std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
-            std::ofstream filWrite(FileName + id3::modifiedEnding,
-                                   std::ios::binary | std::ios::app);
-
-            if (!filRead.good()) {
-                return expected::makeError<bool>() << "__func__"
-                                                   << ": Error opening file";
-            }
-            if (!filWrite.good()) {
-                return expected::makeError<bool>() << "__func__"
-                                                   << ": Error opening file";
-            }
-
-
-            const unsigned int dataSize = filRead.tellg();
-            filRead.seekg(0);
-
-            cUchar bufRead;
-            bufRead.reserve(dataSize);
-            filRead.read(reinterpret_cast<char*>(&bufRead[0]), dataSize);
-
-            assert(cBuffer.size() < dataSize);
-
-            std::for_each(std::begin(cBuffer), std::end(cBuffer),
-                          [&filWrite](const char& n) { filWrite << n; });
-
-            std::for_each(bufRead.begin() + cBuffer.size(),
-                          bufRead.begin() + dataSize,
-                          [&filWrite](const char& n) { filWrite << n; });
-
-            return expected::makeValue<bool>(true);
         }
 
         const expected::Result<TagInfos> findFrameInfos(
@@ -433,7 +400,8 @@ namespace id3v2
             } | [&tag](const std::string&
                            tagArea) -> expected::Result<uint32_t> {
 
-                auto searchTagPosition = id3::search_tag<std::string_view>(tagArea);
+                auto searchTagPosition =
+                    id3::search_tag<std::string_view>(tagArea);
                 const auto ret = searchTagPosition(tag);
 
                 ID3_LOG_TRACE("tag name: #{}", std::string(tag));
@@ -441,7 +409,7 @@ namespace id3v2
                 return ret;
             } | [&](uint32_t tagIndex) -> expected::Result<TagInfos> {
 
-                if (tagIndex == 0){
+                if (tagIndex == 0) {
                     return expected::makeError<TagInfos>("framePosition = 0");
                 }
 
@@ -460,14 +428,18 @@ namespace id3v2
                         tagIndex + GetFrameHeaderSize(TagVersion);
                     FrameSize = frameSize;
 
-                    ID3_LOG_TRACE("frame content offset: {} and Frame Size: {}", frameContentOffset, FrameSize);
+                    ID3_LOG_TRACE("frame content offset: {} and Frame Size: {}",
+                                  frameContentOffset, FrameSize);
                     assert(frameContentOffset > 0);
 
-                    if (FrameSize == 0){
-                        return expected::makeError<TagInfos>("framePosition = 0");
+                    if (FrameSize == 0) {
+                        return expected::makeError<TagInfos>(
+                            "framePosition = 0");
                     }
 
                     return buffer | [&](const cUchar& buff) {
+                        ID3_LOG_TRACE("tag starts with T: {}", tag);
+
                         if (tag.find_first_of("T") ==
                             0)  // if tag starts with T
                         {
@@ -475,7 +447,6 @@ namespace id3v2
                                 buff, FramePos, frameContentOffset, FrameSize);
                         }
 
-                        ID3_LOG_TRACE("tag starts with T: {}", tag);
                         const auto ret1 =
                             TagInfos(FramePos, frameContentOffset, FrameSize);
 
@@ -508,7 +479,7 @@ namespace id3v2
                            }
                            const auto val = ExtractString<uint32_t>(
                                buff, FrameConfig.getTagContentOffset(),
-                                   FrameConfig.getLength());
+                               FrameConfig.getLength());
 
                            return val | [&FrameConfig](
                                             const std::string& val_str) {
