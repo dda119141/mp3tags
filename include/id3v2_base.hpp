@@ -3,20 +3,8 @@
 
 #include <sstream>
 #include <fstream>
-#include <iomanip>
-#include <vector>
-#include <algorithm>
-#include <functional>
-#include <optional>
-#include <cmath>
 #include <variant>
-#include <type_traits>
 #include <experimental/filesystem>
-//#include <range/v3/all.hpp>
-#include <range/v3/view.hpp>
-#include <range/v3/action.hpp>
-#include <range/v3/action/transform.hpp>
-#include <range/v3/view/filter.hpp>
 
 #include "id3.hpp"
 #include "result.hpp"

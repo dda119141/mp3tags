@@ -2,6 +2,7 @@
 #define ID3_BASE
 
 #include <algorithm>
+#include <numeric>
 #include <cmath>
 #include <fstream>
 #include <functional>
@@ -11,6 +12,7 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
+#include <bitset>
 #include "logger.hpp"
 #include "result.hpp"
 
