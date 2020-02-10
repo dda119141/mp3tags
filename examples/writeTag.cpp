@@ -17,6 +17,7 @@ bool changeTagsInFile(const std::string& mediafile,
         std::cerr << "Path: " << currentFilePath << " does not exist" << endl;
         return false;
     }
+
     const std::string filename = mp3Path.string();
 
     if (tags.first == "album") {
@@ -70,6 +71,7 @@ bool changeTagsInDirectory(const std::string& directory,
             cout << "wrong path:" << e.what() << endl;
         }
     }
+
     return true;
 }
 
@@ -78,7 +80,6 @@ int main(int argc, const char** argv) {
     // Where we read in the argument value:
     bool show_help = false;
     std::string directory;
-
     std::vector<std::pair<std::string, std::string>> gTags;
 
     auto parser =

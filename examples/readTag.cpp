@@ -41,7 +41,7 @@ bool readTagsInFile(const std::string& mediafile,
         cout << GetContentType(filename) << "\n";
     }
     if (tags.title) {
-        cout << "Get album of file: " << EndFilename << " : ";
+        cout << "Get title of file: " << EndFilename << " : ";
         cout << GetTitle(filename) << "\n";
     }
 
