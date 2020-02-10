@@ -25,7 +25,7 @@ set(EXAMPLES_SOURCES
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party/spdlog/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party/lyra/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party/catch/single_include/catch2)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party/ericniebler/range-v3/include)
