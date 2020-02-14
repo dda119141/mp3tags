@@ -6,7 +6,6 @@
 // Description : tag reader, tad writer in C++ > c++14
 //============================================================================
 
-#include <experimental/filesystem>
 #include <iostream>
 #include <memory>
 
@@ -16,7 +15,7 @@
 #include "tagwriter.hpp"
 
 TEST_CASE("Read/Write from/to id2v3 tag") {
-    namespace fs = std::experimental::filesystem;
+    namespace fs = id3::filesystem;
 
     using std::cout;
     using std::endl;

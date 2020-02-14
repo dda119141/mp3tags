@@ -1,6 +1,5 @@
 #include <lyra/lyra.hpp>
 #include <iostream>
-#include <experimental/filesystem>
 #include "tagreader.hpp"
 
 struct tagOptions {
@@ -14,7 +13,7 @@ struct tagOptions {
 
 bool readTagsInFile(const std::string& mediafile,
                            const struct tagOptions& tags) {
-    namespace fs = std::experimental::filesystem;
+    namespace fs = id3::filesystem;
     using std::cout;
     using std::endl;
 

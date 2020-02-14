@@ -1,11 +1,10 @@
 #include <lyra/lyra.hpp>
 #include <iostream>
-#include <experimental/filesystem>
 #include "tagwriter.hpp"
 
 bool changeTagsInFile(const std::string& mediafile,
                            const std::pair<std::string, std::string>& tags) {
-    namespace fs = std::experimental::filesystem;
+    namespace fs = id3::filesystem;
     using std::cout;
     using std::endl;
 

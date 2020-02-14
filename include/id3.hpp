@@ -15,8 +15,15 @@
 #include <bitset>
 #include "logger.hpp"
 #include "result.hpp"
+#include "tagfilesystem.hpp"
 
 namespace id3 {
+
+#ifdef HAS_FS_EXPERIMENTAL
+namespace filesystem = std::experimental::filesystem;
+#elif HAS_FS
+namespace filesystem = std::filesystem;
+#endif
 
 using cUchar = std::vector<unsigned char>;
 
@@ -161,7 +168,8 @@ expected::Result<bool> WriteFile(const std::string& FileName, const std::string&
 
 expected::Result<bool> renameFile(const std::string& fileToRename,
                                   const std::string& renamedFile) {
-    namespace fs = std::experimental::filesystem;
+
+    namespace fs = ::id3::filesystem;
 
     const fs::path FileToRenamePath =
         fs::path(fs::system_complete(fileToRename));
