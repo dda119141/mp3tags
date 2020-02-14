@@ -32,7 +32,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/3rd-party/ericniebler/ra
 if(0)
 foreach(APP ${TEST_SOURCES})
     string( REPLACE ".cpp" "" APP_BIN "${APP}" )
-    add_executable(${APP_BIN} src/${APP})
+    add_executable(${APP_BIN} tests/${APP})
     target_link_libraries(${APP_BIN} stdc++fs)
 endforeach()
 endif()
