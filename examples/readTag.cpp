@@ -1,3 +1,7 @@
+// Copyright(c) 2020-present, Moge & contributors.
+// Email: dda119141@gmail.com
+// Distributed under the MIT License (http://opensource.org/licenses/MIT)
+
 #include <lyra/lyra.hpp>
 #include <iostream>
 #include "tagreader.hpp"
@@ -97,13 +101,12 @@ int main(int argc, const char** argv) {
     auto result = parser.parse({argc, argv});
 
     // Check that the arguments where valid:
-    if (!result || (tagOption.isEmpty())) {
+    if (!result) {
         std::cerr << "Error in command line: " << result.errorMessage()
                   << std::endl;
         std::cerr << parser << std::endl;
         std::exit(1);
     } else if(show_help) {
-        std::cout << "Need to add tag to change as well as contents\n";
         std::cout << parser << std::endl;
     }else{
         readTags(directory, tagOption);

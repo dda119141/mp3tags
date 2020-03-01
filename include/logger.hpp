@@ -1,3 +1,7 @@
+// Copyright(c) 2020-present, Moge & contributors.
+// Email: dda119141@gmail.com
+// Distributed under the MIT License (http://opensource.org/licenses/MIT)
+
 #ifndef ID3V2_LOGGER
 #define ID3V2_LOGGER
 #include <spdlog/spdlog.h>
