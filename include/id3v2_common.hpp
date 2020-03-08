@@ -392,7 +392,7 @@ namespace id3v2
 
         const expected::Result<TagInfos> findFrameInfos(
             std::string_view tag, const iD3Variant& TagVersion) {
-            uint32_t FrameSize = 0;
+
             uint32_t FramePos = 0;
 
             const auto ret =
@@ -426,11 +426,11 @@ namespace id3v2
                 return buffer | [&tagIndex, &TagVersion](const cUchar& buff) {
 
                     return GetFrameSize<uint32_t>(buff, TagVersion, tagIndex);
-                } | [&](uint32_t frameSize) -> expected::Result<TagInfos> {
+
+                } | [&](uint32_t FrameSize) -> expected::Result<TagInfos> {
 
                     const uint32_t frameContentOffset =
                         tagIndex + GetFrameHeaderSize(TagVersion);
-                    FrameSize = frameSize;
 
                     ID3_LOG_TRACE("frame content offset: {} and Frame Size: {}",
                                   frameContentOffset, FrameSize);
@@ -467,9 +467,12 @@ namespace id3v2
         template <typename V>
         const expected::Result<V> extractTag(std::string_view tag,
                                              const iD3Variant& TagVersion) {
+
             const auto res = buffer | [=](const cUchar& buff) {
+
                 return findFrameInfos(tag, TagVersion) |
                        [&](const TagInfos& FrameConfig) {
+
                            ID3_LOG_INFO("tag content offset: {}, framesize {}",
                                         FrameConfig.getTagContentOffset(),
                                         FrameConfig.getLength());
@@ -481,6 +484,7 @@ namespace id3v2
                                return expected::makeError<V>(
                                    "extractTag: Error: frame length = 0");
                            }
+
                            const auto val = ExtractString<uint32_t>(
                                buff, FrameConfig.getTagContentOffset(),
                                FrameConfig.getLength());
@@ -532,10 +536,13 @@ namespace id3v2
             ID3_LOG_TRACE("tag content offset: {}",
                          frameConfig.getTagContentOffset());
             ID3_LOG_TRACE("tag area length: {} ", frameConfig.getLength());
+
             if (frameConfig.getLength() == 0) {
                 ID3_LOG_ERROR("findFrameInfos: Error, framesize = 0\n");
+
                 return expected::makeError<bool>(
                     "findFrameInfos: Error, framesize = 0\n");
+
             } else if (frameConfig.getLength() <
                        tag_str.size())  // resize whole header
             {
@@ -548,6 +555,7 @@ namespace id3v2
                 return (NewTagArea.writeFile(tag_str) | [&](const bool& val) {
                     return renameFile(filename + id3::modifiedEnding, filename);
                 });
+
             } else {
                 return id3::WriteFile(filename, tag_str, frameConfig);
             }

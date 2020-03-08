@@ -73,13 +73,13 @@ bool SetAlbum(const std::string& filename, std::string_view content)
     const auto ret = id3v1::SetAlbum(filename, content);
 
     if(ret.has_value() || ret1.has_value()){
+
         SetTag(filename, tags, content);
+
         return ret.value();
     }else{
         return SetTag(filename, tags, content);
     }
-
-    return SetTag(filename, tags, content);
 }
 
 bool SetLeadArtist(const std::string& filename, std::string_view content)
@@ -93,7 +93,9 @@ bool SetLeadArtist(const std::string& filename, std::string_view content)
     const auto ret = id3v1::SetLeadArtist(filename, content);
 
     if(ret.has_value()){
+
         SetTag(filename, tags, content);
+
         return ret.value();
     }else{
         return SetTag(filename, tags, content);
@@ -110,13 +112,13 @@ bool SetGenre(const std::string& filename, std::string_view content)
     const auto ret = id3v1::SetGenre(filename, content);
 
     if(ret.has_value() || ret1.has_value()){
+
         SetTag(filename, tags, content);
+
         return ret1.value();
     }else{
         return SetTag(filename, tags, content);
     }
-
-    return SetTag(filename, tags, content);
 }
 
 
@@ -180,7 +182,9 @@ bool SetTitle(const std::string& filename, std::string_view content)
     const auto ret = id3v1::SetTitle(filename, content);
 
     if(ret.has_value() || ret1.has_value()){
+
         SetTag(filename, tags, content);
+
         return ret.value();
     }else{
         return SetTag(filename, tags, content);
@@ -198,7 +202,9 @@ bool SetYear(const std::string& filename, std::string_view content)
     const auto ret = id3v1::SetYear(filename, content);
 
     if(ret.has_value()){
+
         SetTag(filename, tags, content);
+
         return ret.value();
     }else{
         return SetTag(filename, tags, content);
@@ -232,36 +238,12 @@ const std::string_view GetTextWriter(const std::string_view& filename)
     return SetTag(filename, tags);
 }
 
-const std::string_view GetYear(const std::string_view& filename)
-{
-    const std::vector<std::pair<std::string, std::string_view>> tags
-    {
-        {"0x0400", "TDRC"},
-        {"0x0300", "TYER"},
-        {"0x0000", "TYE"},
-    };
-
-    return SetTag(filename, tags);
-}
-
 const std::string_view GetFileType(const std::string_view& filename)
 {
     const std::vector<std::pair<std::string, std::string_view>> tags
     {
         {"0x0300", "TFLT"},
         {"0x0000", "TFT"},
-    };
-
-    return SetTag(filename, tags);
-}
-
-const std::string_view GetTitle(const std::string_view& filename)
-{
-    const std::vector<std::pair<std::string, std::string_view>> tags
-    {
-        {"0x0400", "TIT2"},
-        {"0x0300", "TIT2"},
-        {"0x0000", "TT2"},
     };
 
     return SetTag(filename, tags);
@@ -291,17 +273,6 @@ const std::string_view GetTrackPosition(const std::string_view& filename)
     return SetTag(filename, tags);
 }
 
-const std::string_view GetLeadArtist(const std::string_view& filename)
-{
-    const std::vector<std::pair<std::string, std::string_view>> tags
-    {
-        {"0x0400", "TPE1"},
-        {"0x0300", "TPE1"},
-        {"0x0000", "TP1"},
-    };
-
-    return SetTag(filename, tags);
-}
 #endif
 
 

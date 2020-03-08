@@ -92,16 +92,16 @@ int main(int argc, const char** argv) {
         lyra::opt(directory, "dir")["--directory"]["-d"](
             "specify directory or file to use for reading the tag (REQUIRED).")
             .required() |
-        lyra::opt(tagOption.title)["--title"]["-t"]("Change the title frame content.") |
-        lyra::opt(tagOption.genre)["--genre"]["-g"]("Change the genre frame content.") |
-        lyra::opt(tagOption.artist)["--artist"]["-a"]("Change the artist frame content.") |
-        lyra::opt(tagOption.album)["--album"]["-b"]("Change the album frame content.");
+        lyra::opt(tagOption.title)["--title"]["-t"]("Get the title frame content.") |
+        lyra::opt(tagOption.genre)["--genre"]["-g"]("Get the genre frame content.") |
+        lyra::opt(tagOption.artist)["--artist"]["-a"]("Get the artist frame content.") |
+        lyra::opt(tagOption.album)["--album"]["-b"]("Get the album frame content.");
 
     // Parse the program arguments:
     auto result = parser.parse({argc, argv});
 
     // Check that the arguments where valid:
-    if (!result) {
+    if (!result || tagOption.isEmpty()) {
         std::cerr << "Error in command line: " << result.errorMessage()
                   << std::endl;
         std::cerr << parser << std::endl;

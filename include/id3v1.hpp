@@ -20,7 +20,7 @@ struct tagReadWriter
 {
     private:
         std::once_flag m_once;
-        bool mValid;
+        bool mHasId3v1Tag;
         const std::string& FileName;
         uint32_t tagBegin;
         uint32_t tagPayload;
@@ -30,7 +30,7 @@ struct tagReadWriter
 
     public:
         explicit tagReadWriter(const std::string& fileName):
-        mValid(false)
+        mHasId3v1Tag(false)
         ,FileName(fileName)
         ,tagBegin(0)
         ,tagPayload(0)
@@ -70,7 +70,7 @@ struct tagReadWriter
                     if (!ret) {
                         ID3_LOG_WARN("error: start {} and end {}");
                     } else {
-                        mValid = true;
+                        mHasId3v1Tag = true;
                     }
 
                     filRead.seekg(tagPayload);
@@ -81,9 +81,10 @@ struct tagReadWriter
         }
 
         const uint32_t GetTagPayload() const { return tagPayload; }
+
         std::optional<cUchar> GetBuffer() const {return buffer;}
 
-        bool IsValid() const {return mValid;}
+        bool HasId3v1Tag() const { return mHasId3v1Tag; }
 };
 
 const expected::Result<cUchar> GetBuffer(const std::string& FileName) {
@@ -113,9 +114,11 @@ const expected::Result<bool> SetTheTag(const std::string& filename,
     assert(end > start);
 
     const tagReadWriter tagRW{filename};
-    if (!tagRW.IsValid()) {
+
+    if (!tagRW.HasId3v1Tag()) {
         return expected::makeError<bool>("id3v1 not valid");
     } else if (content.size() > (end - start)) {
+
         ID3_LOG_ERROR("content length too big foe frame area");
         return expected::makeError<bool>(
             "content length too big foe frame area");
@@ -124,6 +127,7 @@ const expected::Result<bool> SetTheTag(const std::string& filename,
     const id3::TagInfos frameInformations(tagRW.GetTagPayload() + start, tagRW.GetTagPayload() + start, (end - start));
 
     ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content), tagRW.GetTagPayload());
+
     return WriteFile(filename, std::string(content), frameInformations);
 }
 

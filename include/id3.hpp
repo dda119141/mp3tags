@@ -204,6 +204,8 @@ const uint32_t GetValFromBuffer(const cUchar& buffer, T index,
     auto bytes_to_add = num_of_bytes_in_hex;
     auto byte_to_pad = index;
 
+    assert(bytes_to_add >=0);
+
     while (bytes_to_add > 0) {
         remaining = (num_of_bytes_in_hex - bytes_to_add);
         auto val = std::pow(2, 8 * remaining) * buffer[byte_to_pad];
@@ -243,9 +245,9 @@ uint32_t GetTagSizeDefault(const cUchar& buffer,
     assert((startPosition + length) <= buffer.size());
 
     using paire = std::pair<uint32_t, uint32_t>;
-
     std::vector<uint32_t> power_values(length);
     uint32_t n = 0;
+
     std::generate(power_values.begin(), power_values.end(), [&n]{ n+=8; return n-8; });
 
     if(BigEndian){
@@ -279,6 +281,7 @@ bool replaceElementsInBuff(const cUchar& buffIn, cUchar& buffOut,
 uint32_t GetTagSize(const cUchar& buffer,
                     const std::vector<unsigned int>& power_values,
                     uint32_t index) {
+
     using paire = std::pair<uint32_t, uint32_t>;
     std::vector<paire> result(power_values.size());
     const auto it = std::begin(buffer) + index;
