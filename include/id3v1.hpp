@@ -124,7 +124,7 @@ const expected::Result<bool> SetTheTag(const std::string& filename,
             "content length too big foe frame area");
     }
 
-    const id3::TagInfos frameInformations(tagRW.GetTagPayload() + start, tagRW.GetTagPayload() + start, (end - start));
+    const id3::TagInfos frameInformations {tagRW.GetTagPayload() + start, tagRW.GetTagPayload() + start, (end - start)};
 
     ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content), tagRW.GetTagPayload());
 
