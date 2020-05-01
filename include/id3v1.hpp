@@ -117,9 +117,10 @@ const expected::Result<bool> SetTheTag(const std::string& filename,
 
     if (!tagRW.HasId3v1Tag()) {
         return expected::makeError<bool>("id3v1 not valid");
-    } else if (content.size() > (end - start)) {
 
-        ID3_LOG_ERROR("content length too big foe frame area");
+    } else if (content.size() > (end - start)) {
+        ID3_LOG_ERROR("content length {} too big for frame area", content.size());
+
         return expected::makeError<bool>(
             "content length too big foe frame area");
     }

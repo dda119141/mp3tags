@@ -1,23 +1,23 @@
 tag-read-writer
 ===============
 
-mp3 handling header-only library for C++17 applications/libraries. This project provides a header-only library for reading and writing tags in mp3 files.
+audio tags handling header-only library for C++17 applications/libraries. This project provides a header-only library for reading and writing tags in audio files.
 
 About
 -----
 
-Why does the open source world need another mp3 tag library? Yes there is already the taglib out there. But there is a need to a solution that is highly functional and relies on current and future modern cpp patterns. It is a heady-only library that can be easily included and used in any c++17 supported project.
+Why does the open source world need another audio tag library? Yes there is already the taglib out there. But there is a need to a solution that is highly functional and relies on current and future modern cpp patterns. Hence less vulnerability within this solution will be achieved. It is a heady-only library that can be easily included and used in any c++17 supported project.
 
 This library supports parsing, reading and writing [APE tags](http://wiki.hydrogenaud.io/index.php?title=APEv2_specification), [id3v1 tags](http://id3.org/ID3v1), and [id3v2 tags](http://id3.org/id3v2.3.0).
 
-For logging the internal behaviour, this spdlog library is part of this solution. Further informations about the used logging library can be found [here](https://github.com/gabime/spdlog).
+For logging the internal behaviour, this spdlog library is used in this solution. Further informations about the used logging library can be found [here](https://github.com/gabime/spdlog).
 
 Examples
 ---------
 
 In the example folder, there are utilities giving good hints about how to use this library:
 - readTag
-  - Utility for simply reading tags out of an mp3 file or any mp3 file in a directory. The following action gives informations on how to use it.
+  - Utility for simply reading tags out of an audio file or any audio file in a directory. The following action gives informations on how to use it.
 
 ```console
 ./readTag --help
@@ -25,7 +25,7 @@ In the example folder, there are utilities giving good hints about how to use th
 Usage:
   readTag [-?|-h|--help] --directory|-d [--title|-t] [--genre|-g] [--artist|-a] [--album|-b]
 
-This is an utility for changing tag across all mp3 files 
+This is an utility for changing tag across all audio files 
 within a directory.
 
 Options, arguments:
@@ -46,7 +46,7 @@ Options, arguments:
 ```
 
 - writeTag
-  - Utility for modifying tags in an mp3 file or in all mp3 file within a directory. The following command gives informations on how to use it.
+  - Utility for modifying tags in an audio file or in all audio file within a directory. The following command gives informations on how to use it.
 
 ```console
  ./writeTag --help

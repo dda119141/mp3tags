@@ -82,8 +82,10 @@ namespace id3v2
         return id3v2::GetID3FileIdentifier(buffer) |
                    [&](const std::string& val) -> expected::Result<cUchar> {
             if (val != "ID3") {
-                std::string ret = std::string("error ") +
-                                  std::string(__func__) + std::string("\n");
+                id3::log()->info(" ID3 tag not present");
+
+                std::string ret = std::string("ID3 tag not present ") +
+                                  std::string("\n");
                 return expected::makeError<cUchar, std::string>(ret.c_str());
             } else {
                 return expected::makeValue<cUchar>(buffer);
