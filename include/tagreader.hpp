@@ -122,7 +122,12 @@ const std::string GetContentType(const std::string& filename) {
         {"0x0400", "TCON"}, {"0x0300", "TCON"}, {"0x0000", "TCO"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    const auto ret = _getTag(filename, ape::GetGenre, id3v1::GetGenre);
+    if( ret != std::string("") ){
+            return ret;
+    }else{
+        return GetTheTag<std::string>(filename, tags);
+    }
 }
 
 const std::string GetComment(const std::string& filename) {

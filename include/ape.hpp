@@ -98,7 +98,7 @@ private:
         assert(tagToCheck.size() <= bufferLength);
 
         const auto stringToCheck = readString(fRead, bufferLength);
-        bool ret = (stringToCheck == tagToCheck);
+        const bool ret = (stringToCheck == tagToCheck);
         if (!ret) {
             ID3_LOG_WARN("error: {} and {}", stringToCheck, tagToCheck);
         }
