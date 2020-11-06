@@ -18,11 +18,15 @@ bool SetTag(const std::string& filename,
             const std::vector<std::pair<std::string, std::string_view>>& tags,
             std::string_view content) {
     const auto ret =
-        id3v2::GetTagHeader(filename) | id3v2::check_for_ID3 |
-        [](const std::vector<unsigned char>& buffer) {
+        id3v2::GetTagHeader(filename) 
+
+        | id3v2::checkForID3
+
+        | [](const std::vector<unsigned char>& buffer) {
             return id3v2::GetID3Version(buffer);
-        } |
-        [&](std::string id3Version) {
+        }
+
+        | [&](std::string id3Version) {
             id3v2::iD3Variant tagVersion;
 
             for (auto& tag : tags) {
@@ -30,16 +34,19 @@ bool SetTag(const std::string& filename,
                 {
                     if (id3Version == "0x0300") {
                         tagVersion = id3v2::v30();
+
                         return id3v2::setTag<std::string_view,
                                              std::string_view>(
                             filename, tagVersion, content, tag.second);
                     } else if (id3Version == "0x0400") {
                         tagVersion = id3v2::v40();
+
                         return id3v2::setTag<std::string_view,
                                              std::string_view>(
                             filename, tagVersion, content, tag.second);
                     } else if (id3Version == "0x0000") {
                         tagVersion = id3v2::v00();
+
                         return id3v2::setTag<std::string_view,
                                              std::string_view>(
                             filename, tagVersion, content, tag.second);
@@ -88,7 +95,7 @@ bool SetLeadArtist(const std::string& filename, std::string_view content)
     {
         {"0x0400", "TPE1"},
         {"0x0300", "TPE1"},
-            {"0x0000", "TP1"},
+        {"0x0000", "TP1"},
     };
     const auto ret = id3v1::SetLeadArtist(filename, content);
 

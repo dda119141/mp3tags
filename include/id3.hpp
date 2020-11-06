@@ -53,12 +53,7 @@ public:
           encodeFlag(_encodeFlag),
           doSwap(_doSwap) {}
 
-    TagInfos():
-          keyStartPosition(0),
-          frameContentStartPosition(0),
-          length(0),
-          encodeFlag(0),
-          doSwap(0) {}
+    TagInfos() {}
 
     const uint32_t getFrameKeyOffset() const { return keyStartPosition; }
     const uint32_t getTagContentOffset() const {
@@ -70,11 +65,11 @@ public:
 
 private:
     // TagInfos() = delete;
-    uint32_t keyStartPosition;
-    uint32_t frameContentStartPosition;
-    uint32_t length;
-    uint32_t encodeFlag;
-    uint32_t doSwap;
+    uint32_t keyStartPosition = 0;
+    uint32_t frameContentStartPosition = 0;
+    uint32_t length = 0;
+    uint32_t encodeFlag = 0;
+    uint32_t doSwap = 0;
 };
 
 template <typename T>
@@ -355,10 +350,10 @@ class search_tag {
 private:
     const Type& mTagArea;
     std::once_flag m_once;
-    uint32_t loc;
+    uint32_t loc = 0;
 
 public:
-    search_tag(const Type& tagArea) : mTagArea(tagArea), loc(0) {}
+    search_tag(const Type& tagArea) : mTagArea(tagArea) {}
 
     expected::Result<uint32_t> operator()(Type tag) {
         std::call_once(m_once, [this, &tag]() {

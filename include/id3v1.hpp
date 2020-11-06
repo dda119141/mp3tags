@@ -20,22 +20,17 @@ struct tagReadWriter
 {
     private:
         std::once_flag m_once;
-        bool mHasId3v1Tag;
+        bool mHasId3v1Tag = false;
         const std::string& FileName;
-        uint32_t tagBegin;
-        uint32_t tagPayload;
-        uint32_t tagPayloadLength;
-        uint32_t tagHeaderLength;
+        uint32_t tagBegin = 0;
+        uint32_t tagPayload = 0;
+        uint32_t tagPayloadLength = 0;
+        uint32_t tagHeaderLength = 3;
         std::optional<cUchar> buffer;
 
     public:
         explicit tagReadWriter(const std::string& fileName):
-        mHasId3v1Tag(false)
-        ,FileName(fileName)
-        ,tagBegin(0)
-        ,tagPayload(0)
-        ,tagPayloadLength(0)
-        ,tagHeaderLength(3)
+        FileName(fileName)
         ,buffer({})
         {
             std::call_once(m_once,

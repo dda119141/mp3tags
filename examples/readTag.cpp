@@ -68,7 +68,7 @@ bool readTags(const std::string& directory,
         readTagsInFile(mediafile, tags);
     } else {
         try {
-            for (auto& filen : fs::directory_iterator(mp3Path.string())) {
+            for (auto& filen : fs::recursive_directory_iterator(mp3Path.string())) {
                 const std::string mediafile = filen.path().string();
                 readTagsInFile(mediafile, tags);
             }
