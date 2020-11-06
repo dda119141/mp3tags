@@ -548,10 +548,10 @@ namespace id3v2
 
         if (locs.has_value()) {
             const id3::TagInfos& frameConfig = locs.value();
-            const std::string tagSection =
+            const std::string tagPayload =
                 prepareTagContent(content, frameConfig);
 
-            ID3_LOG_TRACE("Content write: {} prepared", tagSection);
+            ID3_LOG_TRACE("Content write: {} prepared", tagPayload);
             ID3_LOG_TRACE("tag content offset: {}",
                          frameConfig.getTagContentOffset());
             ID3_LOG_TRACE("tag area length: {} ", frameConfig.getLength());
@@ -563,21 +563,21 @@ namespace id3v2
                     "findFrameInfos: Error, framesize = 0\n");
 
             } else if (frameConfig.getLength() <
-                       tagSection.size())  // resize whole header
+                       tagPayload.size())  // resize whole header
             {
                 const uint32_t extraLength =
-                    (tagSection.size() - frameConfig.getLength());
+                    (tagPayload.size() - frameConfig.getLength());
 
                 struct id3v2::newTagArea NewTagArea {
                     filename, frameConfig, tagVersion, extraLength
                 };
 
-                return (NewTagArea.extendFile(tagSection) | [&](const bool& val) {
+                return (NewTagArea.extendFile(tagPayload) | [&](const bool& val) {
                     return renameFile(filename + id3::modifiedEnding, filename);
                 });
 
             } else {
-                return id3::WriteFile(filename, tagSection, frameConfig);
+                return id3::WriteFile(filename, tagPayload, frameConfig);
             }
         } else {
             return expected::makeError<bool>(
