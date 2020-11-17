@@ -12,17 +12,22 @@
 #include <id3v1.hpp>
 #include <ape.hpp>
 
+
 template <typename tagType>
-const std::string GetTheTag(
+const std::string GetId3v2Tag(
     const std::string& filename,
     const std::vector<std::pair<std::string, std::string_view>>& tags) {
 
     const auto ret =
-        id3v2::GetTagHeader(filename) | id3v2::check_for_ID3 |
-        [](const std::vector<unsigned char>& buffer) {
+        id3v2::GetTagHeader(filename)
+
+        | id3v2::checkForID3
+
+        | [](const std::vector<unsigned char>& buffer) {
             return id3v2::GetID3Version(buffer);
-        } |
-        [&](const std::string& id3Version) {
+        }
+
+        | [&](const std::string& id3Version) {
             // std::cout << "id3version: " << id3Version << std::endl;
             id3v2::iD3Variant tagVersion;
 
@@ -31,10 +36,13 @@ const std::string GetTheTag(
                 {
                     if (id3Version == "0x0300") {
                         tagVersion = id3v2::v30();
+
                     } else if (id3Version == "0x0400") {
                         tagVersion = id3v2::v40();
+
                     } else if (id3Version == "0x0000") {
                         tagVersion = id3v2::v00();
+
                     } else {
                         return expected::makeError<std::string>(
                             "version not supported");
@@ -45,6 +53,7 @@ const std::string GetTheTag(
                     return obj.extractTag<std::string>(tag.second, tagVersion);
                 }
             }
+
             return expected::makeError<std::string>()
                    << "id3 version not supported"
                    << "\n";
@@ -59,154 +68,126 @@ const std::string GetTheTag(
 }
 
 template <typename Function1, typename Function2>
-const std::string _getTag(const std::string& filename, Function1 fuc1, Function2 fuc2)
+const std::string GetTag(const std::string& filename,
+        const std::vector<std::pair<std::string, std::string_view>>& id3v2Tags,
+        Function1 fuc1, Function2 fuc2)
 {
     const auto retApe = fuc1(filename);
     if (retApe.has_value()) {
         return retApe.value();
-    } else {
-        const auto retId3v1 = fuc2(filename);
-        if(retId3v1.has_value()){
-            return retId3v1.value();
-        }else{
-            return std::string("");
-        }
     }
+
+    const auto retId3v1 = fuc2(filename);
+    if(retId3v1.has_value()){
+        return retId3v1.value();
+    }
+
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 const std::string GetAlbum(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TALB"}, {"0x0300", "TALB"}, {"0x0000", "TAL"},
     };
 
-    const auto ret = _getTag(filename, ape::GetAlbum, id3v1::GetAlbum);
-    if( ret != std::string("") ){
-            return ret;
-    }else{
-        return GetTheTag<std::string>(filename, tags);
-    }
+    return GetTag(filename, id3v2Tags, ape::GetAlbum, id3v1::GetAlbum);
 }
 
 const std::string GetLeadArtist(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TPE1"}, {"0x0300", "TPE1"}, {"0x0000", "TP1"},
     };
 
-    const auto ret = _getTag(filename, ape::GetLeadArtist, id3v1::GetLeadArtist);
-    if( ret != std::string("") ){
-            return ret;
-    }else{
-        return GetTheTag<std::string>(filename, tags);
-    }
+    return GetTag(filename, id3v2Tags, ape::GetLeadArtist, id3v1::GetLeadArtist);
 }
 
 const std::string GetComposer(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TCOM"}, {"0x0300", "TCOM"}, {"0x0000", "TCM"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 const std::string GetDate(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0300", "TDAT"}, {"0x0400", "TDRC"}, {"0x0000", "TDA"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 //Also known as Genre
 const std::string GetContentType(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TCON"}, {"0x0300", "TCON"}, {"0x0000", "TCO"},
     };
 
-    const auto ret = _getTag(filename, ape::GetGenre, id3v1::GetGenre);
-    if( ret != std::string("") ){
-            return ret;
-    }else{
-        return GetTheTag<std::string>(filename, tags);
-    }
+    return GetTag(filename, id3v2Tags, ape::GetGenre, id3v1::GetGenre);
 }
 
 const std::string GetComment(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "COMM"}, {"0x0300", "COMM"}, {"0x0000", "COM"},
     };
 
-    const auto ret = _getTag(filename, ape::GetComment, id3v1::GetComment);
-    if( ret != std::string("") ){
-            return ret;
-    }else{
-        return GetTheTag<std::string>(filename, tags);
-    }
+    return GetTag(filename, id3v2Tags, ape::GetComment, id3v1::GetComment);
 }
 
 const std::string GetTextWriter(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TEXT"}, {"0x0300", "TEXT"}, {"0x0000", "TXT"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 const std::string GetYear(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TDRC"}, {"0x0300", "TYER"}, {"0x0000", "TYE"},
     };
 
-    const auto ret = _getTag(filename, ape::GetYear, id3v1::GetYear);
-    if( ret != std::string("") ){
-            return ret;
-    }else{
-        return GetTheTag<std::string>(filename, tags);
-    }
+    return GetTag(filename, id3v2Tags, ape::GetYear, id3v1::GetYear);
 }
 
 const std::string GetFileType(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0300", "TFLT"}, {"0x0000", "TFT"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 const std::string GetTitle(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TIT2"}, {"0x0300", "TIT2"}, {"0x0000", "TT2"},
     };
 
-    const auto ret = _getTag(filename, ape::GetTitle, id3v1::GetTitle);
-    if( ret != std::string("") ){
-            return ret;
-    }else{
-        return GetTheTag<std::string>(filename, tags);
-    }
+    return GetTag(filename, id3v2Tags, ape::GetTitle, id3v1::GetTitle);
 }
 
 const std::string GetContentGroupDescription(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TIT1"}, {"0x0300", "TIT1"}, {"0x0000", "TT1"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 const std::string GetTrackPosition(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TRCK"}, {"0x0300", "TRCK"}, {"0x0000", "TRK"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 const std::string GetBandOrchestra(const std::string& filename) {
-    const std::vector<std::pair<std::string, std::string_view>> tags{
+    const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
         {"0x0400", "TPE2"}, {"0x0300", "TPE2"}, {"0x0000", "TP2"},
     };
 
-    return GetTheTag<std::string>(filename, tags);
+    return GetId3v2Tag<std::string>(filename, id3v2Tags);
 }
 
 #endif //_TAG_READER

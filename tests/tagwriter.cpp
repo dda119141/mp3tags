@@ -10,7 +10,7 @@
 #include "tagreader.hpp"
 #include "tagwriter.hpp"
 
-TEST_CASE("Read/Write from/to id2v3 tag") {
+TEST_CASE("Read/Write from/to id3v2 tag") {
     namespace fs = id3::filesystem;
 
     using std::cout;
@@ -68,7 +68,7 @@ TEST_CASE("Read/Write from/to id2v3 tag") {
     SECTION("Test reading back artist") {
         REQUIRE(GetLeadArtist(filename) == "TitTestYingArtist");
     }
-    SECTION("Test reading Year") { REQUIRE(GetYear(filename) == "2009"); }
+    SECTION("Test reading Year") { REQUIRE(GetYear(filename) == "2006"); }
     SECTION("Test reading Content type") {
         REQUIRE(GetContentType(filename) == "Rap");
     }

@@ -66,7 +66,7 @@ bool changeTagsInDirectory(const std::string& directory,
         changeTagsInFile(mediafile, tags);
     } else {
         try {
-            for (auto& filen : fs::directory_iterator(mp3Path.string())) {
+            for (auto& filen : fs::recursive_directory_iterator(mp3Path.string())) {
                 const std::string mediafile = filen.path().string();
                 changeTagsInFile(mediafile, tags);
             }
