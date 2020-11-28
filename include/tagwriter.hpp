@@ -35,19 +35,19 @@ bool SetTag(const std::string& filename,
                     if (id3Version == "0x0300") {
                         tagVersion = id3v2::v30();
 
-                        return id3v2::setTag<std::string_view,
+                        return id3v2::writeFramePayload<std::string_view,
                                              std::string_view>(
                             filename, tagVersion, content, tag.second);
                     } else if (id3Version == "0x0400") {
                         tagVersion = id3v2::v40();
 
-                        return id3v2::setTag<std::string_view,
+                        return id3v2::writeFramePayload<std::string_view,
                                              std::string_view>(
                             filename, tagVersion, content, tag.second);
                     } else if (id3Version == "0x0000") {
                         tagVersion = id3v2::v00();
 
-                        return id3v2::setTag<std::string_view,
+                        return id3v2::writeFramePayload<std::string_view,
                                              std::string_view>(
                             filename, tagVersion, content, tag.second);
                     } else {

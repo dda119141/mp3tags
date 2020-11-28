@@ -90,7 +90,7 @@ class v00
             return ::id3v2::RetrieveSize(6);
         }
 
-        std::optional<uint32_t> GetFrameSize(const cUchar& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t>& buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
@@ -110,7 +110,7 @@ class v00
             return {};
         }
 
-        expected::Result<cUchar> UpdateFrameSize(const cUchar& buffer,
+        expected::Result<std::vector<uint8_t>> UpdateFrameSize(const std::vector<uint8_t>& buffer,
                                                  uint32_t extraSize,
                                                  uint32_t tagLocation) {
 
