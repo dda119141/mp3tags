@@ -75,7 +75,7 @@ class v40
         }
 
 
-        std::optional<uint32_t> GetFrameSize(const cUchar& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t>& buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 

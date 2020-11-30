@@ -50,7 +50,7 @@ const std::string GetId3v2Tag(
 
                     id3v2::TagReadWriter<std::string> obj(filename);
 
-                    return obj.extractTag<std::string>(tag.second, tagVersion);
+                    return obj.getFramePayload<std::string>(tag.second, tagVersion);
                 }
             }
 

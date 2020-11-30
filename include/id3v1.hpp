@@ -93,7 +93,7 @@ const expected::Result<cUchar> GetBuffer(const std::string& FileName) {
     }
 }
 
-const expected::Result<std::string> GetTheTag(const cUchar& buffer, uint32_t start,
+const expected::Result<std::string> GetTheFramePayload(const cUchar& buffer, uint32_t start,
                                            uint32_t end) {
     assert(end > start);
 
@@ -103,88 +103,90 @@ const expected::Result<std::string> GetTheTag(const cUchar& buffer, uint32_t sta
            };
 }
 
-const expected::Result<bool> SetTheTag(const std::string& filename,
+const expected::Result<bool> SetFramePayload(const std::string& filename,
                                        std::string_view content,
-                                       uint32_t start, uint32_t end) {
-    assert(end > start);
+                                       uint32_t relativeFramePayloadStart, 
+                                       uint32_t relativeFramePayloadEnd) {
+    assert(relativeFramePayloadEnd > relativeFramePayloadStart);
 
     const tagReadWriter tagRW{filename};
 
     if (!tagRW.HasId3v1Tag()) {
         return expected::makeError<bool>("id3v1 not valid");
 
-    } else if (content.size() > (end - start)) {
+    } else if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
         ID3_LOG_ERROR("content length {} too big for frame area", content.size());
 
         return expected::makeError<bool>(
             "content length too big foe frame area");
     }
 
-    const id3::TagInfos frameInformations {tagRW.GetTagPayload() + start, tagRW.GetTagPayload() + start, (end - start)};
+    const id3::FrameSettings frameSettings {tagRW.GetTagPayload() + relativeFramePayloadStart, 
+        tagRW.GetTagPayload() + relativeFramePayloadStart, (relativeFramePayloadEnd - relativeFramePayloadStart)};
 
     ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content), tagRW.GetTagPayload());
 
-    return WriteFile(filename, std::string(content), frameInformations);
+    return WriteFile(filename, std::string(content), frameSettings);
 }
 
 const expected::Result<bool> SetTitle(const std::string& filename,
                                            std::string_view content) {
-    return id3v1::SetTheTag(filename, content, 0, 30);
+    return id3v1::SetFramePayload(filename, content, 0, 30);
 }
 
 const expected::Result<bool> SetLeadArtist(
     const std::string& filename, std::string_view content) {
-    return id3v1::SetTheTag(filename, content, 30, 60);
+    return id3v1::SetFramePayload(filename, content, 30, 60);
 }
 
 const expected::Result<bool> SetAlbum(const std::string& filename,
                                            std::string_view content) {
-    return id3v1::SetTheTag(filename, content, 60, 90);
+    return id3v1::SetFramePayload(filename, content, 60, 90);
 }
 
 const expected::Result<bool> SetYear(const std::string& filename,
                                       std::string_view content) {
-    return id3v1::SetTheTag(filename, content, 90, 94);
+    return id3v1::SetFramePayload(filename, content, 90, 94);
 }
 
 const expected::Result<bool> SetComment(const std::string& filename,
                                              std::string_view content) {
-    return id3v1::SetTheTag(filename, content, 94, 124);
+    return id3v1::SetFramePayload(filename, content, 94, 124);
 }
 
 const expected::Result<bool> SetGenre(const std::string& filename,
                                            std::string_view content) {
-    return id3v1::SetTheTag(filename, content, 124, 125);
+    return id3v1::SetFramePayload(filename, content, 124, 125);
 }
 
 const expected::Result<std::string> GetTitle(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheTag(buffer, 0, 30); };
+           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 0, 30); };
 }
 
 const expected::Result<std::string> GetLeadArtist(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheTag(buffer, 30, 60); };
+           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 30, 60); };
 }
 
 const expected::Result<std::string> GetAlbum(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheTag(buffer, 60, 90); };
+           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 60, 90); };
 }
 
 const expected::Result<std::string> GetYear(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheTag(buffer, 90, 94); };
+           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 90, 94); };
 }
 
 const expected::Result<std::string> GetComment(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheTag(buffer, 94, 124); };
+           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 94, 124); };
 }
 
 const expected::Result<std::string> GetGenre(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheTag(buffer, 124, 125); };
+           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 124, 125); };
 }
 
 };  // end namespace id3v1

@@ -43,29 +43,30 @@ const std::string stripLeft(const std::string& valIn) {
     return val;
 }
 
-class TagInfos {
+/* Frame settings */
+class FrameSettings {
 public:
-    TagInfos(uint32_t FrameKeyOffset, uint32_t FrameContentOffset, uint32_t Length,
+    FrameSettings(uint32_t FrameIDOffset, uint32_t FramePayloadOffset, uint32_t Length,
              uint32_t _encodeFlag = 0, uint32_t _doSwap = 0):
-          keyStartPosition(FrameKeyOffset),
-          frameContentStartPosition(FrameContentOffset),
+          frameIDStartPosition(FrameIDOffset),
+          frameContentStartPosition(FramePayloadOffset),
           length(Length),
           encodeFlag(_encodeFlag),
           doSwap(_doSwap) {}
 
-    TagInfos() {}
+    FrameSettings() {}
 
-    const uint32_t getFrameKeyOffset() const { return keyStartPosition; }
-    const uint32_t getTagContentOffset() const {
+    const uint32_t getFrameKeyOffset() const { return frameIDStartPosition; }
+    const uint32_t getFramePayloadOffset() const {
         return frameContentStartPosition;
     }
-    const uint32_t getLength() const { return length; }
+    const uint32_t getPayloadLength() const { return length; }
     const uint32_t getEncodingValue() const { return encodeFlag; }
     const uint32_t getSwapValue() const { return doSwap; }
 
 private:
-    // TagInfos() = delete;
-    uint32_t keyStartPosition = 0;
+    // FrameSettings() = delete;
+    uint32_t frameIDStartPosition = 0;
     uint32_t frameContentStartPosition = 0;
     uint32_t length = 0;
     uint32_t encodeFlag = 0;
@@ -73,12 +74,12 @@ private:
 };
 
 template <typename T>
-expected::Result<T> constructNewTagInfos(const T& frameConfig,
-                                         uint32_t newtagSize) {
+expected::Result<T> contructNewFrameSettings(const T& frameConfig,
+                                         uint32_t additionalFramePayloadSize) {
     const T FrameConfig{
-        frameConfig.getFrameKeyOffset(), frameConfig.getTagContentOffset(),
-        frameConfig.getLength() + newtagSize, frameConfig.getEncodingValue(),
-        frameConfig.getSwapValue()};
+        frameConfig.getFrameKeyOffset(), frameConfig.getFramePayloadOffset(),
+        frameConfig.getPayloadLength() + additionalFramePayloadSize, 
+        frameConfig.getEncodingValue(),  frameConfig.getSwapValue()};
 
     return expected::makeValue<T>(FrameConfig);
 }
@@ -125,7 +126,7 @@ template <
         std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
         std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
         std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<id3::TagInfos>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<id3::FrameSettings>>::value ||
         std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value)>,
     typename F>
 auto operator | (T&& _obj, F&& Function)
@@ -141,7 +142,7 @@ auto operator | (T&& _obj, F&& Function)
 }
 
 expected::Result<bool> WriteFile(const std::string& FileName, const std::string& content,
-                                 const TagInfos& frameInformations) {
+                                 const FrameSettings& frameSettings) {
     std::fstream filWrite(FileName,
                           std::ios::binary | std::ios::in | std::ios::out);
 
@@ -150,14 +151,14 @@ expected::Result<bool> WriteFile(const std::string& FileName, const std::string&
                                            << ": Error opening file\n";
     }
 
-    filWrite.seekp(frameInformations.getTagContentOffset());
+    filWrite.seekp(frameSettings.getFramePayloadOffset());
 
     std::for_each(content.begin(), content.end(),
                   [&filWrite](const char& n) { filWrite << n; });
 
-    assert(frameInformations.getLength() >= content.size());
+    assert(frameSettings.getPayloadLength() >= content.size());
 
-    for (uint32_t i = 0; i < (frameInformations.getLength() - content.size());
+    for (uint32_t i = 0; i < (frameSettings.getPayloadLength() - content.size());
          ++i) {
         filWrite << '\0';
     }

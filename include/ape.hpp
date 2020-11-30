@@ -19,14 +19,14 @@ constexpr uint32_t GetTagFooterSize(void) { return 32; }
 
 constexpr uint32_t GetTagHeaderSize(void) { return 32; }
 
-constexpr uint32_t OffsetFromFrameStartToKey(void) { return 8; }
+constexpr uint32_t OffsetFromFrameStartToFrameID(void) { return 8; }
 
 typedef struct _frameConfig {
     uint32_t frameStartPosition;
     uint32_t frameContentPosition;
     uint32_t frameLength;
     std::string frameContent;
-} frameConfig;
+} frameBlock_t;
 
 const expected::Result<std::string> extractTheTag(const cUchar& buffer,
                                                   uint32_t start,
@@ -39,12 +39,12 @@ const expected::Result<std::string> extractTheTag(const cUchar& buffer,
 
 expected::Result<cUchar> UpdateFrameSize(const cUchar& buffer,
                                          uint32_t extraSize,
-                                         uint32_t tagLocation) {
-    const uint32_t frameSizePositionInArea = tagLocation;
+                                         uint32_t frameIDPosition) {
+    const uint32_t frameSizePositionInArea = frameIDPosition;
     constexpr uint32_t frameSizeLengthInArea = 4;
     constexpr uint32_t frameSizeMaxValuePerElement = 255;
 
-    id3::log()->info(" Frame Index: {}", tagLocation);
+    id3::log()->info(" Frame Index: {}", frameIDPosition);
     id3::log()->info(
         "Tag Frame Bytes before update : {}",
         spdlog::to_hex(std::begin(buffer) + frameSizePositionInArea,
@@ -235,13 +235,13 @@ public:
      });
     }
 
-    const expected::Result<frameConfig> getTag() const {
+    const expected::Result<frameBlock_t> getFrameBlock() const {
         if (!mValid)
-            return expected::makeError<frameConfig>("getTag object not valid");
+            return expected::makeError<frameBlock_t>("getFrameBlock object not valid");
 
         cUchar buffer = tagRW->GetBuffer().value();
 
-        ID3_LOG_TRACE("getTag object valid - size: {}", buffer.size());
+        ID3_LOG_TRACE("getFrameBlock object valid - size: {}", buffer.size());
 
         return id3::ExtractString<uint32_t>(buffer, 0, buffer.size()) |
                [&](const std::string& tagArea) {
@@ -259,7 +259,7 @@ public:
                    if (!frameContentPosition) {
                        ID3_LOG_TRACE("position not found: {} for tag name: #{}",
                                      frameContentPosition, std::string(tagKey));
-                       return expected::makeError<frameConfig>()
+                       return expected::makeError<frameBlock_t>()
                               << "frame Key: " << std::string(tagKey)
                               << " could not be found\n";
                    }
@@ -267,24 +267,24 @@ public:
                    ID3_LOG_TRACE("key position found: {} for tag name: #{}",
                                  frameKeyPosition.value(), std::string(tagKey));
 
-                   frameConfig fConfig = {0};
-                   assert(frameKeyPosition.value() >= OffsetFromFrameStartToKey());
+                   frameBlock_t frameConfig = {0};
+                   assert(frameKeyPosition.value() >= OffsetFromFrameStartToFrameID());
 
                    const uint32_t frameStartPosition =
-                       frameKeyPosition.value() - OffsetFromFrameStartToKey();
+                       frameKeyPosition.value() - OffsetFromFrameStartToFrameID();
                    const uint32_t frameLength =
                        id3::GetTagSizeDefault(buffer, 4, frameStartPosition);
                    ID3_LOG_TRACE("key #{} - Frame length: {}",
                                  std::string(tagKey), frameLength);
 
-                   fConfig.frameContentPosition =
+                   frameConfig.frameContentPosition =
                        frameContentPosition + tagRW->getTagStartPosition();
-                   fConfig.frameStartPosition =
+                   frameConfig.frameStartPosition =
                        frameStartPosition + tagRW->getTagStartPosition();
-                   fConfig.frameLength = frameLength;
+                   frameConfig.frameLength = frameLength;
 
                    if (!frameContentPosition) {
-                       return expected::makeError<frameConfig>()
+                       return expected::makeError<frameBlock_t>()
                               << "frame Key: " << std::string(tagKey)
                               << " - Wrong frameLength\n";
                        ID3_LOG_ERROR("framelength: {} for tag name: #{}",
@@ -294,50 +294,50 @@ public:
                    const auto frameContent =
                        extractTheTag(buffer, frameContentPosition, frameLength);
                    if (frameContent.has_value()) {
-                       fConfig.frameContent = frameContent.value();
+                       frameConfig.frameContent = frameContent.value();
                    } else {
-                       fConfig.frameContent = "";
+                       frameConfig.frameContent = "";
                    }
 
-                   return expected::makeValue<frameConfig>(fConfig);
+                   return expected::makeValue<frameBlock_t>(frameConfig);
                };
     }
 
-    const expected::Result<bool> setTag(std::string_view content,
+    const expected::Result<bool> writeFramePayload(std::string_view framePayload,
                                            uint32_t start, uint32_t length) const {
-        if (content.size() > length) {
-            ID3_LOG_ERROR("content length too big foe frame area");
+        if (framePayload.size() > length) {
+            ID3_LOG_ERROR("framePayload length too big foe frame area");
             return expected::makeError<bool>(
-                "content length too big foe frame area");
+                "framePayload length too big foe frame area");
         }
 
-        const auto fConfig = this->getTag();
+        const auto frameConfig = this->getFrameBlock();
 
-        if (!fConfig.has_value()) {
+        if (!frameConfig.has_value()) {
             ID3_LOG_TRACE("Could not retrieve Key");
             return expected::makeError<bool>("Could not retrieve key");
         } else {
-            const id3::TagInfos frameGlobalConfig(
-                fConfig.value().frameStartPosition + OffsetFromFrameStartToKey(),
-                fConfig.value().frameContentPosition,
-                fConfig.value().frameLength);
+            const id3::FrameSettings frameGlobalConfig(
+                frameConfig.value().frameStartPosition + OffsetFromFrameStartToFrameID(),
+                frameConfig.value().frameContentPosition,
+                frameConfig.value().frameLength);
 
-            ID3_LOG_TRACE("ID3V1: Key: {} Write content: {} at {}",
-                          std::string(tagKey), std::string(content),
-                          fConfig.value().frameContentPosition);
+            ID3_LOG_TRACE("ID3V1: Key: {} Write framePayload: {} at {}",
+                          std::string(tagKey), std::string(framePayload),
+                          frameConfig.value().frameContentPosition);
 
-            if (fConfig.value().frameLength >= content.size()) {
-                return WriteFile(filename, std::string(content),
+            if (frameConfig.value().frameLength >= framePayload.size()) {
+                return WriteFile(filename, std::string(framePayload),
                                  frameGlobalConfig);
             } else {
                 ID3_LOG_TRACE(
-                    "Key: {} content length {} too long for frame length {} - "
+                    "Key: {} framePayload length {} too long for frame length {} - "
                     "extend buffer",
-                    std::string(tagKey), content.size(),
-                    fConfig.value().frameLength);
+                    std::string(tagKey), framePayload.size(),
+                    frameConfig.value().frameLength);
 
-                const uint32_t additionalSize = content.size() - fConfig.value().frameLength;
-                const auto writeBackAction = extendBuffer(frameGlobalConfig, content, additionalSize) |
+                const uint32_t additionalSize = framePayload.size() - frameConfig.value().frameLength;
+                const auto writeBackAction = extendTagBuffer(frameGlobalConfig, framePayload, additionalSize) |
                     [&](const cUchar& buffer) {
                         return this->ReWriteFile(buffer);
                     };
@@ -414,8 +414,8 @@ public:
         return expected::makeValue<bool>(true);
     }
 
-    const expected::Result<cUchar> extendBuffer(
-        const id3::TagInfos& frameConfig, std::string_view content, uint32_t additionalSize) const {
+    const expected::Result<cUchar> extendTagBuffer(
+        const id3::FrameSettings& frameConfig, std::string_view framePayload, uint32_t additionalSize) const {
 
         const uint32_t relativeBufferPosition = tagRW->getTagStartPosition();
         const uint32_t tagsSizePositionInHeader =
@@ -423,17 +423,17 @@ public:
         const uint32_t tagsSizePositionInFooter =
             tagRW->getTagFooterBegin() - relativeBufferPosition + 12;
         const uint32_t frameSizePositionInFrameHeader =
-            frameConfig.getFrameKeyOffset() - OffsetFromFrameStartToKey() - relativeBufferPosition;
+            frameConfig.getFrameKeyOffset() - OffsetFromFrameStartToFrameID() - relativeBufferPosition;
         const uint32_t frameContentStart =
-            frameConfig.getTagContentOffset() - relativeBufferPosition;
+            frameConfig.getFramePayloadOffset() - relativeBufferPosition;
 
         if (!tagRW->GetBuffer().has_value()) {
             ID3_LOG_ERROR("No buffer!...");
-            return expected::makeError<cUchar>("ape:extendBuffer - No buffer");
+            return expected::makeError<cUchar>("ape:extendTagBuffer - No buffer");
         }
         const cUchar cBuffer = tagRW->GetBuffer().value();
         ID3_LOG_TRACE("FrameSize... length: {}, frame start: {}",
-                      frameConfig.getLength(), frameConfig.getFrameKeyOffset());
+                      frameConfig.getPayloadLength(), frameConfig.getFrameKeyOffset());
         ID3_LOG_TRACE("Updating segments...");
 
         const auto tagSizeBuff =
@@ -442,7 +442,7 @@ public:
         const auto frameSizeBuff = UpdateFrameSize(cBuffer, additionalSize,
                                                    frameSizePositionInFrameHeader);
 
-        assert(frameConfig.getLength() <= cBuffer.size());
+        assert(frameConfig.getPayloadLength() <= cBuffer.size());
 
         auto finalBuffer = std::move(cBuffer);
 
@@ -464,12 +464,12 @@ public:
 
         ID3_LOG_TRACE("frame Key Offset {}...", frameConfig.getFrameKeyOffset());
         auto it = finalBuffer.begin() + frameContentStart +
-                  frameConfig.getLength();
+                  frameConfig.getPayloadLength();
         finalBuffer.insert(it, additionalSize, 0);
 
         ID3_LOG_TRACE("frame Content Start {}...", frameContentStart);
         const auto iter = std::begin(finalBuffer) + frameContentStart;
-        std::transform(iter, iter + content.size(), content.begin(), iter,
+        std::transform(iter, iter + framePayload.size(), framePayload.begin(), iter,
                        [](char a, char b) { return b; });
 
         ID3_LOG_TRACE(
@@ -485,10 +485,10 @@ public:
 };  // class tagReader
 
 
-const expected::Result<std::string> GetTag(const std::string& filename,
+const expected::Result<std::string> getFramePayload(const std::string& filename,
                                            std::string_view tagKey) {
     const tagReader TagR{filename, tagKey};
-    const auto ret = TagR.getTag();
+    const auto ret = TagR.getFrameBlock();
     if (ret.has_value()) {
         return expected::makeValue<std::string>(ret.value().frameContent);
     } else {
@@ -497,81 +497,81 @@ const expected::Result<std::string> GetTag(const std::string& filename,
     }
 }
 
-const expected::Result<bool> SetTheTag(const std::string& filename, std::string_view tagKey, std::string_view content) {
+const expected::Result<bool> setFramePayload(const std::string& filename, std::string_view tagKey, std::string_view framePayload) {
 
     const tagReader TagR{filename, tagKey};
 
-    return TagR.setTag(content, 0, content.size());
+    return TagR.writeFramePayload(framePayload, 0, framePayload.size());
 }
 
 
 const expected::Result<std::string> GetTitle(const std::string& filename) {
     std::string_view tagKey("TITLE");
 
-    return GetTag(filename, tagKey);
+    return getFramePayload(filename, tagKey);
 }
 
 const expected::Result<std::string> GetLeadArtist(const std::string& filename) {
     std::string_view tagKey("ARTIST");
 
-    return GetTag(filename, tagKey);
+    return getFramePayload(filename, tagKey);
 }
 
 const expected::Result<std::string> GetAlbum(const std::string& filename) {
     std::string_view tagKey("ALBUM");
 
-    return GetTag(filename, tagKey);
+    return getFramePayload(filename, tagKey);
 }
 
 const expected::Result<std::string> GetYear(const std::string& filename) {
-    return GetTag(filename, std::string_view("YEAR"));
+    return getFramePayload(filename, std::string_view("YEAR"));
 }
 
 const expected::Result<std::string> GetComment(const std::string& filename) {
-    return GetTag(filename, std::string_view("COMMENT"));
+    return getFramePayload(filename, std::string_view("COMMENT"));
 }
 
 const expected::Result<std::string> GetGenre(const std::string& filename) {
-    return GetTag(filename, std::string_view("GENRE"));
+    return getFramePayload(filename, std::string_view("GENRE"));
 }
 
 const expected::Result<std::string> GetComposer(const std::string& filename) {
-    return GetTag(filename, std::string_view("COMPOSER"));
+    return getFramePayload(filename, std::string_view("COMPOSER"));
 }
 
 const expected::Result<bool> SetTitle(const std::string& filename,
                                       std::string_view content) {
-    return ape::SetTheTag(filename, std::string_view("TITLE"), content);
+    return ape::setFramePayload(filename, std::string_view("TITLE"), content);
 }
 
 const expected::Result<bool> SetAlbum(const std::string& filename,
                                       std::string_view content) {
-    return ape::SetTheTag(filename, std::string_view("ALBUM"), content);
+    return ape::setFramePayload(filename, std::string_view("ALBUM"), content);
 }
 
 const expected::Result<bool> SetLeadArtist(const std::string& filename,
                                            std::string_view content) {
-    return ape::SetTheTag(filename, std::string_view("ARTIST"), content);
+    return ape::setFramePayload(filename, std::string_view("ARTIST"), content);
 }
 
 const expected::Result<bool> SetYear(const std::string& filename,
                                      std::string_view content) {
-    return ape::SetTheTag(filename, std::string_view("YEAR"), content);
+    return ape::setFramePayload(filename, std::string_view("YEAR"), content);
 }
 
 const expected::Result<bool> SetComment(const std::string& filename,
                                         std::string_view content) {
-    return ape::SetTheTag(filename, std::string_view("COMMENT"), content);
+    return ape::setFramePayload(filename, std::string_view("COMMENT"), content);
 }
 
 const expected::Result<bool> SetGenre(const std::string& filename,
                                       std::string_view content) {
-    return ape::SetTheTag(filename, std::string_view("GENRE"), content);
+    return ape::setFramePayload(filename, std::string_view("GENRE"), content);
 }
 
 const expected::Result<bool> SetComposer(const std::string& filename,
                                          std::string_view content) {
-    return ape::SetTheTag(filename, std::string_view("COMPOSER"), content);
+    return ape::setFramePayload(filename, std::string_view("COMPOSER"), content);
 }
 
 };  // end namespace ape
