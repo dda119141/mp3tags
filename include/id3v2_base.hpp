@@ -14,26 +14,27 @@
 #include "result.hpp"
 #include "logger.hpp"
 
+
 namespace id3v2 {
+
 using namespace id3;
-using cUchar = id3::cUchar;
 
 const auto GetStringFromFile(const std::string& FileName, uint32_t num) {
     std::ifstream fil(FileName);
     std::vector<unsigned char> buffer(num, '0');
 
     if (!fil.good()) {
-        return expected::makeError<id3v2::cUchar>() << __func__
+        return expected::makeError<std::vector<uint8_t>>() << __func__
                                                     << (":failed\n");
     }
 
     fil.read(reinterpret_cast<char*>(buffer.data()), num);
 
-    return expected::makeValue<id3v2::cUchar>(buffer);
+    return expected::makeValue<std::vector<uint8_t>>(buffer);
 }
 
 template <typename T>
-expected::Result<std::string> GetHexFromBuffer(const cUchar& buffer, T index,
+expected::Result<std::string> GetHexFromBuffer(const std::vector<uint8_t>& buffer, T index,
                                                T num_of_bytes_in_hex) {
     id3::integral_unsigned_asserts<T> eval;
     eval();
@@ -75,7 +76,7 @@ constexpr T RetrieveSize(T n) {
     return n;
 }
 
-expected::Result<cUchar> updateTagSize(const cUchar& buffer,
+expected::Result<std::vector<uint8_t>> updateTagSize(const std::vector<uint8_t>& buffer,
                                        uint32_t extraSize) {
     constexpr uint32_t tagSizePositionInHeader = 6;
     constexpr uint32_t tagSizeLengthInHeader = 4;
@@ -86,7 +87,7 @@ expected::Result<cUchar> updateTagSize(const cUchar& buffer,
                                     tagSizeMaxValuePerElement);
 }
 
-expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
+expected::Result<uint32_t> GetTagSize(const std::vector<uint8_t>& buffer) {
 
     const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
     constexpr uint32_t TagIndex = 6;
@@ -117,7 +118,7 @@ expected::Result<uint32_t> GetTagSize(const cUchar& buffer) {
 #endif
 }
 
-const auto GetTotalTagSize(const cUchar& buffer) {
+const auto GetTotalTagSize(const std::vector<uint8_t>& buffer) {
     return GetTagSize(buffer) | [=](const uint32_t Tagsize) {
 
         return expected::makeValue<uint32_t>(Tagsize +
@@ -125,7 +126,7 @@ const auto GetTotalTagSize(const cUchar& buffer) {
     };
 }
 
-const auto GetTagSizeExclusiveHeader(const cUchar& buffer) {
+const auto GetTagSizeExclusiveHeader(const std::vector<uint8_t>& buffer) {
     return GetTagSize(buffer) | [](const int tag_size) {
 
         return expected::makeValue<uint32_t>(tag_size -
@@ -133,18 +134,18 @@ const auto GetTagSizeExclusiveHeader(const cUchar& buffer) {
     };
 }
 
-expected::Result<cUchar> GetTagHeader(const std::string& FileName) {
+expected::Result<std::vector<uint8_t>> GetTagHeader(const std::string& FileName) {
     auto val =
         GetStringFromFile(FileName, GetTagHeaderSize<uint32_t>()) |
-        [&](const cUchar& _val) { return expected::makeValue<cUchar>(_val); };
+        [&](const std::vector<uint8_t>& _val) { return expected::makeValue<std::vector<uint8_t>>(_val); };
 
     if (!val.has_value())
-        return expected::makeError<cUchar>() << "Error: " << __func__ << "\n";
+        return expected::makeError<std::vector<uint8_t>>() << "Error: " << __func__ << "\n";
     else
         return val;
 }
 
-expected::Result<std::string> GetTagArea(const cUchar& buffer) {
+expected::Result<std::string> GetTagArea(const std::vector<uint8_t>& buffer) {
     return GetTotalTagSize(buffer) | [&](uint32_t tagSize) {
         ID3_LOG_TRACE("{}: tagsize: {}", __func__, tagSize);
 
@@ -153,14 +154,14 @@ expected::Result<std::string> GetTagArea(const cUchar& buffer) {
 }
 
 template <typename T>
-expected::Result<cUchar> processFrameHeaderFlags(
-    const cUchar& buffer, uint32_t frameHeaderFlagsPosition,
+expected::Result<std::vector<uint8_t>> processFrameHeaderFlags(
+    const std::vector<uint8_t>& buffer, uint32_t frameHeaderFlagsPosition,
     std::string_view tag) {
     constexpr uint32_t frameHeaderFlagsLength = 2;
 
     const auto it = buffer.begin() + frameHeaderFlagsPosition;
 
-    cUchar temp_vec(frameHeaderFlagsLength);
+    std::vector<uint8_t> temp_vec(frameHeaderFlagsLength);
     std::copy(it, it + 2, temp_vec.begin());
 
     std::bitset<8> frameStatusFlag(temp_vec[0]);
@@ -177,7 +178,7 @@ expected::Result<cUchar> processFrameHeaderFlags(
                      std::string(tag));
     }
 
-    return expected::makeValue<cUchar>(temp_vec);
+    return expected::makeValue<std::vector<uint8_t>>(temp_vec);
 }
 
 template <typename id3Type>
@@ -185,7 +186,7 @@ void GetTagNames(void) {
     return id3Type::tag_names;
 };
 
-expected::Result<std::string> GetID3FileIdentifier(const cUchar& buffer) {
+expected::Result<std::string> GetID3FileIdentifier(const std::vector<uint8_t>& buffer) {
     constexpr auto FileIdentifierStart = 0;
     constexpr auto FileIdentifierLength = 3;
 
@@ -200,7 +201,7 @@ expected::Result<std::string> GetID3FileIdentifier(const cUchar& buffer) {
 #endif
 }
 
-expected::Result<std::string> GetID3Version(const cUchar& buffer) {
+expected::Result<std::string> GetID3Version(const std::vector<uint8_t>& buffer) {
     constexpr auto kID3IndexStart = 4;
     constexpr auto kID3VersionBytesLength = 2;
 

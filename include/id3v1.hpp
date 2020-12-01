@@ -10,7 +10,6 @@
 #include "logger.hpp"
 
 namespace id3v1 {
-using cUchar = id3::cUchar;
 
 constexpr uint32_t GetTagSize(void) {
     return 128;
@@ -26,7 +25,7 @@ struct tagReadWriter
         uint32_t tagPayload = 0;
         uint32_t tagPayloadLength = 0;
         uint32_t tagHeaderLength = 3;
-        std::optional<cUchar> buffer;
+        std::optional<std::vector<uint8_t>> buffer;
 
     public:
         explicit tagReadWriter(const std::string& fileName):
@@ -77,23 +76,23 @@ struct tagReadWriter
 
         const uint32_t GetTagPayload() const { return tagPayload; }
 
-        std::optional<cUchar> GetBuffer() const {return buffer;}
+        std::optional<std::vector<uint8_t>> GetBuffer() const {return buffer;}
 
         bool HasId3v1Tag() const { return mHasId3v1Tag; }
 };
 
-const expected::Result<cUchar> GetBuffer(const std::string& FileName) {
+const expected::Result<std::vector<uint8_t>> GetBuffer(const std::string& FileName) {
     const tagReadWriter tagRW{FileName};
 
     if (tagRW.GetBuffer().has_value()) {
-        return expected::makeValue<cUchar>(tagRW.GetBuffer().value());
+        return expected::makeValue<std::vector<uint8_t>>(tagRW.GetBuffer().value());
     } else {
-        return expected::makeError<cUchar>() << "__func__"
+        return expected::makeError<std::vector<uint8_t>>() << "__func__"
                                              << ": Error opening file";
     }
 }
 
-const expected::Result<std::string> GetTheFramePayload(const cUchar& buffer, uint32_t start,
+const expected::Result<std::string> GetTheFramePayload(const std::vector<uint8_t>& buffer, uint32_t start,
                                            uint32_t end) {
     assert(end > start);
 
@@ -161,32 +160,32 @@ const expected::Result<bool> SetGenre(const std::string& filename,
 
 const expected::Result<std::string> GetTitle(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 0, 30); };
+           [](const std::vector<uint8_t>& buffer) { return GetTheFramePayload(buffer, 0, 30); };
 }
 
 const expected::Result<std::string> GetLeadArtist(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 30, 60); };
+           [](const std::vector<uint8_t>& buffer) { return GetTheFramePayload(buffer, 30, 60); };
 }
 
 const expected::Result<std::string> GetAlbum(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 60, 90); };
+           [](const std::vector<uint8_t>& buffer) { return GetTheFramePayload(buffer, 60, 90); };
 }
 
 const expected::Result<std::string> GetYear(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 90, 94); };
+           [](const std::vector<uint8_t>& buffer) { return GetTheFramePayload(buffer, 90, 94); };
 }
 
 const expected::Result<std::string> GetComment(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 94, 124); };
+           [](const std::vector<uint8_t>& buffer) { return GetTheFramePayload(buffer, 94, 124); };
 }
 
 const expected::Result<std::string> GetGenre(const std::string& filename) {
     return id3v1::GetBuffer(filename) |
-           [](const cUchar& buffer) { return GetTheFramePayload(buffer, 124, 125); };
+           [](const std::vector<uint8_t>& buffer) { return GetTheFramePayload(buffer, 124, 125); };
 }
 
 };  // end namespace id3v1

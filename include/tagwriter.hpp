@@ -27,38 +27,57 @@ bool SetTag(const std::string& filename,
         }
 
         | [&](std::string id3Version) {
-            id3v2::iD3Variant tagVersion;
+            const auto writePayloadResult = [&](){
 
-            for (auto& tag : tags) {
-                if (id3Version == tag.first)  // tag.first is the id3 Version
-                {
-                    if (id3Version == "0x0300") {
-                        tagVersion = id3v2::v30();
+                for (auto& tag : tags) {
+                    if (id3Version == tag.first)  // tag.first is the id3 Version
+                    {
+                        const auto param = [&](){
+                            if (id3Version == "0x0300") {
 
-                        return id3v2::writeFramePayload<std::string_view,
-                                             std::string_view>(
-                            filename, tagVersion, content, tag.second);
-                    } else if (id3Version == "0x0400") {
-                        tagVersion = id3v2::v40();
+                                const id3v2::basicParameters paramLoc
+                                {
+                                    filename,
+                                    id3v2::v30(),
+                                    tag.second,
+                                    content
+                                };
 
-                        return id3v2::writeFramePayload<std::string_view,
-                                             std::string_view>(
-                            filename, tagVersion, content, tag.second);
-                    } else if (id3Version == "0x0000") {
-                        tagVersion = id3v2::v00();
+                                return paramLoc;
+                            } else if (id3Version == "0x0400") {
 
-                        return id3v2::writeFramePayload<std::string_view,
-                                             std::string_view>(
-                            filename, tagVersion, content, tag.second);
-                    } else {
-                        return expected::makeError<bool>(
-                            "id3 version not supported\n");
+                                const id3v2::basicParameters paramLoc
+                                {
+                                    filename,
+                                    id3v2::v40(),
+                                    tag.second,
+                                    content
+                                };
+                                return paramLoc;
+                            } else if (id3Version == "0x0000") {
+                                const id3v2::basicParameters paramLoc
+                                {
+                                    filename,
+                                    id3v2::v00(),
+                                    tag.second, /* Frame ID */
+                                    content
+                                };
+                                return paramLoc;
+                            } else {
+                                const id3v2::basicParameters paramLoc { std::string("") } ;
+                                return paramLoc;
+                            };
+                        }();
+
+                        return id3v2::writeFramePayload(param);
                     }
                 }
-            }
 
-            ID3_LOG_WARN("{} failed", __func__);
-            return expected::makeError<bool>() << __func__ << " failed\n";
+                ID3_LOG_WARN("{} failed", __func__);
+                return expected::makeError<bool>() << __func__ << " failed\n";
+            };
+
+            return writePayloadResult();
         };
 
     if (ret.has_value())

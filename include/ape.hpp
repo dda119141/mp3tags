@@ -11,8 +11,6 @@
 
 namespace ape {
 
-using cUchar = id3::cUchar;
-
 static const std::string modifiedEnding(".ape.mod");
 
 constexpr uint32_t GetTagFooterSize(void) { return 32; }
@@ -28,7 +26,7 @@ typedef struct _frameConfig {
     std::string frameContent;
 } frameBlock_t;
 
-const expected::Result<std::string> extractTheTag(const cUchar& buffer,
+const expected::Result<std::string> extractTheTag(const std::vector<uint8_t>& buffer,
                                                   uint32_t start,
                                                   uint32_t length) {
     return id3::ExtractString<uint32_t>(buffer, start, length) |
@@ -37,7 +35,7 @@ const expected::Result<std::string> extractTheTag(const cUchar& buffer,
            };
 }
 
-expected::Result<cUchar> UpdateFrameSize(const cUchar& buffer,
+expected::Result<std::vector<uint8_t>> UpdateFrameSize(const std::vector<uint8_t>& buffer,
                                          uint32_t extraSize,
                                          uint32_t frameIDPosition) {
     const uint32_t frameSizePositionInArea = frameIDPosition;
@@ -68,7 +66,7 @@ private:
     uint32_t mTagFooterBegin;
     uint32_t mTagPayloadPosition;
     uint32_t mTagStartPosition;
-    std::optional<cUchar> buffer;
+    std::optional<std::vector<uint8_t>> buffer;
 
     const uint32_t getTagSize(std::ifstream& fRead, uint32_t bufferLength) {
         std::vector<unsigned char> tagLengthBuffer(bufferLength);
@@ -197,7 +195,7 @@ public:
     const uint32_t getTagStartPosition() const { return mTagStartPosition; }
     const uint32_t getTagFooterBegin() const { return mTagFooterBegin; }
     const uint32_t getFileLength() const { return mfileSize; }
-    std::optional<cUchar> GetBuffer() const { return buffer; }
+    std::optional<std::vector<uint8_t>> GetBuffer() const { return buffer; }
 
     bool IsValid() const { return mValid; }
 };
@@ -208,7 +206,7 @@ private:
     bool mValid;
     const std::string& filename;
     std::string_view tagKey;
-    std::optional<cUchar> mBuffer;
+    std::optional<std::vector<uint8_t>> mBuffer;
     std::unique_ptr<tagReadWriter> tagRW;
 
 public:
@@ -239,7 +237,7 @@ public:
         if (!mValid)
             return expected::makeError<frameBlock_t>("getFrameBlock object not valid");
 
-        cUchar buffer = tagRW->GetBuffer().value();
+        std::vector<uint8_t> buffer = tagRW->GetBuffer().value();
 
         ID3_LOG_TRACE("getFrameBlock object valid - size: {}", buffer.size());
 
@@ -338,7 +336,7 @@ public:
 
                 const uint32_t additionalSize = framePayload.size() - frameConfig.value().frameLength;
                 const auto writeBackAction = extendTagBuffer(frameGlobalConfig, framePayload, additionalSize) |
-                    [&](const cUchar& buffer) {
+                    [&](const std::vector<uint8_t>& buffer) {
                         return this->ReWriteFile(buffer);
                     };
                 return writeBackAction | [&](bool fileWritten) {
@@ -348,7 +346,7 @@ public:
         }
     }
 
-    expected::Result<bool> ReWriteFile(const cUchar& buff) const {
+    expected::Result<bool> ReWriteFile(const std::vector<uint8_t>& buff) const {
         const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
 
         std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
@@ -364,14 +362,14 @@ public:
         ID3_LOG_INFO("APE start pos: {}", tagRW->getTagStartPosition());
         ID3_LOG_INFO("file length: {}", fileSize);
 
-        cUchar bufFooter;
+        std::vector<uint8_t> bufFooter;
         bufFooter.reserve((endLength));
         if (endLength > 0) {
             filRead.seekg(endOf);
             filRead.read(reinterpret_cast<char*>(&bufFooter[0]), endLength);
         }
 
-        cUchar bufHeader;
+        std::vector<uint8_t> bufHeader;
         bufHeader.reserve((tagRW->getTagStartPosition()));
         filRead.seekg(0);
         filRead.read(reinterpret_cast<char*>(&bufHeader[0]),
@@ -414,7 +412,7 @@ public:
         return expected::makeValue<bool>(true);
     }
 
-    const expected::Result<cUchar> extendTagBuffer(
+    const expected::Result<std::vector<uint8_t>> extendTagBuffer(
         const id3::FrameSettings& frameConfig, std::string_view framePayload, uint32_t additionalSize) const {
 
         const uint32_t relativeBufferPosition = tagRW->getTagStartPosition();
@@ -429,9 +427,9 @@ public:
 
         if (!tagRW->GetBuffer().has_value()) {
             ID3_LOG_ERROR("No buffer!...");
-            return expected::makeError<cUchar>("ape:extendTagBuffer - No buffer");
+            return expected::makeError<std::vector<uint8_t>>("ape:extendTagBuffer - No buffer");
         }
-        const cUchar cBuffer = tagRW->GetBuffer().value();
+        const std::vector<uint8_t> cBuffer = tagRW->GetBuffer().value();
         ID3_LOG_TRACE("FrameSize... length: {}, frame start: {}",
                       frameConfig.getPayloadLength(), frameConfig.getFrameKeyOffset());
         ID3_LOG_TRACE("Updating segments...");
@@ -479,7 +477,7 @@ public:
                 std::begin(finalBuffer) + 8));
         ID3_LOG_TRACE("final buffer Size {}...", finalBuffer.size());
 
-        return expected::makeValue<cUchar>(finalBuffer);
+        return expected::makeValue<std::vector<uint8_t>>(finalBuffer);
     }
 
 };  // class tagReader
