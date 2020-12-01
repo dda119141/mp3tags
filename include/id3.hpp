@@ -21,6 +21,7 @@
 #include "result.hpp"
 #include "tagfilesystem.hpp"
 
+
 namespace id3 {
 
 #ifdef HAS_FS_EXPERIMENTAL
@@ -29,19 +30,8 @@ namespace filesystem = std::experimental::filesystem;
 namespace filesystem = std::filesystem;
 #endif
 
-using cUchar = std::vector<unsigned char>;
 
 static const std::string modifiedEnding(".mod");
-
-const std::string stripLeft(const std::string& valIn) {
-    auto val = valIn;
-
-    val.erase(
-        remove_if(val.begin(), val.end(), [](char c) { return !isprint(c); }),
-        val.end());
-
-    return val;
-}
 
 /* Frame settings */
 class FrameSettings {
@@ -72,6 +62,16 @@ private:
     uint32_t encodeFlag = 0;
     uint32_t doSwap = 0;
 };
+
+const std::string stripLeft(const std::string& valIn) {
+    auto val = valIn;
+
+    val.erase(
+        remove_if(val.begin(), val.end(), [](char c) { return !isprint(c); }),
+        val.end());
+
+    return val;
+}
 
 template <typename T>
 expected::Result<T> contructNewFrameSettings(const T& frameConfig,
@@ -117,12 +117,12 @@ using is_optional_string =
 
 template <typename T>
 using is_optional_vector_char =
-    std::is_same<std::decay_t<T>, std::optional<id3::cUchar>>;
+    std::is_same<std::decay_t<T>, std::optional<std::vector<uint8_t>>>;
 
 template <
     typename T,
     typename = std::enable_if_t<(
-        std::is_same<std::decay_t<T>, std::optional<id3::cUchar>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<std::vector<uint8_t>>>::value ||
         std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
         std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
         std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
@@ -188,7 +188,7 @@ expected::Result<bool> renameFile(const std::string& fileToRename,
 }
 
 template <typename T>
-const uint32_t GetValFromBuffer(const cUchar& buffer, T index,
+const uint32_t GetValFromBuffer(const std::vector<uint8_t>& buffer, T index,
                                 T num_of_bytes_in_hex) {
     integral_unsigned_asserts<T> eval;
     eval();
@@ -215,7 +215,7 @@ const uint32_t GetValFromBuffer(const cUchar& buffer, T index,
 }
 
 template <typename T1>
-expected::Result<std::string> ExtractString(const cUchar& buffer, T1 start,
+expected::Result<std::string> ExtractString(const std::vector<uint8_t>& buffer, T1 start,
                                             T1 length) {
     assert((start + length) <= buffer.size());
 
@@ -235,7 +235,7 @@ expected::Result<std::string> ExtractString(const cUchar& buffer, T1 start,
     }
 }
 
-uint32_t GetTagSizeDefault(const cUchar& buffer,
+uint32_t GetTagSizeDefault(const std::vector<uint8_t>& buffer,
                     uint32_t length, uint32_t startPosition = 0, bool BigEndian = false) {
 
     assert((startPosition + length) <= buffer.size());
@@ -264,7 +264,7 @@ uint32_t GetTagSizeDefault(const cUchar& buffer,
     return val;
 }
 
-bool replaceElementsInBuff(const cUchar& buffIn, cUchar& buffOut,
+bool replaceElementsInBuff(const std::vector<uint8_t>& buffIn, std::vector<uint8_t>& buffOut,
                            uint32_t position) {
     const auto iter = std::begin(buffOut) + position;
 
@@ -274,7 +274,7 @@ bool replaceElementsInBuff(const cUchar& buffIn, cUchar& buffOut,
     return true;
 }
 
-uint32_t GetTagSize(const cUchar& buffer,
+uint32_t GetTagSize(const std::vector<uint8_t>& buffer,
                     const std::vector<unsigned int>& power_values,
                     uint32_t index) {
 
@@ -294,7 +294,7 @@ uint32_t GetTagSize(const cUchar& buffer,
 }
 
 template <typename T>
-expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
+expected::Result<std::vector<uint8_t>> updateAreaSize(const std::vector<uint8_t>& buffer,
                                         uint32_t extraSize, T tagIndex,
                                         T numberOfElements, T _maxValue
                                         , bool littleEndian = true) {
@@ -305,7 +305,7 @@ expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
     auto ExtraSize = extraSize;
     auto extr = ExtraSize % maxValue;
 
-    cUchar temp_vec(NumberOfElements);
+    std::vector<uint8_t> temp_vec(NumberOfElements);
     std::copy(itIn, itIn + NumberOfElements, temp_vec.begin());
     auto it = temp_vec.begin();
 
@@ -343,7 +343,7 @@ expected::Result<cUchar> updateAreaSize(const cUchar& buffer,
                        std::begin(temp_vec) + NumberOfElements));
     ID3_LOG_TRACE("success...");
 
-    return expected::makeValue<cUchar>(temp_vec);
+    return expected::makeValue<std::vector<uint8_t>>(temp_vec);
 }
 
 template <typename Type>

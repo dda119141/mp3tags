@@ -11,8 +11,9 @@ struct tagOptions {
     bool genre;
     bool title;
     bool artist;
+    bool trackPosition;
 
-    bool isEmpty() { return !(album | genre | title | artist); }
+    bool isEmpty() { return !(album | genre | title | artist | trackPosition); }
 } tagOption = {};
 
 bool readTagsInFile(const std::string& mediafile,
@@ -47,6 +48,11 @@ bool readTagsInFile(const std::string& mediafile,
         cout << "Get title of file: " << EndFilename << " : ";
         cout << GetTitle(filename) << "\n";
     }
+    if (tags.trackPosition) {
+        cout << "Get track position of file: " << EndFilename << " : ";
+        cout << GetTrackPosition(filename) << "\n";
+    }
+
 
     return true;
 }
@@ -95,7 +101,8 @@ int main(int argc, const char** argv) {
         lyra::opt(tagOption.title)["--title"]["-t"]("Get the title frame content.") |
         lyra::opt(tagOption.genre)["--genre"]["-g"]("Get the genre frame content.") |
         lyra::opt(tagOption.artist)["--artist"]["-a"]("Get the artist frame content.") |
-        lyra::opt(tagOption.album)["--album"]["-b"]("Get the album frame content.");
+        lyra::opt(tagOption.album)["--album"]["-b"]("Get the album frame content.") |
+        lyra::opt(tagOption.trackPosition)["--trackposition"]["-p"]("Get the track position.");
 
     // Parse the program arguments:
     auto result = parser.parse({argc, argv});

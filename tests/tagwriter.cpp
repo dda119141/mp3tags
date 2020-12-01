@@ -24,13 +24,20 @@ TEST_CASE("Read/Write from/to id3v2 tag") {
     const std::string mp3Path =
         (fs::path(currentFilePath).parent_path() /= "../files").string();
 
+    const auto findFileName = [&](const std::string& filName){
+        const auto pos = filName.find_last_of('/');
+        return filName.substr(pos+1);
+    };
+
     try {
         for (auto& filen : fs::directory_iterator(mp3Path)) {
             std::string _filename = filen.path().string();
 
-            if (_filename.find("test1.mp3") != std::string::npos) {
+            if (findFileName(_filename) == std::string("test1.mp3")) {
                 filename = _filename;
-            }
+            } /* else if (_filename.find("test1.mp3") != std::string::npos) {
+                filename = _filename;
+            } */
         }
     } catch (fs::filesystem_error& e) {
         cout << "wrong path:" << e.what() << endl;
@@ -49,6 +56,7 @@ TEST_CASE("Read/Write from/to id3v2 tag") {
         REQUIRE(SetAlbum(filename, "test1") == 1);
     }
     */
+
     SECTION("Test writing album") {
         REQUIRE(SetAlbum(filename, "AlbYingAlbum") == 1);
     }
@@ -68,7 +76,7 @@ TEST_CASE("Read/Write from/to id3v2 tag") {
     SECTION("Test reading back artist") {
         REQUIRE(GetLeadArtist(filename) == "TitTestYingArtist");
     }
-    SECTION("Test reading Year") { REQUIRE(GetYear(filename) == "2006"); }
+    SECTION("Test reading Year") { REQUIRE(GetYear(filename) == "2009"); }
     SECTION("Test reading Content type") {
         REQUIRE(GetContentType(filename) == "Rap");
     }
