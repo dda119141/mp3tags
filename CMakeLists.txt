@@ -18,6 +18,7 @@ add_definitions(
         -Wall
         -Wfatal-errors
         -Werror
+        -g
 )
 
 set(TEST_SOURCES
@@ -27,6 +28,7 @@ set(TEST_SOURCES
 set(EXAMPLES_SOURCES
   readTag.cpp
   writeTag.cpp
+  handleDirectory.cpp
 )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
