@@ -101,7 +101,7 @@ void removeObsoleteDirectory(const fs::path& filePath, const struct DirectoryOpt
 }
 
 
-bool readTags(const std::string& directory,
+bool removePaths(const std::string& directory,
                            const struct DirectoryOptions& directoryOption) {
     using std::cout;
     using std::endl;
@@ -154,7 +154,7 @@ int main(int argc, const char** argv) {
     } else if(show_help) {
         std::cout << parser << std::endl;
     }else{
-        readTags(directory, DirectoryOption);
+        removePaths(directory, DirectoryOption);
     }
 
     return 0;

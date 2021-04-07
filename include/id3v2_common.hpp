@@ -126,7 +126,7 @@ namespace id3v2
             if (val != "ID3") {
                 id3::log()->info(" ID3 tag not present");
 
-                std::string ret = std::string("ID3 tag not present ") +
+                const std::string ret = std::string("ID3 tag not present ") +
                                   std::string("\n");
                 return expected::makeError<std::vector<uint8_t>, std::string>(ret.c_str());
             } else {
@@ -362,7 +362,7 @@ namespace id3v2
                         std::begin(finalBuffer) + frameConfig.getFrameKeyOffset() +
                             frameSizePositionInFrameHeader + 4));
 
-                auto it = finalBuffer.begin() + frameConfig.getFramePayloadOffset() +
+                const auto it = finalBuffer.begin() + frameConfig.getFramePayloadOffset() +
                           frameConfig.getPayloadLength();
                 finalBuffer.insert(it, additionalSize, 0);
 
@@ -613,6 +613,9 @@ namespace id3v2
         } else if (frameConfig.getPayloadLength() <
                    framePayloadToWrite.size())  // resize whole header
         {
+            return expected::makeError<bool>(
+                "Error, framesize does not fit\n");
+
             const auto tagExtended = [&](){
                 const uint32_t extraLength =
                     (framePayloadToWrite.size() - frameConfig.getPayloadLength());
@@ -622,9 +625,9 @@ namespace id3v2
                 };
 
                 return NewTagArea.extendFile(framePayloadToWrite);
-            }();
+            };
 
-            return (tagExtended | [&](const bool& val) {
+            return (tagExtended() | [&](const bool& val) {
                 return renameFile(params.filename + id3::modifiedEnding, params.filename);
             });
 

@@ -69,7 +69,13 @@ bool SetTag(const std::string& filename,
                             };
                         }();
 
-                        return id3v2::writeFramePayload(param);
+                        try {
+                            const auto result = id3v2::writeFramePayload(param);
+                            return result;
+                        } catch (const std::runtime_error& e) {
+                            std::cerr << "Runtime Error: " << e.what() << std::endl;
+                        }
+
                     }
                 }
 
