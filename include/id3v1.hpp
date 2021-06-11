@@ -120,8 +120,10 @@ const expected::Result<bool> SetFramePayload(const std::string& filename,
             "content length too big foe frame area");
     }
 
-    const id3::FrameSettings frameSettings {tagRW.GetTagPayload() + relativeFramePayloadStart, 
-        tagRW.GetTagPayload() + relativeFramePayloadStart, (relativeFramePayloadEnd - relativeFramePayloadStart)};
+    const auto frameSettings = id3::FrameSettings()
+        .with_frameID_offset(tagRW.GetTagPayload() + relativeFramePayloadStart)
+        .with_framecontent_offset(tagRW.GetTagPayload() + relativeFramePayloadStart)
+        .with_frame_length(tagRW.GetTagPayload() + relativeFramePayloadStart);
 
     ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content), tagRW.GetTagPayload());
 

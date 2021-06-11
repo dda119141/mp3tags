@@ -34,7 +34,6 @@ bool SetTag(const std::string& filename,
                     {
                         const auto param = [&](){
                             if (id3Version == "0x0300") {
-
                                 const id3v2::basicParameters paramLoc
                                 {
                                     filename,
@@ -42,10 +41,8 @@ bool SetTag(const std::string& filename,
                                     tag.second,
                                     content
                                 };
-
                                 return paramLoc;
                             } else if (id3Version == "0x0400") {
-
                                 const id3v2::basicParameters paramLoc
                                 {
                                     filename,
@@ -75,7 +72,6 @@ bool SetTag(const std::string& filename,
                         } catch (const std::runtime_error& e) {
                             std::cerr << "Runtime Error: " << e.what() << std::endl;
                         }
-
                     }
                 }
 

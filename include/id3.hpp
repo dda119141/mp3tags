@@ -35,32 +35,71 @@ static const std::string modifiedEnding(".mod");
 
 /* Frame settings */
 class FrameSettings {
+    using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
+    
 public:
-    FrameSettings(uint32_t FrameIDOffset, uint32_t FramePayloadOffset, uint32_t Length,
-             uint32_t _encodeFlag = 0, uint32_t _doSwap = 0):
-          frameIDStartPosition(FrameIDOffset),
-          frameContentStartPosition(FramePayloadOffset),
-          length(Length),
-          encodeFlag(_encodeFlag),
-          doSwap(_doSwap) {}
-
     FrameSettings() {}
+
+    FrameSettings& with_frameID_offset(uint32_t id_offset)
+    {
+        frameIDStartPosition = id_offset;
+        return *this;
+    }
+
+    FrameSettings& with_framecontent_offset(uint32_t payload_offset)
+    {
+        frameContentStartPosition = payload_offset;
+        return *this;
+    }
+
+    FrameSettings& with_frame_length(uint32_t frame_length)
+    {
+        frameLength = frame_length;
+        return *this;
+    }
+
+    FrameSettings& with_encode_flag(uint32_t encode_flag)
+    {
+        encodeFlag = encode_flag;
+        return *this;
+    }
+
+    FrameSettings& with_do_swap(uint32_t dSwap)
+    {
+        doSwap = dSwap;
+        return *this;
+    }
+
+    FrameSettings with_additional_payload_size(uint32_t additionalPayload)
+    {
+        this->frameLength += additionalPayload;
+        this->framePayloadLength += additionalPayload;
+        return *this;
+    }
+
+    FrameSettings& with_frame_buffer(buffer_t audioBuffer)
+    {
+        audioBuffer = audioBuffer;
+        return *this;
+    }
 
     const uint32_t getFrameKeyOffset() const { return frameIDStartPosition; }
     const uint32_t getFramePayloadOffset() const {
         return frameContentStartPosition;
     }
-    const uint32_t getPayloadLength() const { return length; }
+    const uint32_t getFramePayloadLength() const { return frameLength; }
+    const uint32_t getFrameLength() const { return frameLength; }
     const uint32_t getEncodingValue() const { return encodeFlag; }
     const uint32_t getSwapValue() const { return doSwap; }
 
 private:
-    // FrameSettings() = delete;
-    uint32_t frameIDStartPosition = 0;
-    uint32_t frameContentStartPosition = 0;
-    uint32_t length = 0;
-    uint32_t encodeFlag = 0;
-    uint32_t doSwap = 0;
+    uint32_t frameIDStartPosition = {};
+    uint32_t frameContentStartPosition = {};
+    uint32_t frameLength = {};
+    uint32_t framePayloadLength = {};
+    uint32_t encodeFlag = {};
+    uint32_t doSwap = {};
+    std::optional<buffer_t> audioBuffer = {};
 };
 
 const std::string stripLeft(const std::string& valIn) {
@@ -73,15 +112,15 @@ const std::string stripLeft(const std::string& valIn) {
     return val;
 }
 
-template <typename T>
-expected::Result<T> contructNewFrameSettings(const T& frameConfig,
-                                         uint32_t additionalFramePayloadSize) {
-    const T FrameConfig{
-        frameConfig.getFrameKeyOffset(), frameConfig.getFramePayloadOffset(),
-        frameConfig.getPayloadLength() + additionalFramePayloadSize, 
-        frameConfig.getEncodingValue(),  frameConfig.getSwapValue()};
+expected::Result<FrameSettings> contructNewFrameSettings(const FrameSettings& frameconfig,
+                                         uint32_t additionalFramePayloadSize) 
+{
+    FrameSettings frameConf = frameconfig;
 
-    return expected::makeValue<T>(FrameConfig);
+    frameConf = frameConf
+        .with_frame_length(frameConf.getFrameLength() + additionalFramePayloadSize); 
+
+    return expected::makeValue<FrameSettings>(frameConf);
 }
 
 template <typename T>
@@ -156,9 +195,9 @@ expected::Result<bool> WriteFile(const std::string& FileName, const std::string&
     std::for_each(content.begin(), content.end(),
                   [&filWrite](const char& n) { filWrite << n; });
 
-    assert(frameSettings.getPayloadLength() >= content.size());
+    assert(frameSettings.getFramePayloadLength() >= content.size());
 
-    for (uint32_t i = 0; i < (frameSettings.getPayloadLength() - content.size());
+    for (uint32_t i = 0; i < (frameSettings.getFramePayloadLength() - content.size());
          ++i) {
         filWrite << '\0';
     }

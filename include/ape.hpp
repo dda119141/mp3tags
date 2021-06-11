@@ -315,10 +315,10 @@ public:
             ID3_LOG_TRACE("Could not retrieve Key");
             return expected::makeError<bool>("Could not retrieve key");
         } else {
-            const id3::FrameSettings frameGlobalConfig(
-                frameConfig.value().frameStartPosition + OffsetFromFrameStartToFrameID(),
-                frameConfig.value().frameContentPosition,
-                frameConfig.value().frameLength);
+            const auto frameGlobalConfig = id3::FrameSettings()
+                .with_frameID_offset(frameConfig.value().frameStartPosition + OffsetFromFrameStartToFrameID())
+                .with_framecontent_offset(frameConfig.value().frameContentPosition)
+                .with_frame_length(frameConfig.value().frameLength);
 
             ID3_LOG_TRACE("ID3V1: Key: {} Write framePayload: {} at {}",
                           std::string(tagKey), std::string(framePayload),
@@ -431,7 +431,7 @@ public:
         }
         const std::vector<uint8_t> cBuffer = tagRW->GetBuffer().value();
         ID3_LOG_TRACE("FrameSize... length: {}, frame start: {}",
-                      frameConfig.getPayloadLength(), frameConfig.getFrameKeyOffset());
+                      frameConfig.getFramePayloadLength(), frameConfig.getFrameKeyOffset());
         ID3_LOG_TRACE("Updating segments...");
 
         const auto tagSizeBuff =
@@ -440,7 +440,7 @@ public:
         const auto frameSizeBuff = UpdateFrameSize(cBuffer, additionalSize,
                                                    frameSizePositionInFrameHeader);
 
-        assert(frameConfig.getPayloadLength() <= cBuffer.size());
+        assert(frameConfig.getFramePayloadLength() <= cBuffer.size());
 
         auto finalBuffer = std::move(cBuffer);
 
@@ -462,7 +462,7 @@ public:
 
         ID3_LOG_TRACE("frame Key Offset {}...", frameConfig.getFrameKeyOffset());
         auto it = finalBuffer.begin() + frameContentStart +
-                  frameConfig.getPayloadLength();
+                  frameConfig.getFramePayloadLength();
         finalBuffer.insert(it, additionalSize, 0);
 
         ID3_LOG_TRACE("frame Content Start {}...", frameContentStart);
