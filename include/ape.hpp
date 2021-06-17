@@ -26,7 +26,7 @@ typedef struct _frameConfig {
     std::string frameContent;
 } frameBlock_t;
 
-const expected::Result<std::string> extractTheTag(const std::vector<uint8_t>& buffer,
+const expected::Result<std::string> extractTheTag(buffer_t buffer,
                                                   uint32_t start,
                                                   uint32_t length) {
     return id3::ExtractString<uint32_t>(buffer, start, length) |
@@ -35,7 +35,7 @@ const expected::Result<std::string> extractTheTag(const std::vector<uint8_t>& bu
            };
 }
 
-expected::Result<std::vector<uint8_t>> UpdateFrameSize(const std::vector<uint8_t>& buffer,
+expected::Result<std::vector<uint8_t>> UpdateFrameSize(buffer_t buffer,
                                          uint32_t extraSize,
                                          uint32_t frameIDPosition) {
     const uint32_t frameSizePositionInArea = frameIDPosition;
@@ -78,8 +78,8 @@ private:
 
     const auto readString(std::ifstream& fRead, uint32_t bufferLength) {
         assert(bufferLength > 0);
-        std::vector<unsigned char> Buffer(bufferLength);
-        fRead.read(reinterpret_cast<char*>(Buffer.data()), bufferLength);
+        buffer_t Buffer = std::make_shared<std::vector<unsigned char>(bufferLength);
+        fRead.read(reinterpret_cast<char*>(Buffer->data()), bufferLength);
 
         const auto ret = id3::ExtractString<uint32_t>(Buffer, 0, bufferLength) |
                          [](const std::string& readTag) {
@@ -195,7 +195,7 @@ public:
     const uint32_t getTagStartPosition() const { return mTagStartPosition; }
     const uint32_t getTagFooterBegin() const { return mTagFooterBegin; }
     const uint32_t getFileLength() const { return mfileSize; }
-    std::optional<std::vector<uint8_t>> GetBuffer() const { return buffer; }
+    std::optional<buffer_t> GetBuffer() const { return buffer; }
 
     bool IsValid() const { return mValid; }
 };
@@ -206,7 +206,7 @@ private:
     bool mValid;
     const std::string& filename;
     std::string_view tagKey;
-    std::optional<std::vector<uint8_t>> mBuffer;
+    std::optional<buffer_t> mBuffer;
     std::unique_ptr<tagReadWriter> tagRW;
 
 public:
@@ -429,7 +429,7 @@ public:
             ID3_LOG_ERROR("No buffer!...");
             return expected::makeError<std::vector<uint8_t>>("ape:extendTagBuffer - No buffer");
         }
-        const std::vector<uint8_t> cBuffer = tagRW->GetBuffer().value();
+        auto cBuffer = tagRW->GetBuffer().value();
         ID3_LOG_TRACE("FrameSize... length: {}, frame start: {}",
                       frameConfig.getFramePayloadLength(), frameConfig.getFrameKeyOffset());
         ID3_LOG_TRACE("Updating segments...");
@@ -466,7 +466,7 @@ public:
         finalBuffer.insert(it, additionalSize, 0);
 
         ID3_LOG_TRACE("frame Content Start {}...", frameContentStart);
-        const auto iter = std::begin(finalBuffer) + frameContentStart;
+        const auto iter = std::begin(*finalBuffer) + frameContentStart;
         std::transform(iter, iter + framePayload.size(), framePayload.begin(), iter,
                        [](char a, char b) { return b; });
 

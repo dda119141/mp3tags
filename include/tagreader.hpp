@@ -22,7 +22,7 @@ const std::string GetId3v2Tag(
 
         | id3v2::checkForID3
 
-        | [](const std::vector<unsigned char>& buffer) {
+        | [](buffer_t buffer) {
             return id3v2::GetID3Version(buffer);
         }
 

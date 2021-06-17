@@ -32,10 +32,10 @@ namespace filesystem = std::filesystem;
 
 
 static const std::string modifiedEnding(".mod");
+using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
 
 /* Frame settings */
 class FrameSettings {
-    using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
     
 public:
     FrameSettings() {}
@@ -77,9 +77,15 @@ public:
         return *this;
     }
 
-    FrameSettings& with_frame_buffer(buffer_t audioBuffer)
+    FrameSettings& with_audio_buffer(buffer_t audio_Buffer)
     {
-        audioBuffer = audioBuffer;
+        audioBuffer = audio_Buffer;
+        return *this;
+    }
+
+    FrameSettings& with_tag_buffer(buffer_t tag_Buffer)
+    {
+        tagBuffer = tag_Buffer;
         return *this;
     }
 
@@ -91,6 +97,8 @@ public:
     const uint32_t getFrameLength() const { return frameLength; }
     const uint32_t getEncodingValue() const { return encodeFlag; }
     const uint32_t getSwapValue() const { return doSwap; }
+    auto getTagBuffer() const { return tagBuffer; }
+    auto getAudioBuffer() const { return audioBuffer; }
 
 private:
     uint32_t frameIDStartPosition = {};
@@ -100,6 +108,7 @@ private:
     uint32_t encodeFlag = {};
     uint32_t doSwap = {};
     std::optional<buffer_t> audioBuffer = {};
+    std::optional<buffer_t> tagBuffer = {};
 };
 
 const std::string stripLeft(const std::string& valIn) {
@@ -162,6 +171,7 @@ template <
     typename T,
     typename = std::enable_if_t<(
         std::is_same<std::decay_t<T>, std::optional<std::vector<uint8_t>>>::value ||
+        std::is_same<std::decay_t<T>, std::optional<buffer_t>>::value ||
         std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
         std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
         std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
@@ -254,20 +264,20 @@ const uint32_t GetValFromBuffer(const std::vector<uint8_t>& buffer, T index,
 }
 
 template <typename T1>
-expected::Result<std::string> ExtractString(const std::vector<uint8_t>& buffer, T1 start,
+expected::Result<std::string> ExtractString(buffer_t buffer, T1 start,
                                             T1 length) {
-    assert((start + length) <= buffer.size());
+    assert((start + length) <= buffer->size());
 
-    if (buffer.size() >= (start + length)) {
+    if (buffer->size() >= (start + length)) {
         static_assert(std::is_integral<T1>::value,
                       "second and third parameters should be integers");
 
-        std::string obj(reinterpret_cast<const char*>(buffer.data()), (start + length));
+        std::string obj(reinterpret_cast<const char*>(buffer->data()), (start + length));
 
         return expected::makeValue<std::string>(
             obj.substr(start, (length)));
     } else {
-        ID3_LOG_ERROR("Buffer size {} < buffer length: {} ", buffer.size(), length);
+        ID3_LOG_ERROR("Buffer size {} < buffer length: {} ", buffer->size(), length);
         return expected::makeError<std::string>() << __func__ << ":failed"
                                                   << " start: " << start
                                                   << " end: " << (start + length) << "\n";
@@ -303,23 +313,23 @@ uint32_t GetTagSizeDefault(const std::vector<uint8_t>& buffer,
     return val;
 }
 
-bool replaceElementsInBuff(const std::vector<uint8_t>& buffIn, std::vector<uint8_t>& buffOut,
+bool replaceElementsInBuff(buffer_t buffIn, buffer_t buffOut,
                            uint32_t position) {
-    const auto iter = std::begin(buffOut) + position;
+    const auto iter = std::begin(*buffOut) + position;
 
-    std::transform(iter, iter + buffIn.size(), buffIn.begin(), iter,
+    std::transform(iter, iter + buffIn->size(), buffIn->begin(), iter,
                    [](char a, char b) { return b; });
 
     return true;
 }
 
-uint32_t GetTagSize(const std::vector<uint8_t>& buffer,
+uint32_t GetTagSize(buffer_t buffer,
                     const std::vector<unsigned int>& power_values,
                     uint32_t index) {
 
     using paire = std::pair<uint32_t, uint32_t>;
     std::vector<paire> result(power_values.size());
-    const auto it = std::begin(buffer) + index;
+    const auto it = std::begin(*buffer) + index;
 
     std::transform(it, it + power_values.size(), power_values.begin(),
                    result.begin(),
@@ -333,20 +343,20 @@ uint32_t GetTagSize(const std::vector<uint8_t>& buffer,
 }
 
 template <typename T>
-expected::Result<std::vector<uint8_t>> updateAreaSize(const std::vector<uint8_t>& buffer,
+expected::Result<buffer_t> updateAreaSize(buffer_t buffer,
                                         uint32_t extraSize, T tagIndex,
                                         T numberOfElements, T _maxValue
                                         , bool littleEndian = true) {
     const uint32_t TagIndex = tagIndex;
     const uint32_t NumberOfElements = numberOfElements;
     const uint32_t maxValue = _maxValue;
-    auto itIn = std::begin(buffer) + TagIndex;
+    auto itIn = std::begin(*buffer) + TagIndex;
     auto ExtraSize = extraSize;
     auto extr = ExtraSize % maxValue;
 
-    std::vector<uint8_t> temp_vec(NumberOfElements);
-    std::copy(itIn, itIn + NumberOfElements, temp_vec.begin());
-    auto it = temp_vec.begin();
+    buffer_t temp_vec = std::make_shared<std::vector<uint8_t>>(NumberOfElements);
+    std::copy(itIn, itIn + NumberOfElements, temp_vec->begin());
+    auto it = temp_vec->begin();
 
     if(littleEndian){
         /* reverse order of elements */
@@ -378,11 +388,11 @@ expected::Result<std::vector<uint8_t>> updateAreaSize(const std::vector<uint8_t>
 
     id3::log()->trace(
         "Tag Frame Bytes after update : {}",
-        spdlog::to_hex(std::begin(temp_vec) ,
-                       std::begin(temp_vec) + NumberOfElements));
+        spdlog::to_hex(std::begin(*temp_vec) ,
+                       std::begin(*temp_vec) + NumberOfElements));
     ID3_LOG_TRACE("success...");
 
-    return expected::makeValue<std::vector<uint8_t>>(temp_vec);
+    return expected::makeValue<buffer_t>(temp_vec);
 }
 
 template <typename Type>
