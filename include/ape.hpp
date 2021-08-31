@@ -26,7 +26,7 @@ typedef struct _frameConfig {
     std::string frameContent;
 } frameBlock_t;
 
-const expected::Result<std::string> extractTheTag(buffer_t buffer,
+const expected::Result<std::string> extractTheTag(id3::buffer_t buffer,
                                                   uint32_t start,
                                                   uint32_t length) {
     return id3::ExtractString<uint32_t>(buffer, start, length) |
@@ -35,7 +35,7 @@ const expected::Result<std::string> extractTheTag(buffer_t buffer,
            };
 }
 
-expected::Result<std::vector<uint8_t>> UpdateFrameSize(buffer_t buffer,
+expected::Result<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
                                          uint32_t extraSize,
                                          uint32_t frameIDPosition) {
     const uint32_t frameSizePositionInArea = frameIDPosition;
@@ -45,8 +45,8 @@ expected::Result<std::vector<uint8_t>> UpdateFrameSize(buffer_t buffer,
     id3::log()->info(" Frame Index: {}", frameIDPosition);
     id3::log()->info(
         "Tag Frame Bytes before update : {}",
-        spdlog::to_hex(std::begin(buffer) + frameSizePositionInArea,
-                       std::begin(buffer) + frameSizePositionInArea + 4));
+        spdlog::to_hex(std::begin(*buffer) + frameSizePositionInArea,
+                       std::begin(*buffer) + frameSizePositionInArea + 4));
     const auto ret =  id3::updateAreaSize<uint32_t>(
         buffer, extraSize, frameSizePositionInArea, frameSizeLengthInArea,
         frameSizeMaxValuePerElement, false);
@@ -66,11 +66,11 @@ private:
     uint32_t mTagFooterBegin;
     uint32_t mTagPayloadPosition;
     uint32_t mTagStartPosition;
-    std::optional<std::vector<uint8_t>> buffer;
+    std::optional<id3::buffer_t> buffer;
 
     const uint32_t getTagSize(std::ifstream& fRead, uint32_t bufferLength) {
-        std::vector<unsigned char> tagLengthBuffer(bufferLength);
-        fRead.read(reinterpret_cast<char*>(tagLengthBuffer.data()),
+        auto tagLengthBuffer = std::make_shared<std::vector<unsigned char>>(bufferLength);
+        fRead.read(reinterpret_cast<char*>(tagLengthBuffer->data()),
                    bufferLength);
 
         return id3::GetTagSizeDefault(tagLengthBuffer, bufferLength);
@@ -78,7 +78,7 @@ private:
 
     const auto readString(std::ifstream& fRead, uint32_t bufferLength) {
         assert(bufferLength > 0);
-        buffer_t Buffer = std::make_shared<std::vector<unsigned char>(bufferLength);
+        id3::buffer_t Buffer = std::make_shared<std::vector<unsigned char>>(bufferLength);
         fRead.read(reinterpret_cast<char*>(Buffer->data()), bufferLength);
 
         const auto ret = id3::ExtractString<uint32_t>(Buffer, 0, bufferLength) |
@@ -180,9 +180,9 @@ public:
                         mTagFooterBegin + GetTagFooterSize() - mTagSize;
 
                     filRead.seekg(mTagStartPosition);
-                    std::vector<unsigned char> buffer1(
+                    auto buffer1 = std::make_shared<std::vector<unsigned char>>(
                         mTagSize + GetTagFooterSize(), '0');
-                    filRead.read(reinterpret_cast<char*>(buffer1.data()),
+                    filRead.read(reinterpret_cast<char*>(buffer1->data()),
                                  mTagSize + GetTagFooterSize());
 
                     mValid = true;
@@ -195,7 +195,7 @@ public:
     const uint32_t getTagStartPosition() const { return mTagStartPosition; }
     const uint32_t getTagFooterBegin() const { return mTagFooterBegin; }
     const uint32_t getFileLength() const { return mfileSize; }
-    std::optional<buffer_t> GetBuffer() const { return buffer; }
+    std::optional<id3::buffer_t> GetBuffer() const { return buffer; }
 
     bool IsValid() const { return mValid; }
 };
@@ -206,7 +206,7 @@ private:
     bool mValid;
     const std::string& filename;
     std::string_view tagKey;
-    std::optional<buffer_t> mBuffer;
+    std::optional<id3::buffer_t> mBuffer;
     std::unique_ptr<tagReadWriter> tagRW;
 
 public:
@@ -237,11 +237,11 @@ public:
         if (!mValid)
             return expected::makeError<frameBlock_t>("getFrameBlock object not valid");
 
-        std::vector<uint8_t> buffer = tagRW->GetBuffer().value();
+        auto buffer = tagRW->GetBuffer().value();
 
-        ID3_LOG_TRACE("getFrameBlock object valid - size: {}", buffer.size());
+        ID3_LOG_TRACE("getFrameBlock object valid - size: {}", buffer->size());
 
-        return id3::ExtractString<uint32_t>(buffer, 0, buffer.size()) |
+        return id3::ExtractString<uint32_t>(buffer, 0, buffer->size()) |
                [&](const std::string& tagArea) {
 
                    constexpr uint32_t frameKeyTerminatorLength = 1;
@@ -336,7 +336,7 @@ public:
 
                 const uint32_t additionalSize = framePayload.size() - frameConfig.value().frameLength;
                 const auto writeBackAction = extendTagBuffer(frameGlobalConfig, framePayload, additionalSize) |
-                    [&](const std::vector<uint8_t>& buffer) {
+                    [&](id3::buffer_t buffer) {
                         return this->ReWriteFile(buffer);
                     };
                 return writeBackAction | [&](bool fileWritten) {
@@ -346,7 +346,7 @@ public:
         }
     }
 
-    expected::Result<bool> ReWriteFile(const std::vector<uint8_t>& buff) const {
+    expected::Result<bool> ReWriteFile(id3::buffer_t buff) const {
         const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
 
         std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
@@ -358,9 +358,6 @@ public:
         const uint32_t fileSize = filRead.tellg();
         assert(fileSize >= endOf);
         const uint32_t endLength = fileSize - endOf;
-
-        ID3_LOG_INFO("APE start pos: {}", tagRW->getTagStartPosition());
-        ID3_LOG_INFO("file length: {}", fileSize);
 
         std::vector<uint8_t> bufFooter;
         bufFooter.reserve((endLength));
@@ -383,36 +380,23 @@ public:
 
         std::ofstream filWrite(writeFileName, std::ios::binary | std::ios::app);
 
-        if (!filWrite.good()) {
-            ID3_LOG_ERROR("file could not be opened: {}", writeFileName);
-            return expected::makeError<bool>() << "__func__"
-                                               << ": Error opening file";
-        }
-
         filWrite.seekp(0);
         std::for_each(std::begin(bufHeader),
                       std::begin(bufHeader) + tagRW->getTagStartPosition(),
                       [&filWrite](const char& n) { filWrite << n; });
 
-        ID3_LOG_TRACE("buffer to write : {}",
-                      spdlog::to_hex(std::begin(buff), std::begin(buff) + 8));
-
-        ID3_LOG_INFO("endlength: {}", endLength);
-
         filWrite.seekp(tagRW->getTagStartPosition());
-        std::for_each(std::begin(buff), std::end(buff),
+        std::for_each(std::begin(*buff), std::end(*buff),
                       [&filWrite](const char& n) { filWrite << n; });
 
         filWrite.seekp(endOf);
         std::for_each(bufFooter.begin(), bufFooter.begin() + endLength,
                       [&filWrite](const char& n) { filWrite << n; });
 
-        ID3_LOG_INFO("success: {}", __func__);
-
         return expected::makeValue<bool>(true);
     }
 
-    const expected::Result<std::vector<uint8_t>> extendTagBuffer(
+    const expected::Result<id3::buffer_t> extendTagBuffer(
         const id3::FrameSettings& frameConfig, std::string_view framePayload, uint32_t additionalSize) const {
 
         const uint32_t relativeBufferPosition = tagRW->getTagStartPosition();
@@ -427,12 +411,9 @@ public:
 
         if (!tagRW->GetBuffer().has_value()) {
             ID3_LOG_ERROR("No buffer!...");
-            return expected::makeError<std::vector<uint8_t>>("ape:extendTagBuffer - No buffer");
+            return expected::makeError<id3::buffer_t>("ape:extendTagBuffer - No buffer");
         }
         auto cBuffer = tagRW->GetBuffer().value();
-        ID3_LOG_TRACE("FrameSize... length: {}, frame start: {}",
-                      frameConfig.getFramePayloadLength(), frameConfig.getFrameKeyOffset());
-        ID3_LOG_TRACE("Updating segments...");
 
         const auto tagSizeBuff =
             UpdateFrameSize(cBuffer, additionalSize, tagsSizePositionInHeader);
@@ -440,44 +421,29 @@ public:
         const auto frameSizeBuff = UpdateFrameSize(cBuffer, additionalSize,
                                                    frameSizePositionInFrameHeader);
 
-        assert(frameConfig.getFramePayloadLength() <= cBuffer.size());
+        assert(frameConfig.getFramePayloadLength() <= cBuffer->size());
 
         auto finalBuffer = std::move(cBuffer);
-
-        ID3_LOG_TRACE("final Buffer size {} and frameSizePositionInFrameHeader {}...", finalBuffer.size(), frameSizePositionInFrameHeader);
 
         id3::replaceElementsInBuff(frameSizeBuff.value(), finalBuffer,
                                    frameSizePositionInFrameHeader);
 
-        ID3_LOG_TRACE("tagsSizePositionInHeader {}...", tagsSizePositionInHeader);
         id3::replaceElementsInBuff(tagSizeBuff.value(), finalBuffer,
                                    tagsSizePositionInHeader);
 
-        ID3_LOG_TRACE("tagsSizePositionInFooter {}...", tagsSizePositionInFooter);
         id3::replaceElementsInBuff(tagSizeBuff.value(), finalBuffer,
                                    tagsSizePositionInFooter);
 
-
-        ID3_LOG_TRACE("previous buffer Size {}...", finalBuffer.size());
-
         ID3_LOG_TRACE("frame Key Offset {}...", frameConfig.getFrameKeyOffset());
-        auto it = finalBuffer.begin() + frameContentStart +
+        auto it = finalBuffer->begin() + frameContentStart +
                   frameConfig.getFramePayloadLength();
-        finalBuffer.insert(it, additionalSize, 0);
+        finalBuffer->insert(it, additionalSize, 0);
 
-        ID3_LOG_TRACE("frame Content Start {}...", frameContentStart);
         const auto iter = std::begin(*finalBuffer) + frameContentStart;
         std::transform(iter, iter + framePayload.size(), framePayload.begin(), iter,
                        [](char a, char b) { return b; });
 
-        ID3_LOG_TRACE(
-            "Tag Frame Bytes after update : {}",
-            spdlog::to_hex(
-                std::begin(finalBuffer),
-                std::begin(finalBuffer) + 8));
-        ID3_LOG_TRACE("final buffer Size {}...", finalBuffer.size());
-
-        return expected::makeValue<std::vector<uint8_t>>(finalBuffer);
+        return expected::makeValue<id3::buffer_t>(finalBuffer);
     }
 
 };  // class tagReader

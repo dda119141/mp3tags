@@ -22,7 +22,7 @@ const std::string GetId3v2Tag(
 
         | id3v2::checkForID3
 
-        | [](buffer_t buffer) {
+        | [](id3::buffer_t buffer) {
             return id3v2::GetID3Version(buffer);
         }
 
@@ -61,30 +61,22 @@ const std::string GetId3v2Tag(
                                 return paramLoc;
                             }
                         };
-
                     try {
                         id3v2::TagReadWriter<std::string> obj(params());
 
-                        return obj.getFramePayload<std::string>();
-                    } catch (const std::runtime_error& e) {
-                        ID3_LOG_ERROR(e.what());
-                        std::cout << e.what() << '\n';
-                    }
+                        const auto found = obj.getFramePayload<std::string>().value();
+                        return id3::stripLeft(found);
 
+                    } catch (const std::runtime_error& e) {
+                        std::cout << e.what();
+                    }
                 }
             }
 
-            return expected::makeError<std::string>()
-                   << "id3 version not supported"
-                   << "\n";
+            return std::string(" :No value");
         };
 
-    if (!ret.has_value()) {
-        // return "Tag not found";
-        return ret.error();
-    } else {
-        return id3::stripLeft(ret.value());
-    }
+    return ret;
 }
 
 template <typename Function1, typename Function2>

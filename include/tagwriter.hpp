@@ -22,7 +22,7 @@ bool SetTag(const std::string& filename,
 
         | id3v2::checkForID3
 
-        | [](buffer_t buffer) {
+        | [](id3::buffer_t buffer) {
             return id3v2::GetID3Version(buffer);
         }
 

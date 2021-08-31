@@ -107,8 +107,8 @@ private:
     uint32_t framePayloadLength = {};
     uint32_t encodeFlag = {};
     uint32_t doSwap = {};
-    std::optional<buffer_t> audioBuffer = {};
-    std::optional<buffer_t> tagBuffer = {};
+    buffer_t audioBuffer = {};
+    buffer_t tagBuffer = {};
 };
 
 const std::string stripLeft(const std::string& valIn) {
@@ -237,12 +237,12 @@ expected::Result<bool> renameFile(const std::string& fileToRename,
 }
 
 template <typename T>
-const uint32_t GetValFromBuffer(const std::vector<uint8_t>& buffer, T index,
+const uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
                                 T num_of_bytes_in_hex) {
     integral_unsigned_asserts<T> eval;
     eval();
 
-    assert(buffer.size() > num_of_bytes_in_hex);
+    assert(buffer->size() > num_of_bytes_in_hex);
 
     auto version = 0;
     auto remaining = 0;
@@ -253,7 +253,7 @@ const uint32_t GetValFromBuffer(const std::vector<uint8_t>& buffer, T index,
 
     while (bytes_to_add > 0) {
         remaining = (num_of_bytes_in_hex - bytes_to_add);
-        auto val = std::pow(2, 8 * remaining) * buffer[byte_to_pad];
+        auto val = std::pow(2, 8 * remaining) * buffer->at(byte_to_pad);
         version += val;
 
         bytes_to_add--;
@@ -284,10 +284,10 @@ expected::Result<std::string> ExtractString(buffer_t buffer, T1 start,
     }
 }
 
-uint32_t GetTagSizeDefault(const std::vector<uint8_t>& buffer,
+uint32_t GetTagSizeDefault(buffer_t buffer,
                     uint32_t length, uint32_t startPosition = 0, bool BigEndian = false) {
 
-    assert((startPosition + length) <= buffer.size());
+    assert((startPosition + length) <= buffer->size());
 
     using paire = std::pair<uint32_t, uint32_t>;
     std::vector<uint32_t> power_values(length);
@@ -300,7 +300,7 @@ uint32_t GetTagSizeDefault(const std::vector<uint8_t>& buffer,
     }
 
     std::vector<paire> result(power_values.size());
-    const auto it = std::begin(buffer) + startPosition;
+    const auto it = std::begin(*buffer) + startPosition;
 
     std::transform(it, it + length, power_values.begin(),
                    result.begin(),

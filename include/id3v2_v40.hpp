@@ -75,11 +75,11 @@ class v40
         }
 
 
-        std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t>& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(buffer_t buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
-            if(buffer.size() >= start)
+            if(buffer->size() >= start)
             {
                 using paire = std::pair<uint32_t, uint32_t>;
 
@@ -87,7 +87,7 @@ class v40
 
                 std::vector<paire> result(pow_val.size());
 
-                std::transform(std::begin(buffer) + start, std::begin(buffer) + start + pow_val.size(),
+                std::transform(std::begin(*buffer) + start, std::begin(*buffer) + start + pow_val.size(),
                         pow_val.begin(), result.begin(),
                         [](uint32_t a, uint32_t b){
                         return std::make_pair(a, b);
@@ -104,7 +104,7 @@ class v40
                 return val;
 
             } else	{
-                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
+                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(), start);
             }
 
             return {};

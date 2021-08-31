@@ -65,7 +65,7 @@ namespace id3v2
 
 
     template <typename T>
-    std::optional<T> GetFrameSize(const std::vector<uint8_t>& buff,
+    std::optional<T> GetFrameSize(buffer_t buff,
                                   const iD3Variant& TagVersion,
                                   uint32_t framePos) {
         return std::visit(
@@ -140,7 +140,7 @@ namespace id3v2
         const auto& frameOffset = frSet.getFrameKeyOffset();
         const auto& frameContentOffset = frSet.getFramePayloadOffset();
         const auto& frameSize = frSet.getFrameLength();
-        const auto buff = frSet.getAudioBuffer().value();
+        const auto buff = frSet.getAudioBuffer();
 
         switch (buff->at(frameContentOffset)) {
             case 0x0: {
@@ -448,18 +448,13 @@ namespace id3v2
                         return GetStringFromFile(
                             mParams.filename, tags_size + GetTagHeaderSize<uint32_t>());
                     };
-                if (ret.has_value()) {
-                    buffer = ret.value();
-                }else{
-                     throw std::range_error("No found area for tag");
-                }
+
                 if(!mParams.frameID)
                      throw std::runtime_error("No frame ID parameter");
 
                 const auto frameSet = findFrameSettings();
 
-                if (frameSet.has_value())
-                    mFrameSettings = frameSet.value();
+                mFrameSettings = frameSet.value();
 
             });
         }
@@ -506,33 +501,25 @@ namespace id3v2
 
             const auto ret =
                 buffer 
-                | [this, &framesettings](buffer_t buffer_arg) -> expected::Result<std::string>
+                | [&framesettings](buffer_t buffer_arg) -> expected::Result<std::string>
                 {
                     framesettings = framesettings.with_audio_buffer(buffer_arg);
                     return GetTagArea(buffer_arg);
                 } 
-                | [this](const std::string&
-                           tagArea) -> expected::Result<uint32_t> {
+                | [&framesettings, this](const std::string&
+                           tagArea) -> expected::Result<FrameSettings> {
+
                     auto searchTagPosition =
                         id3::search_tag<std::string_view>(tagArea);
-                    const auto ret = searchTagPosition(mParams.frameID.value());
 
-                    return ret;
-                } 
-                | [this, &framesettings](uint32_t framePos) -> expected::Result<FrameSettings> {
-
-                    const uint32_t frameContentOffset =
-                        framePos + GetFrameHeaderSize(mParams.tagVersion);
+                    const auto framePos = searchTagPosition(mParams.frameID.value()).value();
+                    const auto FrameSize = GetFrameSize<uint32_t>(framesettings.getAudioBuffer()
+                     , mParams.tagVersion, framePos).value();
 
                     framesettings = framesettings
                         .with_frameID_offset(framePos)
-                        .with_framecontent_offset(frameContentOffset);
-
-                    return GetFrameSize<uint32_t>(framesettings.getAudioBuffer() , mParams.tagVersion, framePos);
-
-                 | [&framesettings, this](uint32_t FrameSize) -> expected::Result<FrameSettings> {
-
-                    framesettings = framesettings.with_frame_length(FrameSize);
+                        .with_framecontent_offset(framePos + GetFrameHeaderSize(mParams.tagVersion))
+                        .with_frame_length(FrameSize);
 
                     if (mParams.frameID.value().find_first_of("T") ==
                         0)  // if frameID starts with T
@@ -542,7 +529,6 @@ namespace id3v2
 
                     return expected::makeValue<FrameSettings>(framesettings);
                 };
-            };
 
             if (!ret.has_value()) throw std::runtime_error("Could not retrieve frame settings");
 

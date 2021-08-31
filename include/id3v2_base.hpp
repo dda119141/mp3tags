@@ -34,7 +34,7 @@ const auto GetStringFromFile(const std::string& FileName, uint32_t num) {
 }
 
 template <typename T>
-expected::Result<std::string> GetHexFromBuffer(buffer_t buffer, T index,
+expected::Result<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
                                                T num_of_bytes_in_hex) {
     id3::integral_unsigned_asserts<T> eval;
     eval();
@@ -197,7 +197,7 @@ expected::Result<std::string> GetID3FileIdentifier(buffer_t buffer) {
 #endif
 }
 
-expected::Result<std::string> GetID3Version(buffer_t buffer) {
+expected::Result<std::string> GetID3Version(id3::buffer_t buffer) {
     constexpr auto kID3IndexStart = 4;
     constexpr auto kID3VersionBytesLength = 2;
 

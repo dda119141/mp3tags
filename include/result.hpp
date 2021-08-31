@@ -170,8 +170,8 @@ namespace expected {
             if (r.has_value()) {
                 return fuc(r.value());
             } else {
-                return Ret()(r.error());
-               // return Ret();
+               // return Ret()(r.error());
+                return Ret();
             }
      }
 

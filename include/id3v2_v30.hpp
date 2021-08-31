@@ -61,22 +61,22 @@ class v30
         }
 
 
-        std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t>& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(buffer_t buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
-            if(buffer.size() >= start)
+            if(buffer->size() >= start)
             {
-                uint32_t val = buffer[start + 0] * std::pow(2, 24);
+                uint32_t val = buffer->at(start + 0) * std::pow(2, 24);
 
-                val += buffer[start + 1] * std::pow(2, 16);
-                val += buffer[start + 2] * std::pow(2, 8);
-                val += buffer[start + 3] * std::pow(2, 0);
+                val += buffer->at(start + 1) * std::pow(2, 16);
+                val += buffer->at(start + 2) * std::pow(2, 8);
+                val += buffer->at(start + 3) * std::pow(2, 0);
 
                 return val;
 
             } else	{
-                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
+                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(), start);
             }
 
             return {};

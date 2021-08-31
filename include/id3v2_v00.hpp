@@ -90,16 +90,16 @@ class v00
             return ::id3v2::RetrieveSize(6);
         }
 
-        std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t>& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(buffer_t buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
-            if(buffer.size() >= start)
+            if(buffer->size() >= start)
             {
-                auto val = buffer[start + 0] * std::pow(2, 16);
+                auto val = buffer->at(start + 0) * std::pow(2, 16);
 
-                val += buffer[start + 1] * std::pow(2, 8);
-                val += buffer[start + 2] * std::pow(2, 0);
+                val += buffer->at(start + 1) * std::pow(2, 8);
+                val += buffer->at(start + 2) * std::pow(2, 0);
 
                 return val;
 
