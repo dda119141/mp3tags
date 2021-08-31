@@ -159,25 +159,28 @@ auto mbind(std::optional<T>&& _obj, F&& function)
     }
 }
 
-template <typename T>
-using is_optional_string =
-    std::is_same<std::decay_t<T>, std::optional<std::string>>;
+template <typename T, typename... Rest>
+struct is_any_of : std::false_type {};
 
-template <typename T>
-using is_optional_vector_char =
-    std::is_same<std::decay_t<T>, std::optional<std::vector<uint8_t>>>;
+template<typename T, typename First>
+struct is_any_of<T, First> : std::is_same<T, First> {};
 
-template <
-    typename T,
-    typename = std::enable_if_t<(
-        std::is_same<std::decay_t<T>, std::optional<std::vector<uint8_t>>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<buffer_t>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<id3::FrameSettings>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value)>,
-    typename F>
+template<typename T, typename First, typename... Rest>
+struct is_any_of<T, First, Rest...> 
+    : std::integral_constant<bool, std::is_same<T, First>::value || is_any_of<T, Rest...>::value> 
+{};
+
+template <typename T,
+        typename = std::enable_if_t<
+            is_any_of<std::decay_t<T>, 
+                std::optional<id3::FrameSettings>,
+                std::optional<std::vector<uint8_t>>,
+                std::optional<buffer_t>,
+                std::optional<std::string>,
+                std::optional<std::string_view>,
+                std::optional<bool>,
+                std::optional<uint32_t>>::value>,
+        typename F>
 auto operator | (T&& _obj, F&& Function)
     -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value())) {
     auto fuc = std::forward<F>(Function);
