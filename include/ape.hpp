@@ -26,16 +26,16 @@ typedef struct _frameConfig {
     std::string frameContent;
 } frameBlock_t;
 
-const expected::Result<std::string> extractTheTag(id3::buffer_t buffer,
+const std::optional<std::string> extractTheTag(id3::buffer_t buffer,
                                                   uint32_t start,
                                                   uint32_t length) {
     return id3::ExtractString<uint32_t>(buffer, start, length) |
-           [](const std::string& readTag) {
-               return expected::makeValue<std::string>(id3::stripLeft(readTag));
+           [](id3::shared_string_t readTag) {
+               return id3::stripLeft(*readTag);
            };
 }
 
-expected::Result<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
+std::optional<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
                                          uint32_t extraSize,
                                          uint32_t frameIDPosition) {
     const uint32_t frameSizePositionInArea = frameIDPosition;
@@ -76,19 +76,16 @@ private:
         return id3::GetTagSizeDefault(tagLengthBuffer, bufferLength);
     }
 
-    const auto readString(std::ifstream& fRead, uint32_t bufferLength) {
+    const id3::shared_string_t readString(std::ifstream& fRead, uint32_t bufferLength) {
         assert(bufferLength > 0);
         id3::buffer_t Buffer = std::make_shared<std::vector<unsigned char>>(bufferLength);
         fRead.read(reinterpret_cast<char*>(Buffer->data()), bufferLength);
 
         const auto ret = id3::ExtractString<uint32_t>(Buffer, 0, bufferLength) |
-                         [](const std::string& readTag) {
-                             return expected::makeValue<std::string>(readTag);
+                         [](id3::shared_string_t readTag) {
+                             return readTag;
                          };
-        if (ret.has_value())
-            return ret.value();
-        else
-            return ret.error();
+        return ret;
     }
 
     bool checkAPEtag(std::ifstream& fRead, uint32_t bufferLength,
@@ -96,9 +93,9 @@ private:
         assert(tagToCheck.size() <= bufferLength);
 
         const auto stringToCheck = readString(fRead, bufferLength);
-        const bool ret = (stringToCheck == tagToCheck);
+        const bool ret = (*stringToCheck == tagToCheck);
         if (!ret) {
-            ID3_LOG_WARN("error: {} and {}", stringToCheck, tagToCheck);
+            ID3_LOG_WARN("error: {} and {}", *stringToCheck, tagToCheck);
         }
 
         return ret;
@@ -242,11 +239,11 @@ public:
         ID3_LOG_TRACE("getFrameBlock object valid - size: {}", buffer->size());
 
         return id3::ExtractString<uint32_t>(buffer, 0, buffer->size()) |
-               [&](const std::string& tagArea) {
+               [&](id3::shared_string_t tagArea) {
 
                    constexpr uint32_t frameKeyTerminatorLength = 1;
                    auto searchTagPosition =
-                       id3::search_tag<std::string_view>(tagArea);
+                       id3::search_tag<std::string_view>(*tagArea);
                    const auto frameKeyPosition = searchTagPosition(tagKey);
                    const uint32_t frameContentPosition =
                        frameKeyPosition.has_value()
@@ -301,11 +298,10 @@ public:
                };
     }
 
-    const expected::Result<bool> writeFramePayload(std::string_view framePayload,
+    const std::optional<bool> writeFramePayload(std::string_view framePayload,
                                            uint32_t start, uint32_t length) const {
         if (framePayload.size() > length) {
-            ID3_LOG_ERROR("framePayload length too big foe frame area");
-            return expected::makeError<bool>(
+            throw std::runtime_error(
                 "framePayload length too big foe frame area");
         }
 
@@ -313,32 +309,25 @@ public:
 
         if (!frameConfig.has_value()) {
             ID3_LOG_TRACE("Could not retrieve Key");
-            return expected::makeError<bool>("Could not retrieve key");
+            return {};
         } else {
             const auto frameGlobalConfig = id3::FrameSettings()
                 .with_frameID_offset(frameConfig.value().frameStartPosition + OffsetFromFrameStartToFrameID())
                 .with_framecontent_offset(frameConfig.value().frameContentPosition)
                 .with_frame_length(frameConfig.value().frameLength);
 
-            ID3_LOG_TRACE("ID3V1: Key: {} Write framePayload: {} at {}",
-                          std::string(tagKey), std::string(framePayload),
-                          frameConfig.value().frameContentPosition);
-
             if (frameConfig.value().frameLength >= framePayload.size()) {
+
                 return WriteFile(filename, std::string(framePayload),
                                  frameGlobalConfig);
             } else {
-                ID3_LOG_TRACE(
-                    "Key: {} framePayload length {} too long for frame length {} - "
-                    "extend buffer",
-                    std::string(tagKey), framePayload.size(),
-                    frameConfig.value().frameLength);
-
                 const uint32_t additionalSize = framePayload.size() - frameConfig.value().frameLength;
+
                 const auto writeBackAction = extendTagBuffer(frameGlobalConfig, framePayload, additionalSize) |
                     [&](id3::buffer_t buffer) {
                         return this->ReWriteFile(buffer);
                     };
+
                 return writeBackAction | [&](bool fileWritten) {
                     return id3::renameFile(filename + ape::modifiedEnding, filename);
                 };
@@ -350,11 +339,7 @@ public:
         const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
 
         std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
-        if (!filRead.good()) {
-            return expected::makeError<bool>() << "__func__"
-                                               << ": Error opening file";
-        }
-
+       
         const uint32_t fileSize = filRead.tellg();
         assert(fileSize >= endOf);
         const uint32_t endLength = fileSize - endOf;
@@ -461,7 +446,8 @@ const expected::Result<std::string> getFramePayload(const std::string& filename,
     }
 }
 
-const expected::Result<bool> setFramePayload(const std::string& filename, std::string_view tagKey, std::string_view framePayload) {
+const std::optional<bool> setFramePayload(const std::string& filename, std::string_view tagKey,
+    std::string_view framePayload) {
 
     const tagReader TagR{filename, tagKey};
 
@@ -503,37 +489,37 @@ const expected::Result<std::string> GetComposer(const std::string& filename) {
     return getFramePayload(filename, std::string_view("COMPOSER"));
 }
 
-const expected::Result<bool> SetTitle(const std::string& filename,
+const std::optional<bool> SetTitle(const std::string& filename,
                                       std::string_view content) {
     return ape::setFramePayload(filename, std::string_view("TITLE"), content);
 }
 
-const expected::Result<bool> SetAlbum(const std::string& filename,
+const std::optional<bool> SetAlbum(const std::string& filename,
                                       std::string_view content) {
     return ape::setFramePayload(filename, std::string_view("ALBUM"), content);
 }
 
-const expected::Result<bool> SetLeadArtist(const std::string& filename,
+const std::optional<bool> SetLeadArtist(const std::string& filename,
                                            std::string_view content) {
     return ape::setFramePayload(filename, std::string_view("ARTIST"), content);
 }
 
-const expected::Result<bool> SetYear(const std::string& filename,
+const std::optional<bool> SetYear(const std::string& filename,
                                      std::string_view content) {
     return ape::setFramePayload(filename, std::string_view("YEAR"), content);
 }
 
-const expected::Result<bool> SetComment(const std::string& filename,
+const std::optional<bool> SetComment(const std::string& filename,
                                         std::string_view content) {
     return ape::setFramePayload(filename, std::string_view("COMMENT"), content);
 }
 
-const expected::Result<bool> SetGenre(const std::string& filename,
+const std::optional<bool> SetGenre(const std::string& filename,
                                       std::string_view content) {
     return ape::setFramePayload(filename, std::string_view("GENRE"), content);
 }
 
-const expected::Result<bool> SetComposer(const std::string& filename,
+const std::optional<bool> SetComposer(const std::string& filename,
                                          std::string_view content) {
     return ape::setFramePayload(filename, std::string_view("COMPOSER"), content);
 }

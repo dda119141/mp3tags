@@ -9,6 +9,8 @@
 #include "result.hpp"
 #include "logger.hpp"
 
+using namespace id3;
+
 namespace id3v1 {
 
 constexpr uint32_t GetTagSize(void) {
@@ -19,7 +21,6 @@ struct tagReadWriter
 {
     private:
         std::once_flag m_once;
-        bool mHasId3v1Tag = false;
         const std::string& FileName;
         uint32_t tagBegin = 0;
         uint32_t tagPayload = 0;
@@ -37,10 +38,6 @@ struct tagReadWriter
                     std::ifstream filRead(FileName,
                                           std::ios::binary | std::ios::ate);
 
-                    if (!filRead.good()) {
-                        ID3_LOG_ERROR("tagReadWriter: Error opening file {}", FileName);
-                    }
-
                     const unsigned int dataSize = filRead.tellg();
                     tagBegin = dataSize - ::id3v1::GetTagSize();
                     filRead.seekg(tagBegin);
@@ -51,10 +48,12 @@ struct tagReadWriter
                         reinterpret_cast<char*>(tagHeaderBuffer->data()),
                         tagHeaderLength);
 
-                    const auto ret = id3::ExtractString<uint32_t>(
-                                         tagHeaderBuffer, 0, tagHeaderLength) |
-                                     [](const std::string& readTag) {
-                                         return readTag == std::string("TAG");
+                    const std::optional<shared_string_t> stringExtracted = id3::ExtractString<uint32_t>(
+                                         tagHeaderBuffer, 0, tagHeaderLength);
+
+                    const auto ret = stringExtracted |
+                                     [](shared_string_t readTag_p) {
+                                         return *readTag_p == std::string("TAG");
                                      };
 
                     tagPayload = tagBegin + tagHeaderLength;
@@ -62,9 +61,7 @@ struct tagReadWriter
                     tagPayloadLength = ::id3v1::GetTagSize() - tagHeaderLength;
 
                     if (!ret) {
-                        ID3_LOG_WARN("error: start {} and end {}");
-                    } else {
-                        mHasId3v1Tag = true;
+                        throw std::runtime_error("error id3v1: start {} and end {}");
                     }
 
                     filRead.seekg(tagPayload);
@@ -77,18 +74,19 @@ struct tagReadWriter
         const uint32_t GetTagPayload() const { return tagPayload; }
 
         std::optional<id3::buffer_t> GetBuffer() const {return buffer;}
-
-        bool HasId3v1Tag() const { return mHasId3v1Tag; }
 };
 
-const expected::Result<id3::buffer_t> GetBuffer(const std::string& FileName) {
-    const tagReadWriter tagRW{FileName};
-
-    if (tagRW.GetBuffer().has_value()) {
+const expected::Result<id3::buffer_t> GetBuffer(const std::string &FileName)
+{
+    try
+    {
+        const tagReadWriter tagRW{FileName};
         return expected::makeValue<id3::buffer_t>(tagRW.GetBuffer().value());
-    } else {
-        return expected::makeError<id3::buffer_t>() << "__func__"
-                                             << ": Error opening file";
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << e.what() << std::endl;
+        return expected::makeError<id3::buffer_t>("id3v1 object not valid");
     }
 }
 
@@ -97,12 +95,12 @@ const expected::Result<std::string> GetTheFramePayload(id3::buffer_t buffer, uin
     assert(end > start);
 
     return id3::ExtractString<uint32_t>(buffer, start, (end - start)) |
-           [](const std::string& readTag) {
-               return expected::makeValue<std::string>(id3::stripLeft(readTag));
+           [](shared_string_t readTag) {
+               return expected::makeValue<std::string>(id3::stripLeft(*readTag));
            };
 }
 
-const expected::Result<bool> SetFramePayload(const std::string& filename,
+const std::optional<bool> SetFramePayload(const std::string& filename,
                                        std::string_view content,
                                        uint32_t relativeFramePayloadStart, 
                                        uint32_t relativeFramePayloadEnd) {
@@ -110,54 +108,95 @@ const expected::Result<bool> SetFramePayload(const std::string& filename,
 
     const tagReadWriter tagRW{filename};
 
-    if (!tagRW.HasId3v1Tag()) {
-        return expected::makeError<bool>("id3v1 not valid");
-
-    } else if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
+    if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
         ID3_LOG_ERROR("content length {} too big for frame area", content.size());
 
-        return expected::makeError<bool>(
-            "content length too big foe frame area");
+        return {};
     }
 
     const auto frameSettings = id3::FrameSettings()
         .with_frameID_offset(tagRW.GetTagPayload() + relativeFramePayloadStart)
         .with_framecontent_offset(tagRW.GetTagPayload() + relativeFramePayloadStart)
-        .with_frame_length(tagRW.GetTagPayload() + relativeFramePayloadStart);
+        .with_frame_length(relativeFramePayloadEnd - relativeFramePayloadStart);
 
     ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content), tagRW.GetTagPayload());
 
     return WriteFile(filename, std::string(content), frameSettings);
 }
 
-const expected::Result<bool> SetTitle(const std::string& filename,
+const std::optional<bool> SetTitle(const std::string& filename,
                                            std::string_view content) {
-    return id3v1::SetFramePayload(filename, content, 0, 30);
+    try {
+        return id3v1::SetFramePayload(filename, content, 0, 30);
+    } catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
+        return {};
+    }
 }
 
-const expected::Result<bool> SetLeadArtist(
+const std::optional<bool> SetLeadArtist(
     const std::string& filename, std::string_view content) {
-    return id3v1::SetFramePayload(filename, content, 30, 60);
+    try
+    {
+        return id3v1::SetFramePayload(filename, content, 30, 60);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << e.what() << std::endl;
+        return {};
+    }
 }
 
-const expected::Result<bool> SetAlbum(const std::string& filename,
+const std::optional<bool> SetAlbum(const std::string& filename,
                                            std::string_view content) {
-    return id3v1::SetFramePayload(filename, content, 60, 90);
+    try
+    {
+        return id3v1::SetFramePayload(filename, content, 60, 90);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << e.what() << std::endl;
+        return {};
+    }
 }
 
-const expected::Result<bool> SetYear(const std::string& filename,
+const std::optional<bool> SetYear(const std::string& filename,
                                       std::string_view content) {
-    return id3v1::SetFramePayload(filename, content, 90, 94);
+    try
+    {
+        return id3v1::SetFramePayload(filename, content, 90, 94);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << e.what() << std::endl;
+        return {};
+    }
 }
 
-const expected::Result<bool> SetComment(const std::string& filename,
+const std::optional<bool> SetComment(const std::string& filename,
                                              std::string_view content) {
-    return id3v1::SetFramePayload(filename, content, 94, 124);
+    try
+    {
+        return id3v1::SetFramePayload(filename, content, 94, 124);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << e.what() << std::endl;
+        return {};
+    }
 }
 
-const expected::Result<bool> SetGenre(const std::string& filename,
+const std::optional<bool> SetGenre(const std::string& filename,
                                            std::string_view content) {
-    return id3v1::SetFramePayload(filename, content, 124, 125);
+    try
+    {
+        return id3v1::SetFramePayload(filename, content, 124, 125);
+    }
+    catch (const std::exception &e)
+    {
+        std::cout << e.what() << std::endl;
+        return {};
+    }
 }
 
 const expected::Result<std::string> GetTitle(const std::string& filename) {

@@ -11,7 +11,6 @@
 #include <experimental/filesystem>
 
 #include "id3.hpp"
-#include "result.hpp"
 #include "logger.hpp"
 
 
@@ -34,7 +33,7 @@ const auto GetStringFromFile(const std::string& FileName, uint32_t num) {
 }
 
 template <typename T>
-expected::Result<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
+std::optional<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
                                                T num_of_bytes_in_hex) {
     id3::integral_unsigned_asserts<T> eval;
     eval();
@@ -52,10 +51,10 @@ expected::Result<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
     if (version != 0) {
         stream_obj << std::hex << version;
 
-        return expected::makeValue<std::string>(stream_obj.str());
+        return stream_obj.str();
 
     } else {
-        return expected::makeError<std::string>() << __func__ << (":failed\n");
+        return {};
     }
 }
 
@@ -76,7 +75,7 @@ constexpr T RetrieveSize(T n) {
     return n;
 }
 
-expected::Result<buffer_t> updateTagSize(buffer_t buffer,
+std::optional<buffer_t> updateTagSize(buffer_t buffer,
                                        uint32_t extraSize) {
     constexpr uint32_t tagSizePositionInHeader = 6;
     constexpr uint32_t tagSizeLengthInHeader = 4;
@@ -87,7 +86,7 @@ expected::Result<buffer_t> updateTagSize(buffer_t buffer,
                                     tagSizeMaxValuePerElement);
 }
 
-expected::Result<uint32_t> GetTagSize(buffer_t buffer) {
+std::optional<uint32_t> GetTagSize(buffer_t buffer) {
 
     const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
     constexpr uint32_t TagIndex = 6;
@@ -96,7 +95,7 @@ expected::Result<uint32_t> GetTagSize(buffer_t buffer) {
 
     assert(val > GetTagHeaderSize<uint32_t>());
 
-    return expected::makeValue<uint32_t>(val);
+    return val;
 
 #if 0
         if(buffer.size() >= GetTagHeaderSize<uint32_t>())
@@ -121,36 +120,36 @@ expected::Result<uint32_t> GetTagSize(buffer_t buffer) {
 const auto GetTotalTagSize(buffer_t buffer) {
     return GetTagSize(buffer) | [=](const uint32_t Tagsize) {
 
-        return expected::makeValue<uint32_t>(Tagsize +
-                                             GetTagHeaderSize<uint32_t>());
+        return Tagsize + GetTagHeaderSize<uint32_t>();
     };
 }
 
 const auto GetTagSizeExclusiveHeader(buffer_t buffer) {
     return GetTagSize(buffer) | [](const int tag_size) {
 
-        return expected::makeValue<uint32_t>(tag_size -
-                                             GetTagHeaderSize<uint32_t>());
+        return (tag_size - GetTagHeaderSize<uint32_t>());
     };
 }
 
-expected::Result<buffer_t> GetTagHeader(const std::string& FileName) {
+std::optional<buffer_t> GetTagHeader(const std::string& FileName) {
     auto val =
         GetStringFromFile(FileName, GetTagHeaderSize<uint32_t>());
 
-    return expected::makeValue<buffer_t>(val);
+    return val;
 }
 
-expected::Result<std::string> GetTagArea(buffer_t buffer) {
-    return GetTotalTagSize(buffer) | [&](uint32_t tagSize) {
-        ID3_LOG_TRACE("{}: tagsize: {}", __func__, tagSize);
+std::optional<shared_string_t> GetTagArea(buffer_t buffer) {
 
-        return ExtractString<uint32_t>(buffer, 0, tagSize);
-    };
+    const auto totalSize = GetTotalTagSize(buffer);
+
+    const auto tagArea = ExtractString<uint32_t>(buffer,
+             0, totalSize);
+
+    return tagArea;
 }
 
 template <typename T>
-expected::Result<std::vector<uint8_t>> processFrameHeaderFlags(
+std::optional<std::vector<uint8_t>> processFrameHeaderFlags(
     buffer_t buffer, uint32_t frameHeaderFlagsPosition,
     std::string_view tag) {
     constexpr uint32_t frameHeaderFlagsLength = 2;
@@ -174,7 +173,7 @@ expected::Result<std::vector<uint8_t>> processFrameHeaderFlags(
                      std::string(tag));
     }
 
-    return expected::makeValue<std::vector<uint8_t>>(temp_vec);
+    return temp_vec;
 }
 
 template <typename id3Type>
@@ -182,7 +181,7 @@ void GetTagNames(void) {
     return id3Type::tag_names;
 };
 
-expected::Result<std::string> GetID3FileIdentifier(buffer_t buffer) {
+std::optional<shared_string_t> GetID3FileIdentifier(buffer_t buffer) {
     constexpr auto FileIdentifierStart = 0;
     constexpr auto FileIdentifierLength = 3;
 
@@ -197,7 +196,7 @@ expected::Result<std::string> GetID3FileIdentifier(buffer_t buffer) {
 #endif
 }
 
-expected::Result<std::string> GetID3Version(id3::buffer_t buffer) {
+std::optional<std::string> GetID3Version(id3::buffer_t buffer) {
     constexpr auto kID3IndexStart = 4;
     constexpr auto kID3VersionBytesLength = 2;
 

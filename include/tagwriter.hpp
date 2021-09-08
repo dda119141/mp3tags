@@ -76,7 +76,8 @@ bool SetTag(const std::string& filename,
                 }
 
                 ID3_LOG_WARN("{} failed", __func__);
-                return expected::makeError<bool>() << __func__ << " failed\n";
+
+                return static_cast<std::optional<bool>>(false);
             };
 
             return writePayloadResult();

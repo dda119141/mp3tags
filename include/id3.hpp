@@ -17,9 +17,13 @@
 #include <variant>
 #include <vector>
 #include <bitset>
+#include <string>
 #include "logger.hpp"
-#include "result.hpp"
+//#include "result.hpp"
 #include "tagfilesystem.hpp"
+
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 
 namespace id3 {
@@ -33,6 +37,7 @@ namespace filesystem = std::filesystem;
 
 static const std::string modifiedEnding(".mod");
 using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
+using shared_string_t = std::shared_ptr<std::string>;
 
 /* Frame settings */
 class FrameSettings {
@@ -45,6 +50,13 @@ public:
         frameIDStartPosition = id_offset;
         return *this;
     }
+
+    FrameSettings& with_frameID_length(uint32_t length)
+    {
+        frameIDLength = length;
+        return *this;
+    }
+
 
     FrameSettings& with_framecontent_offset(uint32_t payload_offset)
     {
@@ -89,12 +101,29 @@ public:
         return *this;
     }
 
-    const uint32_t getFrameKeyOffset() const { return frameIDStartPosition; }
+    const uint32_t getFrameKeyOffset() const { 
+        return frameIDStartPosition; 
+    }
+
     const uint32_t getFramePayloadOffset() const {
         return frameContentStartPosition;
     }
-    const uint32_t getFramePayloadLength() const { return frameLength; }
-    const uint32_t getFrameLength() const { return frameLength; }
+
+    const uint32_t getFramePayloadLength() const 
+    {
+        if (frameLength && frameIDLength)
+            return (frameLength - frameIDLength);
+        else
+            return frameLength;
+    }
+
+    const uint32_t getFrameLength() const 
+    {
+        if (framePayloadLength && frameIDLength)
+            return (framePayloadLength + frameIDLength);
+        else
+            return frameLength; 
+    }
     const uint32_t getEncodingValue() const { return encodeFlag; }
     const uint32_t getSwapValue() const { return doSwap; }
     auto getTagBuffer() const { return tagBuffer; }
@@ -103,6 +132,7 @@ public:
 private:
     uint32_t frameIDStartPosition = {};
     uint32_t frameContentStartPosition = {};
+    uint32_t frameIDLength = {};
     uint32_t frameLength = {};
     uint32_t framePayloadLength = {};
     uint32_t encodeFlag = {};
@@ -121,7 +151,7 @@ const std::string stripLeft(const std::string& valIn) {
     return val;
 }
 
-expected::Result<FrameSettings> contructNewFrameSettings(const FrameSettings& frameconfig,
+std::optional<FrameSettings> contructNewFrameSettings(const FrameSettings& frameconfig,
                                          uint32_t additionalFramePayloadSize) 
 {
     FrameSettings frameConf = frameconfig;
@@ -129,7 +159,7 @@ expected::Result<FrameSettings> contructNewFrameSettings(const FrameSettings& fr
     frameConf = frameConf
         .with_frame_length(frameConf.getFrameLength() + additionalFramePayloadSize); 
 
-    return expected::makeValue<FrameSettings>(frameConf);
+    return frameConf;
 }
 
 template <typename T>
@@ -170,6 +200,7 @@ struct is_any_of<T, First, Rest...>
     : std::integral_constant<bool, std::is_same<T, First>::value || is_any_of<T, Rest...>::value> 
 {};
 
+#if 0
 template <typename T,
         typename = std::enable_if_t<
             is_any_of<std::decay_t<T>, 
@@ -192,15 +223,39 @@ auto operator | (T&& _obj, F&& Function)
         return {};
     }
 }
+#endif
 
-expected::Result<bool> WriteFile(const std::string& FileName, const std::string& content,
+template <typename T,
+        typename = std::enable_if_t<(
+            std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
+            std::is_same<std::decay_t<T>, std::optional<shared_string_t>>::value ||
+            std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value ||
+            std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
+            std::is_same<std::decay_t<T>, std::optional<buffer_t>>::value ||
+            std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
+            std::is_same<std::decay_t<T>, std::optional<id3::FrameSettings>>::value
+        )>,
+        typename F>
+auto operator | (T&& _obj, F&& Function)
+    -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value())) {
+    auto fuc = std::forward<F>(Function);
+    auto obj = std::forward<T>(_obj);
+
+    if (obj.has_value()) {
+        return fuc(obj.value());
+    } else {
+        return {};
+    }
+}
+
+
+std::optional<bool> WriteFile(const std::string& FileName, const std::string& content,
                                  const FrameSettings& frameSettings) {
     std::fstream filWrite(FileName,
                           std::ios::binary | std::ios::in | std::ios::out);
 
     if (!filWrite.is_open()) {
-        return expected::makeError<bool>() << __func__
-                                           << ": Error opening file\n";
+        return {};
     }
 
     filWrite.seekp(frameSettings.getFramePayloadOffset());
@@ -215,10 +270,10 @@ expected::Result<bool> WriteFile(const std::string& FileName, const std::string&
         filWrite << '\0';
     }
 
-    return expected::makeValue<bool>(true);
+    return true;
 }
 
-expected::Result<bool> renameFile(const std::string& fileToRename,
+std::optional<bool> renameFile(const std::string& fileToRename,
                                   const std::string& renamedFile) {
 
     namespace fs = ::id3::filesystem;
@@ -229,14 +284,14 @@ expected::Result<bool> renameFile(const std::string& fileToRename,
 
     try {
         fs::rename(FileToRenamePath, RenamedFilePath);
-        return expected::makeValue<bool>(true);
+        return true;
     } catch (fs::filesystem_error& e) {
         ID3_LOG_ERROR("could not rename modified audio file: {}", e.what());
     } catch (const std::bad_alloc& e) {
         ID3_LOG_ERROR("Renaming: Allocation failed: ", e.what());
     }
 
-    return expected::makeError<bool>("could rename the modified audio file");
+    return {};
 }
 
 template <typename T>
@@ -267,7 +322,7 @@ const uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
 }
 
 template <typename T1>
-expected::Result<std::string> ExtractString(buffer_t buffer, T1 start,
+std::optional<shared_string_t> ExtractString(buffer_t buffer, T1 start,
                                             T1 length) {
     assert((start + length) <= buffer->size());
 
@@ -275,15 +330,13 @@ expected::Result<std::string> ExtractString(buffer_t buffer, T1 start,
         static_assert(std::is_integral<T1>::value,
                       "second and third parameters should be integers");
 
-        std::string obj(reinterpret_cast<const char*>(buffer->data()), (start + length));
+        auto obj = std::make_shared<std::string>(reinterpret_cast<const char*>(buffer->data() + start), length);
 
-        return expected::makeValue<std::string>(
-            obj.substr(start, (length)));
+        return obj;
     } else {
+
         ID3_LOG_ERROR("Buffer size {} < buffer length: {} ", buffer->size(), length);
-        return expected::makeError<std::string>() << __func__ << ":failed"
-                                                  << " start: " << start
-                                                  << " end: " << (start + length) << "\n";
+        return {};
     }
 }
 
@@ -346,7 +399,7 @@ uint32_t GetTagSize(buffer_t buffer,
 }
 
 template <typename T>
-expected::Result<buffer_t> updateAreaSize(buffer_t buffer,
+std::optional<buffer_t> updateAreaSize(buffer_t buffer,
                                         uint32_t extraSize, T tagIndex,
                                         T numberOfElements, T _maxValue
                                         , bool littleEndian = true) {
@@ -395,7 +448,7 @@ expected::Result<buffer_t> updateAreaSize(buffer_t buffer,
                        std::begin(*temp_vec) + NumberOfElements));
     ID3_LOG_TRACE("success...");
 
-    return expected::makeValue<buffer_t>(temp_vec);
+    return temp_vec;
 }
 
 template <typename Type>
@@ -408,7 +461,7 @@ private:
 public:
     search_tag(const Type& tagArea) : mTagArea(tagArea) {}
 
-    expected::Result<uint32_t> operator()(Type tag) {
+    std::optional<uint32_t> operator()(Type tag) {
         std::call_once(m_once, [this, &tag]() {
 
             const auto it = std::search(
@@ -423,10 +476,9 @@ public:
         });
 
         if (loc != 0) {
-            return expected::makeValue<uint32_t>(loc);
+            return loc;
         } else {
-            return expected::makeError<uint32_t>() << "tag: " << tag
-                                                   << " not found";
+            return {};
         }
     }
 };

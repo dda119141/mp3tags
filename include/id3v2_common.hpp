@@ -30,7 +30,7 @@ namespace id3v2
         public:
             const std::string& filename;
             std::optional<std::string_view> framePayload {};
-            std::optional<std::string_view> frameID {};
+            std::string_view frameID = {};
             iD3Variant tagVersion;
 
         public:
@@ -89,7 +89,7 @@ namespace id3v2
             TagVersion);
     }
 
-    expected::Result<buffer_t> UpdateFrameSize(buffer_t buffer,
+    std::optional<buffer_t> UpdateFrameSize(buffer_t buffer,
                                              uint32_t extraSize,
                                              uint32_t frameIDPosition) {
 
@@ -107,7 +107,7 @@ namespace id3v2
     }
 
     template <typename... Args>
-    expected::Result<buffer_t> updateFrameSizeIndex(const iD3Variant& TagVersion,
+    std::optional<buffer_t> updateFrameSizeIndex(const iD3Variant& TagVersion,
                                                 Args... args) 
     {
         return std::visit(
@@ -118,19 +118,16 @@ namespace id3v2
             TagVersion);
     }
 
-    expected::Result<buffer_t> checkForID3(buffer_t buffer) 
+    std::optional<buffer_t> checkForID3(buffer_t buffer) 
     {
         return id3v2::GetID3FileIdentifier(buffer)
             |
-            [&](const std::string& val) -> expected::Result<buffer_t> {
-            if (val != "ID3") {
+            [&](shared_string_t val) -> std::optional<buffer_t> {
+            if (*val != "ID3") {
                 id3::log()->info(" ID3 tag not present");
-
-                const std::string ret = std::string("ID3 tag not present ") +
-                                  std::string("\n");
-                return expected::makeError<buffer_t, std::string>(ret.c_str());
+                return {};
             } else {
-                return expected::makeValue<buffer_t>(buffer);
+                return buffer;
             }
         };
     }
@@ -149,7 +146,7 @@ namespace id3v2
                 .with_framecontent_offset(frameContentOffset + 1) 
                 .with_frame_length(frameSize - 1);
 
-                return expected::makeValue<FrameSettings>(ret);
+                return ret;
                 break;
             }
             case 0x1: {
@@ -167,7 +164,7 @@ namespace id3v2
                 .with_do_swap(doSwap) 
                 .with_frame_length(frameSize - 3);
 
-                return expected::makeValue<FrameSettings>(ret);
+                return ret;
                 break;
             }
             case 0x2: { /* UTF-16BE [UTF-16] encoded Unicode [UNICODE] without
@@ -178,7 +175,7 @@ namespace id3v2
                 .with_encode_flag(0x02) 
                 .with_frame_length(frameSize - 1);
                                     
-                return expected::makeValue<FrameSettings>(ret);
+                return ret;
                 break;
             }
             case 0x3: { /* UTF-8 [UTF-8] encoded Unicode [UNICODE]. Terminated
@@ -189,7 +186,7 @@ namespace id3v2
                 .with_encode_flag(0x03) 
                 .with_frame_length(frameSize - 3);
 
-                return expected::makeValue<FrameSettings>(ret);
+                return ret;
                 break;
             }
             default: {
@@ -198,7 +195,7 @@ namespace id3v2
                 .with_framecontent_offset(frameContentOffset + 1)
                 .with_frame_length(frameSize - 1);
 
-                return expected::makeValue<FrameSettings>(ret);
+                return ret;
                 break;
             }
         }
@@ -293,23 +290,25 @@ namespace id3v2
                 ID3_LOG_TRACE("Buffer could be read - prepare to extend.");
                 mCBuffer = ret;
 
-                const auto ret1 =
-                    extendBuffer(frameConfig, additionalSize, tagVersion) |
+                const auto buffer_opt = extendBuffer(frameConfig, additionalSize, tagVersion) |
                     [&](buffer_t buffer) {
                         mCBuffer = buffer;
                         return contructNewFrameSettings(frameConfig, additionalSize);
-                    } |
+                    };
+
+                const auto result = buffer_opt |
                     [&](const FrameSettings& frameSettings) {
                         mFrameSettings = frameSettings;
                         mAdditionalSize = additionalSize;
 
-                        return expected::makeValue<bool>(true);
+                        return true;
                     };
-                assert(ret1.has_value());
+
+                assert(result == true);
         });
         }
 
-        expected::Result<bool> extendFile(const std::string& content) 
+        std::optional<bool> extendFile(const std::string& content) 
         {
             return (mFrameSettings | [&](const FrameSettings& frameConfig) {
 
@@ -329,7 +328,7 @@ namespace id3v2
         std::once_flag m_once;
         const std::string& FileName;
 
-        const expected::Result<buffer_t> extendBuffer(
+        const std::optional<buffer_t> extendBuffer(
             const FrameSettings& frameConfig, uint32_t additionalSize,
             const iD3Variant& tagVersion) 
         {
@@ -377,26 +376,25 @@ namespace id3v2
                           frameConfig.getFramePayloadLength();
                 finalBuffer->insert(it, additionalSize, 0);
 
-                return expected::makeValue<buffer_t>(finalBuffer);
+                return finalBuffer;
             };
 
             return ret;
         }
 
-        expected::Result<bool> ReWriteFile(uint32_t extraSize) {
+        std::optional<bool> ReWriteFile(uint32_t extraSize) {
             std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
 
             if (!filRead.good()) {
                 ID3_LOG_ERROR("Error opening file");
-                return expected::makeError<bool>() << "__func__"
-                                                   << ": Error opening file";
+                return {};
             }
 
             return mCBuffer 
                 | [&](buffer_t buff) {
                 const auto _headerAndTagsSize = GetTotalTagSize(buff);
 
-                return _headerAndTagsSize | [&](uint32_t headerAndTagsSize) {
+                return [&](uint32_t headerAndTagsSize) {
 
                     ID3_LOG_TRACE("headerAndtagsize: {}", headerAndTagsSize);
 
@@ -428,9 +426,8 @@ namespace id3v2
                         bufRead->begin(), bufRead->begin() + dataSize,
                         [&filWrite](const char& n) { filWrite << n; });
 
-                    ID3_LOG_INFO("success: {}", __func__);
-                    return expected::makeValue<bool>(true);
-                };
+                    return true;
+                }(_headerAndTagsSize);
             };
         };
     };
@@ -442,14 +439,14 @@ namespace id3v2
             : mParams(params) {
             std::call_once(m_once, [this]() {
 
-                const auto ret =
+                buffer =
                     GetTagHeader(mParams.filename) | GetTagSize |
                     [&](uint32_t tags_size) {
                         return GetStringFromFile(
                             mParams.filename, tags_size + GetTagHeaderSize<uint32_t>());
                     };
 
-                if(!mParams.frameID)
+                if(mParams.frameID.length() == 0)
                      throw std::runtime_error("No frame ID parameter");
 
                 const auto frameSet = findFrameSettings();
@@ -464,7 +461,7 @@ namespace id3v2
         }
 
         template <typename V>
-        const expected::Result<V> getFramePayload() {
+        const std::optional<V> getFramePayload() {
 
             const auto res = buffer | [=](buffer_t buff) {
             const auto& FrameConfig = mFrameSettings.value();
@@ -474,14 +471,14 @@ namespace id3v2
                FrameConfig.getFramePayloadLength());
 
             return val | [&FrameConfig](
-                            const std::string& framePayload) {
+                            shared_string_t framePayload) {
 
                if (FrameConfig.getSwapValue() == 0x01) {
                    const auto tempPayload = tagBase::swapW16String(
-                       std::string_view(framePayload));
-                   return expected::makeValue<V>(tempPayload);
+                       std::string_view(*framePayload));
+                   return tempPayload;
                } else {
-                   return expected::makeValue<V>(framePayload);
+                   return *framePayload;
                }
             };
             };
@@ -495,39 +492,76 @@ namespace id3v2
         std::optional<FrameSettings> mFrameSettings = {};
         std::optional<buffer_t> buffer = {};
 
-        const expected::Result<FrameSettings> findFrameSettings() {
+    uint32_t getFramePosition(std::string_view frameID, std::optional<shared_string_t> tagAreaOpt)
+    {
+        if (tagAreaOpt.has_value()){
+                const auto& tagArea = *(tagAreaOpt.value());
 
-            id3::FrameSettings framesettings = {};
-
-            const auto ret =
-                buffer 
-                | [&framesettings](buffer_t buffer_arg) -> expected::Result<std::string>
-                {
-                    framesettings = framesettings.with_audio_buffer(buffer_arg);
-                    return GetTagArea(buffer_arg);
-                } 
-                | [&framesettings, this](const std::string&
-                           tagArea) -> expected::Result<FrameSettings> {
-
-                    auto searchTagPosition =
+                auto searchTagPosition =
                         id3::search_tag<std::string_view>(tagArea);
 
-                    const auto framePos = searchTagPosition(mParams.frameID.value()).value();
-                    const auto FrameSize = GetFrameSize<uint32_t>(framesettings.getAudioBuffer()
+                try {
+                  const auto _framePos = searchTagPosition(frameID);
+                              return _framePos.value();
+                
+                } catch (const std::bad_optional_access& e) {
+                
+                    std::cout << e.what();
+                    std::cout <<  " Could not find " << frameID << "\n";
+
+                    return 0;
+                }
+          
+        }else{
+            throw std::invalid_argument("tagArea Empty while searching for frame position");
+        }
+
+    }
+
+        const std::optional<FrameSettings> findFrameSettings() {
+
+            id3::FrameSettings framesettings;
+
+            std::optional<shared_string_t> tagAreaOpt =  buffer 
+                | [](buffer_t buffer_arg) -> std::optional<shared_string_t>
+                {
+                    return GetTagArea(buffer_arg);
+                };
+#if 0
+            const auto framePos = tagAreaOpt
+              | [this](shared_string_t tagArea) -> uint32_t {
+
+                    auto searchTagPosition =
+                        id3::search_tag<std::string_view>(*tagArea);
+
+                    const auto _framePos = searchTagPosition(mParams.frameID).value();
+                    return _framePos;
+            };
+#endif
+            const auto framePos = getFramePosition(mParams.frameID, tagAreaOpt);
+
+            const auto FrameSize = buffer | [&](buffer_t audioBuffer) {
+                return GetFrameSize<uint32_t>(audioBuffer
                      , mParams.tagVersion, framePos).value();
+            };
 
-                    framesettings = framesettings
-                        .with_frameID_offset(framePos)
+            const auto ret =
+                tagAreaOpt  | [&framesettings, &framePos, &FrameSize, this](shared_string_t
+                           tagArea) -> std::optional<FrameSettings> {
+
+                    framesettings.with_frameID_offset(framePos)
+                        .with_frameID_length(mParams.frameID.length())
                         .with_framecontent_offset(framePos + GetFrameHeaderSize(mParams.tagVersion))
-                        .with_frame_length(FrameSize);
+                        .with_frame_length(FrameSize)
+                        .with_audio_buffer(buffer.value());
 
-                    if (mParams.frameID.value().find_first_of("T") ==
+                    if (mParams.frameID.find_first_of("T") ==
                         0)  // if frameID starts with T
                     {
                         return getFrameSettingsFromEncodeByte(framesettings);
                     }
 
-                    return expected::makeValue<FrameSettings>(framesettings);
+                    return framesettings;
                 };
 
             if (!ret.has_value()) throw std::runtime_error("Could not retrieve frame settings");
@@ -535,7 +569,7 @@ namespace id3v2
             return ret;
         }
     };
-
+  
     template <typename id3Type>
     const auto is_tag(std::string name) {
         return (std::any_of(id3v2::GetTagNames<id3Type>().cbegin(),
@@ -543,33 +577,24 @@ namespace id3v2
                             [&](std::string obj) { return name == obj; }));
     }
 
-    expected::Result<bool> writeFramePayload(const ::id3v2::basicParameters& params) 
+    std::optional<bool> writeFramePayload(const ::id3v2::basicParameters& params) 
     {
         id3v2::TagReadWriter<std::string_view> obj(params);
 
         const id3::FrameSettings& frameConfig = obj.GetFrameSettings();
 
-        if (!params.framePayload.has_value()) return expected::makeError<bool>("No frame payload parameter\n");
-
         const std::string framePayloadToWrite =
             formatFramePayload(params.framePayload.value(), frameConfig);
-
-        ID3_LOG_TRACE("Content write: {} prepared", framePayloadToWrite);
-        ID3_LOG_TRACE("frame content offset: {}",
-                     frameConfig.getFramePayloadOffset());
-        ID3_LOG_TRACE("frame payload length: {} ", frameConfig.getFramePayloadLength());
 
         if (frameConfig.getFramePayloadLength() == 0) {
             ID3_LOG_ERROR("findFrameSettings: Error, framesize = 0\n");
 
-            return expected::makeError<bool>(
-                "findFrameSettings: Error, framesize = 0\n");
-
+            return {};
         } else if (frameConfig.getFramePayloadLength() <
                    framePayloadToWrite.size())  // resize whole header
         {
-            return expected::makeError<bool>(
-                "Error, framesize does not fit\n");
+            std::cerr << "Error, framesize does not fit\n";
+            return false;
 
             const auto tagExtended = [&](){
                 const uint32_t extraLength =

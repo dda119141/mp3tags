@@ -110,7 +110,7 @@ class v00
             return {};
         }
 
-        expected::Result<buffer_t> UpdateFrameSize(buffer_t buffer,
+        std::optional<buffer_t> UpdateFrameSize(buffer_t buffer,
                                                  uint32_t extraSize,
                                                  uint32_t tagLocation) {
 
