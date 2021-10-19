@@ -159,8 +159,9 @@ namespace expected {
     template <typename T, typename E, typename Transform,
             typename Ret = typename std::result_of<Transform(T)>::type>
         auto operator | (const expected::Result_t<T, E>& r, Transform f)
-            -> typename std::enable_if_t<not std::is_integral<Ret>::value && not std::is_void<Ret>::value, Ret>
-    {
+            -> typename std::enable_if_t<!std::is_void<Ret>::value, Ret>
+	//	-> typename std::enable_if_t<!std::is_integral<Ret>::value && !std::is_void<Ret>::value, Ret>
+	{
             auto fuc = std::forward<Transform>(f);
 
             if (r.has_value()) {

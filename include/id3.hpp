@@ -28,9 +28,11 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 namespace id3 {
 
-#ifdef HAS_FS_EXPERIMENTAL
+#if defined(HAS_FS_EXPERIMENTAL)
 namespace filesystem = std::experimental::filesystem;
-#elif HAS_FS
+#elif defined(_MSVC_LANG )
+	namespace filesystem = std::filesystem;
+#elif defined(HAS_FS)
 namespace filesystem = std::filesystem;
 #endif
 
@@ -279,8 +281,8 @@ std::optional<bool> renameFile(const std::string& fileToRename,
     namespace fs = ::id3::filesystem;
 
     const fs::path FileToRenamePath =
-        fs::path(fs::system_complete(fileToRename));
-    const fs::path RenamedFilePath = fs::path(fs::system_complete(renamedFile));
+        fs::path(fs::absolute(fileToRename));
+    const fs::path RenamedFilePath = fs::path(fs::absolute(renamedFile));
 
     try {
         fs::rename(FileToRenamePath, RenamedFilePath);

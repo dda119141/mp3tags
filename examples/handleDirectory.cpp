@@ -14,7 +14,9 @@ struct DirectoryOptions {
     bool isEmpty() { return !(empty | remove ); }
 } DirectoryOption;
 
-namespace fs = std::experimental::filesystem;
+
+namespace fs = id3::filesystem;
+
 
 static bool deleteFiles(const fs::path& filePath)
 {
@@ -106,7 +108,12 @@ bool removePaths(const std::string& directory,
     using std::cout;
     using std::endl;
 
-    const std::string currentFilePath = fs::system_complete(directory);
+#ifdef HAS_FS_EXPERIMENTAL
+	const std::string currentFilePath = fs::system_complete(directory);
+#else
+	const std::string currentFilePath = fs::absolute(directory).string();
+#endif
+
     const fs::path mp3Path = fs::path(currentFilePath);
 
     if (!fs::exists(mp3Path)) {

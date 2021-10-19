@@ -51,7 +51,7 @@ const std::string GetId3v2Tag(
                             } else if (id3Version == "0x0000") {
                                 const id3v2::basicParameters paramLoc {
                                     fileName,
-                                    .tagVersion = id3v2::v00(),
+                                    id3v2::v00(),
                                     tag.second
                                 };
                                 return paramLoc;

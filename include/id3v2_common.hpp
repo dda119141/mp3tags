@@ -607,7 +607,7 @@ namespace id3v2
                 return NewTagArea.extendFile(framePayloadToWrite);
             };
 
-            return (tagExtended() | [&](const bool& val) {
+            return (tagExtended() | [&](bool val) {
                 return renameFile(params.filename + id3::modifiedEnding, params.filename);
             });
 

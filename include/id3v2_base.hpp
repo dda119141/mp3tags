@@ -8,7 +8,6 @@
 #include <sstream>
 #include <fstream>
 #include <variant>
-#include <experimental/filesystem>
 
 #include "id3.hpp"
 #include "logger.hpp"

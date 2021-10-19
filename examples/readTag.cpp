@@ -22,7 +22,11 @@ bool readTagsInFile(const std::string& mediafile,
     using std::cout;
     using std::endl;
 
+#ifdef HAS_FS_EXPERIMENTAL
     const std::string currentFilePath = fs::system_complete(mediafile);
+#else
+	const std::string currentFilePath = fs::absolute(mediafile).string();
+#endif
 
     const fs::path mp3Path = fs::path(currentFilePath);
     if (!fs::exists(mp3Path)) {
@@ -59,11 +63,12 @@ bool readTagsInFile(const std::string& mediafile,
 
 bool readTags(const std::string& directory,
                            const struct tagOptions& tags) {
-    namespace fs = std::experimental::filesystem;
+	namespace fs = id3::filesystem;
+
     using std::cout;
     using std::endl;
 
-    const std::string currentFilePath = fs::system_complete(directory);
+    const std::string currentFilePath = fs::absolute(directory).string();
 
     const fs::path mp3Path = fs::path(currentFilePath);
     if (!fs::exists(mp3Path)) {
