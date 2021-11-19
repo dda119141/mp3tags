@@ -150,7 +150,8 @@ public:
 template <typename T>
 buffer_t fillTagBufferWithPayload(T content, id3::buffer_t tagBuffer, const FrameSettings& frameConfig) {
 
-	assert(frameConfig.getFramePayloadLength() >= content.size());
+	ID3_PRECONDITION(frameConfig.getFramePayloadLength() >= content.size(), 
+		"Existing Frame Payload size < content size");
 
 	const auto PositionFramePayloadStart = frameConfig.getFramePayloadOffset();
 
@@ -239,7 +240,7 @@ std::optional<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
     id3::integral_unsigned_asserts<T> eval;
     eval();
 
-    assert(buffer->size() > num_of_bytes_in_hex);
+	ID3_PRECONDITION(buffer->size() > num_of_bytes_in_hex);
 
     std::stringstream stream_obj;
 
@@ -294,7 +295,7 @@ std::optional<uint32_t> GetTagSize(buffer_t buffer) {
 
     const auto val = id3::GetTagSize(buffer, pow_val, TagIndex);
 
-    assert(val > GetTagHeaderSize<uint32_t>());
+	ID3_PRECONDITION(val > GetTagHeaderSize<uint32_t>());
 
     return val;
 

@@ -275,7 +275,7 @@ bool WriteFile(const std::string& FileName, const std::string& content,
     std::for_each(content.begin(), content.end(),
                   [&filWrite](const char& n) { filWrite << n; });
 
-    assert(frameSettings.getFramePayloadLength() >= content.size());
+	ID3_PRECONDITION(frameSettings.getFramePayloadLength() >= content.size());
 
     for (uint32_t i = 0; i < (frameSettings.getFramePayloadLength() - content.size());
          ++i) {
@@ -312,14 +312,14 @@ const uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
     integral_unsigned_asserts<T> eval;
     eval();
 
-    assert(buffer->size() > num_of_bytes_in_hex);
+	ID3_PRECONDITION(buffer->size() > num_of_bytes_in_hex);
 
     auto version = 0;
     auto remaining = 0;
     auto bytes_to_add = num_of_bytes_in_hex;
     auto byte_to_pad = index;
 
-    assert(bytes_to_add >=0);
+	ID3_PRECONDITION(bytes_to_add >=0);
 
     while (bytes_to_add > 0) {
         remaining = (num_of_bytes_in_hex - bytes_to_add);
@@ -336,7 +336,7 @@ const uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
 std::string ExtractString(buffer_t buffer, uint32_t start,
 	uint32_t length) 
 {
-    assert((start + length) <= static_cast<uint32_t>(buffer->size()));
+	ID3_PRECONDITION((start + length) <= static_cast<uint32_t>(buffer->size()));
 
     if (static_cast<uint32_t>(buffer->size()) >= (start + length)) {
    
@@ -351,7 +351,7 @@ std::string ExtractString(buffer_t buffer, uint32_t start,
 uint32_t GetTagSizeDefault(buffer_t buffer,
                     uint32_t length, uint32_t startPosition = 0, bool BigEndian = false) {
 
-    assert((startPosition + length) <= static_cast<uint32_t>(buffer->size()));
+	ID3_PRECONDITION((startPosition + length) <= static_cast<uint32_t>(buffer->size()));
 
     using pair_integers = std::pair<uint32_t, uint32_t>;
     std::vector<uint32_t> power_values(length);

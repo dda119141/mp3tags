@@ -83,11 +83,11 @@ namespace id3
 #define ID3_PRECONDITION(expr, msg)                                     \
     if (!(expr))                                                            \
     {                                                                       \
-      ID3_THROW(std::runtime_error,                                     \
+      ID3_THROW(id3_error,                                     \
                     std::string("Precondition violation!\n") + msg +        \
                     "\n  " + __FILE__ + '(' + std::to_string(__LINE__) +    \
                     ")\n");                                               \
     }
 }
-#endif  // XEXCEPTION_HPP
+#endif  // 
 
