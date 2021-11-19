@@ -71,6 +71,7 @@ Supported Compilers
 The code is known to work on the following compilers:
 
 - GCC 7.4.0 (or later) ( with explicit C++17)
+- Visual C++ 2015
 
 
 Platforms
@@ -78,6 +79,7 @@ Platforms
 
  * Linux Ubuntu starting from Xenial
  * Windows (cygwin)
+ * Windows Visual Studio 2019
 
 
 **Development Status:** This code is still under development. First release is yet to happen. This code *will* evolve without regard to backwards compatibility.
