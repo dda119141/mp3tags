@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1.2)
 
-project(tag-read-writer VERSION 1.3.6)
+project(tagreader VERSION 1.3.6)
 
 # Provide path for scripts
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")

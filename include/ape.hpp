@@ -13,26 +13,27 @@ namespace ape {
 
 static const std::string modifiedEnding(".ape.mod");
 
-constexpr uint32_t GetTagFooterSize(void) { return 32; }
+constexpr uint32_t GetTagFooterSize(void) { return static_cast<uint32_t>(32); }
 
-constexpr uint32_t GetTagHeaderSize(void) { return 32; }
+constexpr uint32_t GetTagHeaderSize(void) { return static_cast<uint32_t>(32); }
 
-constexpr uint32_t OffsetFromFrameStartToFrameID(void) { return 8; }
+constexpr uint32_t OffsetFromFrameStartToFrameID(void) { return static_cast<uint32_t>(8); }
 
 typedef struct _frameConfig {
     uint32_t frameStartPosition;
     uint32_t frameContentPosition;
     uint32_t frameLength;
     std::string frameContent;
-} frameBlock_t;
+} frameProperties_t;
 
-const std::optional<std::string> extractTheTag(id3::buffer_t buffer,
+std::string extractTheTag(id3::buffer_t buffer,
                                                   uint32_t start,
                                                   uint32_t length) {
-    return id3::ExtractString<uint32_t>(buffer, start, length) |
-           [](id3::shared_string_t readTag) {
-               return id3::stripLeft(*readTag);
-           };
+	auto tagArea = id3::ExtractString(buffer, start, length);
+
+	auto tagAreaFinal = std::string(id3::stripLeft(tagArea));
+	
+	return tagAreaFinal;
 }
 
 std::optional<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
@@ -54,137 +55,94 @@ std::optional<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
     return ret;
 }
 
-struct tagReadWriter {
+class apeTagProperties {
 private:
-    std::once_flag m_once;
-    bool mValid;
-    const std::string& FileName;
-    uint32_t mfileSize;
-    uint32_t mVersion;
-    uint32_t mTagSize;
-    uint32_t mNumberOfFrames;
-    uint32_t mTagFooterBegin;
-    uint32_t mTagPayloadPosition;
-    uint32_t mTagStartPosition;
-    std::optional<id3::buffer_t> buffer;
+	std::once_flag m_once;
+	const std::string& FileName;
+	uint32_t mfileSize = 0;
+	uint32_t mTagSize = 0;
+	uint32_t mNumberOfFrames = 0;
+	uint32_t mTagFooterBegin = 0;
+	uint32_t mTagPayloadPosition = 0;
+	uint32_t mTagStartPosition = 0;
+	id3::buffer_t buffer = {};
 
-    const uint32_t getTagSize(std::ifstream& fRead, uint32_t bufferLength) {
-        auto tagLengthBuffer = std::make_shared<std::vector<unsigned char>>(bufferLength);
-        fRead.read(reinterpret_cast<char*>(tagLengthBuffer->data()),
-                   bufferLength);
+	const uint32_t getTagSize(std::ifstream& fRead, uint32_t bufferLength) {
+		auto tagLengthBuffer = std::make_shared<std::vector<unsigned char>>(bufferLength);
+		fRead.read(reinterpret_cast<char*>(tagLengthBuffer->data()),
+			bufferLength);
 
-        return id3::GetTagSizeDefault(tagLengthBuffer, bufferLength);
-    }
+		return id3::GetTagSizeDefault(tagLengthBuffer, bufferLength);
+	}
 
-    const id3::shared_string_t readString(std::ifstream& fRead, uint32_t bufferLength) {
-        assert(bufferLength > 0);
-        id3::buffer_t Buffer = std::make_shared<std::vector<unsigned char>>(bufferLength);
-        fRead.read(reinterpret_cast<char*>(Buffer->data()), bufferLength);
+	const std::string readString(std::ifstream& fRead, uint32_t bufferLength) {
 
-        const auto ret = id3::ExtractString<uint32_t>(Buffer, 0, bufferLength) |
-                         [](id3::shared_string_t readTag) {
-                             return readTag;
-                         };
-        return ret;
-    }
+		id3::buffer_t Buffer = std::make_shared<std::vector<unsigned char>>(bufferLength);
+		fRead.read(reinterpret_cast<char*>(Buffer->data()), bufferLength);
 
-    bool checkAPEtag(std::ifstream& fRead, uint32_t bufferLength,
-                     const std::string& tagToCheck) {
-        assert(tagToCheck.size() <= bufferLength);
+		return id3::ExtractString(Buffer, 0, bufferLength);
 
-        const auto stringToCheck = readString(fRead, bufferLength);
-        const bool ret = (*stringToCheck == tagToCheck);
-        if (!ret) {
-            ID3_LOG_WARN("error: {} and {}", *stringToCheck, tagToCheck);
-        }
+	}
 
-        return ret;
-    }
+	bool checkAPEtag(std::ifstream& fRead, uint32_t bufferLength,
+		const std::string& tagToCheck) {
+		assert(tagToCheck.size() <= bufferLength);
+		const auto stringToCheck = readString(fRead, bufferLength);
+
+		if (bool ret = (stringToCheck == tagToCheck);  !ret) {
+			ID3_LOG_WARN("error: {} and {}", stringToCheck, tagToCheck);
+		}
+		else {
+			return ret;
+		}
+	}
 
 public:
-    explicit tagReadWriter(const std::string& fileName,
-                           uint32_t id3v1TagSizeIfPresent)
-        : mValid(false),
-          FileName(fileName),
-          mfileSize(0),
-          mVersion(0),
-          mTagSize(0),
-          mNumberOfFrames(0),
-          mTagFooterBegin(0),
-          mTagPayloadPosition(0),
-          mTagStartPosition(0),
-          buffer({}) {
+	explicit apeTagProperties(const std::string& fileName,
+		uint32_t id3v1TagSizeIfPresent)
+		: FileName{ fileName }
+	{
         std::call_once(m_once, [this, &fileName, &id3v1TagSizeIfPresent]() {
-            bool Ok = false;
             uint32_t footerPreambleOffsetFromEndOfFile = 0;
 
             std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
-            if (!filRead.good()) {
-                ID3_LOG_ERROR("tagReadWriter: Error opening file {}", FileName);
-            } else {
-                Ok = true;
-            }
-            if (Ok) {
-                if (id3v1TagSizeIfPresent)
-                    footerPreambleOffsetFromEndOfFile =
-                        id3v1::GetTagSize() + ape::GetTagFooterSize();
-                else
-                    footerPreambleOffsetFromEndOfFile = ape::GetTagFooterSize();
+           
+			{
+				if (id3v1TagSizeIfPresent)
+					footerPreambleOffsetFromEndOfFile =
+					id3v1::GetTagSize() + ape::GetTagFooterSize();
+				else
+					footerPreambleOffsetFromEndOfFile = ape::GetTagFooterSize();
 
-                mfileSize = filRead.tellg();
-                mTagFooterBegin = mfileSize - footerPreambleOffsetFromEndOfFile;
-                filRead.seekg(mTagFooterBegin);
-
-                ID3_LOG_INFO("APE tag filename: {} start: {}", fileName,
-                             mTagFooterBegin);
-                constexpr uint32_t APEpreambleLength = 8;
-                if (!checkAPEtag(filRead, APEpreambleLength,
-                                 std::string("APETAGEX"))) {
-                    ID3_LOG_TRACE("APE tagReadWriter: APETAGEX is not there");
-                    Ok = false;
-                }
+				mfileSize = filRead.tellg();
+				mTagFooterBegin = mfileSize - footerPreambleOffsetFromEndOfFile;
+				filRead.seekg(mTagFooterBegin);
+			}
+            if (uint32_t APEpreambleLength = 8; !checkAPEtag(filRead, APEpreambleLength,
+                                std::string("APETAGEX"))) {
+				APE_THROW("APE apeTagProperties: APETAGEX is not there");
             }
-            if (Ok) {
-                mVersion = getTagSize(filRead, 4);
-                if ((mVersion != 1000) && (mVersion != 2000)) {
-                    ID3_LOG_ERROR("APE tagReadWriter Version: Version = {}",
-                                  mVersion);
-                    ID3_LOG_ERROR("fRead Pos: {}", (uint32_t)filRead.tellg());
-                    Ok = false;
-                }
+            if (uint32_t mVersion = getTagSize(filRead, 4); (mVersion != 1000) && (mVersion != 2000)) {
+				APE_THROW("APE apeTagProperties Version: Version = {}",
+                                mVersion);
             }
-            if (Ok) {
-                mTagSize = getTagSize(filRead, 4);
-                assert(mTagSize > 0);
-                if (mTagSize == 0) {
-                    ID3_LOG_ERROR("APE tagReadWriter: tagsize = 0");
-                    ID3_LOG_ERROR("fRead Pos: {}", (uint32_t)filRead.tellg());
-                    Ok = false;
-                }
+            if (uint32_t mTagSize = getTagSize(filRead, 4); mTagSize == 0) {
+				APE_THROW("APE apeTagProperties: tagsize = 0");
             }
-            if (Ok) {
-                mNumberOfFrames = getTagSize(filRead, 4);
-                assert(mNumberOfFrames > 0);
-                if (mNumberOfFrames == 0) {
-                    ID3_LOG_WARN("APE tagReadWriter: No frame!");
-                    Ok = false;
-                }
+            if (uint32_t mNumberOfFrames = getTagSize(filRead, 4); mNumberOfFrames == 0) {
+				APE_THROW("APE apeTagProperties: No frame!");
             }
-                if (Ok) {
-                    mTagStartPosition = mTagFooterBegin - mTagSize;
 
-                    mTagPayloadPosition =
-                        mTagFooterBegin + GetTagFooterSize() - mTagSize;
+            mTagStartPosition = mTagFooterBegin - mTagSize;
 
-                    filRead.seekg(mTagStartPosition);
-                    auto buffer1 = std::make_shared<std::vector<unsigned char>>(
-                        mTagSize + GetTagFooterSize(), '0');
-                    filRead.read(reinterpret_cast<char*>(buffer1->data()),
-                                 mTagSize + GetTagFooterSize());
+            mTagPayloadPosition =
+                mTagFooterBegin + GetTagFooterSize() - mTagSize;
 
-                    mValid = true;
-                    buffer = buffer1;
-                }
+            filRead.seekg(mTagStartPosition);
+            buffer = std::make_shared<std::vector<unsigned char>>(
+                mTagSize + GetTagFooterSize(), '0');
+            filRead.read(reinterpret_cast<char*>(buffer->data()),
+                            mTagSize + GetTagFooterSize());
         });
     }
 
@@ -192,285 +150,252 @@ public:
     const uint32_t getTagStartPosition() const { return mTagStartPosition; }
     const uint32_t getTagFooterBegin() const { return mTagFooterBegin; }
     const uint32_t getFileLength() const { return mfileSize; }
-    std::optional<id3::buffer_t> GetBuffer() const { return buffer; }
-
-    bool IsValid() const { return mValid; }
+    id3::buffer_t GetBuffer() const { return buffer; }
 };
 
-struct tagReader {
-private:
-    std::once_flag m_once;
-    bool mValid;
-    const std::string& filename;
-    std::string_view tagKey;
-    std::optional<id3::buffer_t> mBuffer;
-    std::unique_ptr<tagReadWriter> tagRW;
+class tagReader {
 
 public:
-    explicit tagReader(const std::string& FileName, std::string_view TagKey)
-        : mValid(false), filename(FileName), tagKey(TagKey), mBuffer({}) {
-        std::call_once(m_once, [this]() {
-            tagRW = std::make_unique<tagReadWriter>(filename, true);
-            if (!tagRW->IsValid()) {
-                tagRW.reset(new tagReadWriter(filename, false));
-                if (!tagRW->IsValid()) {
-                    ID3_LOG_TRACE("ape not valid!");
-                } else {
-                    ID3_LOG_TRACE("tagReadWriter with no id3v1 exists!");
-                }
-            } else {
-                ID3_LOG_TRACE("tagReadWriter with id3v1 exists!");
-            }
+	explicit tagReader(const std::string& FileName, std::string_view FrameID)
+		: filename{FileName}, frameID{ FrameID }
+	{
+		std::call_once(m_once, [this]() {
+			bool bContinue = true;
 
-            if (!tagRW->GetBuffer().has_value()) {
-                ID3_LOG_TRACE("ape not valid!");
-            } else {
-                mValid = true;
-            }
-     });
-    }
+			try {
+				tagProperties = std::make_unique<apeTagProperties>(filename, true);				
+			}
+			catch (const id3::ape_error & e) {
+				bContinue = false;
+			}
+			if(!bContinue){ // id3v1 not present
+				try {
+					tagProperties.reset(new apeTagProperties(filename, false));
+				}
+				catch (const id3::ape_error& e) {
+					bContinue = false;
+					APE_THROW("ape not valid!");
+				}
+			}			
+			if (bContinue) {
+				getFrameProperties();
+			}
+			});
+	}
 
-    const expected::Result<frameBlock_t> getFrameBlock() const {
-        if (!mValid)
-            return expected::makeError<frameBlock_t>("getFrameBlock object not valid");
+	const std::string getFramePayload(void) const
+	{
+		return frameProperties->frameContent;
+	}
 
-        auto buffer = tagRW->GetBuffer().value();
+	const std::optional<bool> writeFramePayload(std::string_view framePayload,
+		uint32_t start, uint32_t length) const 
+	{
+		if (framePayload.size() > length) {
+			APE_THROW("framePayload length too big for frame area");
+		}
 
-        ID3_LOG_TRACE("getFrameBlock object valid - size: {}", buffer->size());
+		const auto frameGlobalConfig = FrameSettings::create()
+			->with_frameID_offset(frameProperties->frameStartPosition + OffsetFromFrameStartToFrameID())
+			.with_framecontent_offset(frameProperties->frameContentPosition)
+			.with_frame_length(frameProperties->frameLength);
 
-        return id3::ExtractString<uint32_t>(buffer, 0, buffer->size()) |
-               [&](id3::shared_string_t tagArea) {
+		if (frameProperties->frameLength >= framePayload.size()) {
 
-                   constexpr uint32_t frameKeyTerminatorLength = 1;
-                   auto searchTagPosition =
-                       id3::search_tag<std::string_view>(*tagArea);
-                   const auto frameKeyPosition = searchTagPosition(tagKey);
-                   const uint32_t frameContentPosition =
-                       frameKeyPosition.has_value()
-                           ? frameKeyPosition.value() + tagKey.size() +
-                                 frameKeyTerminatorLength
-                           : 0;
+			return WriteFile(filename, std::string(framePayload),
+				frameGlobalConfig);
+		}
+		else {
+			const uint32_t additionalSize = framePayload.size() - frameProperties->frameLength;
 
-                   if (!frameContentPosition) {
-                       ID3_LOG_TRACE("position not found: {} for tag name: #{}",
-                                     frameContentPosition, std::string(tagKey));
-                       return expected::makeError<frameBlock_t>()
-                              << "frame Key: " << std::string(tagKey)
-                              << " could not be found\n";
-                   }
+			const auto writeBackAction = extendTagBuffer(frameGlobalConfig, framePayload, additionalSize) |
+				[&](id3::buffer_t buffer) {
+				return this->ReWriteFile(buffer);
+			};
 
-                   ID3_LOG_TRACE("key position found: {} for tag name: #{}",
-                                 frameKeyPosition.value(), std::string(tagKey));
+			return writeBackAction | [&](bool fileWritten) {
+				return id3::renameFile(filename + ape::modifiedEnding, filename);
+			};
+		}
+	}
 
-                   frameBlock_t frameConfig = {0};
-                   assert(frameKeyPosition.value() >= OffsetFromFrameStartToFrameID());
+	/* function not thread safe */
+	expected::Result<bool> ReWriteFile(id3::buffer_t buff) const 
+	{
+		const uint32_t endOfFooter = tagProperties->getTagFooterBegin() + GetTagFooterSize();
 
-                   const uint32_t frameStartPosition =
-                       frameKeyPosition.value() - OffsetFromFrameStartToFrameID();
-                   const uint32_t frameLength =
-                       id3::GetTagSizeDefault(buffer, 4, frameStartPosition);
-                   ID3_LOG_TRACE("key #{} - Frame length: {}",
-                                 std::string(tagKey), frameLength);
+		std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
 
-                   frameConfig.frameContentPosition =
-                       frameContentPosition + tagRW->getTagStartPosition();
-                   frameConfig.frameStartPosition =
-                       frameStartPosition + tagRW->getTagStartPosition();
-                   frameConfig.frameLength = frameLength;
+		const uint32_t fileSize = filRead.tellg();
+		assert(fileSize >= endOfFooter);
+		const uint32_t endLength = fileSize - endOfFooter;
 
-                   if (!frameContentPosition) {
-                       return expected::makeError<frameBlock_t>()
-                              << "frame Key: " << std::string(tagKey)
-                              << " - Wrong frameLength\n";
-                       ID3_LOG_ERROR("framelength: {} for tag name: #{}",
-                                     frameLength, std::string(tagKey));
-                   }
+		/* read in bytes from footer end until audio file end */
+		std::vector<uint8_t> bufFooter;
+		bufFooter.reserve((endLength));
+		filRead.seekg(endOfFooter);
+		filRead.read(reinterpret_cast<char*>(&bufFooter[0]), endLength);
 
-                   const auto frameContent =
-                       extractTheTag(buffer, frameContentPosition, frameLength);
-                   if (frameContent.has_value()) {
-                       frameConfig.frameContent = frameContent.value();
-                   } else {
-                       frameConfig.frameContent = "";
-                   }
+		/* read in bytes from audio file start end until ape area start */
+		std::vector<uint8_t> bufHeader;
+		bufHeader.reserve((tagProperties->getTagStartPosition()));
+		filRead.seekg(0);
+		filRead.read(reinterpret_cast<char*>(&bufHeader[0]),
+			tagProperties->getTagStartPosition());
 
-                   return expected::makeValue<frameBlock_t>(frameConfig);
-               };
-    }
+		filRead.close();
 
-    const std::optional<bool> writeFramePayload(std::string_view framePayload,
-                                           uint32_t start, uint32_t length) const {
-        if (framePayload.size() > length) {
-            throw std::runtime_error(
-                "framePayload length too big foe frame area");
-        }
+		const std::string writeFileName =
+			filename + ::ape::modifiedEnding;
+		ID3_LOG_INFO("file to write: {}", writeFileName);
 
-        const auto frameConfig = this->getFrameBlock();
+		std::ofstream filWrite(writeFileName, std::ios::binary | std::ios::app);
 
-        if (!frameConfig.has_value()) {
-            ID3_LOG_TRACE("Could not retrieve Key");
-            return {};
-        } else {
-            const auto frameGlobalConfig = id3::FrameSettings()
-                .with_frameID_offset(frameConfig.value().frameStartPosition + OffsetFromFrameStartToFrameID())
-                .with_framecontent_offset(frameConfig.value().frameContentPosition)
-                .with_frame_length(frameConfig.value().frameLength);
+		filWrite.seekp(0);
+		std::for_each(std::begin(bufHeader),
+			std::begin(bufHeader) + tagProperties->getTagStartPosition(),
+			[&filWrite](const char& n) { filWrite << n; });
 
-            if (frameConfig.value().frameLength >= framePayload.size()) {
+		filWrite.seekp(tagProperties->getTagStartPosition());
+		std::for_each(std::begin(*buff), std::end(*buff),
+			[&filWrite](const char& n) { filWrite << n; });
 
-                return WriteFile(filename, std::string(framePayload),
-                                 frameGlobalConfig);
-            } else {
-                const uint32_t additionalSize = framePayload.size() - frameConfig.value().frameLength;
+		filWrite.seekp(endOfFooter);
+		std::for_each(bufFooter.begin(), bufFooter.begin() + endLength,
+			[&filWrite](const char& n) { filWrite << n; });
 
-                const auto writeBackAction = extendTagBuffer(frameGlobalConfig, framePayload, additionalSize) |
-                    [&](id3::buffer_t buffer) {
-                        return this->ReWriteFile(buffer);
-                    };
+		return expected::makeValue<bool>(true);
+	}
 
-                return writeBackAction | [&](bool fileWritten) {
-                    return id3::renameFile(filename + ape::modifiedEnding, filename);
-                };
-            }
-        }
-    }
+	const expected::Result<id3::buffer_t> extendTagBuffer(
+		const id3::FrameSettings& frameConfig, std::string_view framePayload, uint32_t additionalSize) const {
 
-    expected::Result<bool> ReWriteFile(id3::buffer_t buff) const {
-        const uint32_t endOf = tagRW->getTagFooterBegin() + GetTagFooterSize();
+		const uint32_t relativeBufferPosition = tagProperties->getTagStartPosition();
+		const uint32_t tagsSizePositionInHeader =
+			tagProperties->getTagStartPosition() - relativeBufferPosition + 12;
+		const uint32_t tagsSizePositionInFooter =
+			tagProperties->getTagFooterBegin() - relativeBufferPosition + 12;
+		const uint32_t frameSizePositionInFrameHeader =
+			frameConfig.getFrameKeyOffset() - OffsetFromFrameStartToFrameID() - relativeBufferPosition;
+		const uint32_t frameContentStart =
+			frameConfig.getFramePayloadOffset() - relativeBufferPosition;
 
-        std::ifstream filRead(filename, std::ios::binary | std::ios::ate);
-       
-        const uint32_t fileSize = filRead.tellg();
-        assert(fileSize >= endOf);
-        const uint32_t endLength = fileSize - endOf;
+		auto cBuffer = tagProperties->GetBuffer();
 
-        std::vector<uint8_t> bufFooter;
-        bufFooter.reserve((endLength));
-        if (endLength > 0) {
-            filRead.seekg(endOf);
-            filRead.read(reinterpret_cast<char*>(&bufFooter[0]), endLength);
-        }
+		const auto tagSizeBuff =
+			UpdateFrameSize(cBuffer, additionalSize, tagsSizePositionInHeader);
 
-        std::vector<uint8_t> bufHeader;
-        bufHeader.reserve((tagRW->getTagStartPosition()));
-        filRead.seekg(0);
-        filRead.read(reinterpret_cast<char*>(&bufHeader[0]),
-                     tagRW->getTagStartPosition());
+		const auto frameSizeBuff = UpdateFrameSize(cBuffer, additionalSize,
+			frameSizePositionInFrameHeader);
 
-        filRead.close();
+		assert(frameConfig.getFramePayloadLength() <= cBuffer->size());
 
-        const std::string writeFileName =
-            filename + ::ape::modifiedEnding;
-        ID3_LOG_INFO("file to write: {}", writeFileName);
+		auto finalBuffer = std::move(cBuffer);
 
-        std::ofstream filWrite(writeFileName, std::ios::binary | std::ios::app);
+		id3::replaceElementsInBuff(frameSizeBuff.value(), finalBuffer,
+			frameSizePositionInFrameHeader);
 
-        filWrite.seekp(0);
-        std::for_each(std::begin(bufHeader),
-                      std::begin(bufHeader) + tagRW->getTagStartPosition(),
-                      [&filWrite](const char& n) { filWrite << n; });
+		id3::replaceElementsInBuff(tagSizeBuff.value(), finalBuffer,
+			tagsSizePositionInHeader);
 
-        filWrite.seekp(tagRW->getTagStartPosition());
-        std::for_each(std::begin(*buff), std::end(*buff),
-                      [&filWrite](const char& n) { filWrite << n; });
+		id3::replaceElementsInBuff(tagSizeBuff.value(), finalBuffer,
+			tagsSizePositionInFooter);
 
-        filWrite.seekp(endOf);
-        std::for_each(bufFooter.begin(), bufFooter.begin() + endLength,
-                      [&filWrite](const char& n) { filWrite << n; });
+		auto it = finalBuffer->begin() + frameContentStart +
+			frameConfig.getFramePayloadLength();
+		finalBuffer->insert(it, additionalSize, 0);
 
-        return expected::makeValue<bool>(true);
-    }
+		const auto iter = std::begin(*finalBuffer) + frameContentStart;
+		std::transform(iter, iter + framePayload.size(), framePayload.begin(), iter,
+			[](char a, char b) { return b; });
 
-    const expected::Result<id3::buffer_t> extendTagBuffer(
-        const id3::FrameSettings& frameConfig, std::string_view framePayload, uint32_t additionalSize) const {
+		return expected::makeValue<id3::buffer_t>(finalBuffer);
+	}
 
-        const uint32_t relativeBufferPosition = tagRW->getTagStartPosition();
-        const uint32_t tagsSizePositionInHeader =
-            tagRW->getTagStartPosition() - relativeBufferPosition + 12;
-        const uint32_t tagsSizePositionInFooter =
-            tagRW->getTagFooterBegin() - relativeBufferPosition + 12;
-        const uint32_t frameSizePositionInFrameHeader =
-            frameConfig.getFrameKeyOffset() - OffsetFromFrameStartToFrameID() - relativeBufferPosition;
-        const uint32_t frameContentStart =
-            frameConfig.getFramePayloadOffset() - relativeBufferPosition;
+private:
+    std::once_flag m_once;
+    const std::string& filename;
+    std::string_view frameID;
+    std::unique_ptr<apeTagProperties> tagProperties;
+	std::unique_ptr<frameProperties_t> frameProperties = {};
 
-        if (!tagRW->GetBuffer().has_value()) {
-            ID3_LOG_ERROR("No buffer!...");
-            return expected::makeError<id3::buffer_t>("ape:extendTagBuffer - No buffer");
-        }
-        auto cBuffer = tagRW->GetBuffer().value();
+	void getFrameProperties()
+	{
+		auto buffer = tagProperties->GetBuffer();
 
-        const auto tagSizeBuff =
-            UpdateFrameSize(cBuffer, additionalSize, tagsSizePositionInHeader);
+		const auto tagArea = id3::ExtractString(buffer, 0, buffer->size());
 
-        const auto frameSizeBuff = UpdateFrameSize(cBuffer, additionalSize,
-                                                   frameSizePositionInFrameHeader);
+		constexpr uint32_t frameKeyTerminatorLength = 1;
+		auto searchFramePosition = id3::searchFrame<std::string_view>(tagArea);
+		const auto frameIDPosition = searchFramePosition(frameID);
+		const uint32_t frameContentPosition =
+			frameIDPosition + frameID.size() + frameKeyTerminatorLength;
 
-        assert(frameConfig.getFramePayloadLength() <= cBuffer->size());
+		if (!frameContentPosition) {
+			APE_THROW("frameContentPosition = 0");
+		}
+		if (frameIDPosition < OffsetFromFrameStartToFrameID()) {
+			APE_THROW("Frame ID position < OffsetFromFrameStartToFrameID")
+		}
 
-        auto finalBuffer = std::move(cBuffer);
+		const uint32_t frameStartPosition =
+			frameIDPosition - OffsetFromFrameStartToFrameID();
+		const uint32_t frameLength =
+			id3::GetTagSizeDefault(buffer, 4, frameStartPosition);
 
-        id3::replaceElementsInBuff(frameSizeBuff.value(), finalBuffer,
-                                   frameSizePositionInFrameHeader);
+		frameProperties = std::make_unique<frameProperties_t>();
+		frameProperties->frameContentPosition = frameContentPosition + tagProperties->getTagStartPosition();
+		frameProperties->frameStartPosition = frameStartPosition + tagProperties->getTagStartPosition();
+		frameProperties->frameLength = frameLength;
 
-        id3::replaceElementsInBuff(tagSizeBuff.value(), finalBuffer,
-                                   tagsSizePositionInHeader);
+		frameProperties->frameContent = extractTheTag(buffer, frameContentPosition, frameLength);
 
-        id3::replaceElementsInBuff(tagSizeBuff.value(), finalBuffer,
-                                   tagsSizePositionInFooter);
-
-        ID3_LOG_TRACE("frame Key Offset {}...", frameConfig.getFrameKeyOffset());
-        auto it = finalBuffer->begin() + frameContentStart +
-                  frameConfig.getFramePayloadLength();
-        finalBuffer->insert(it, additionalSize, 0);
-
-        const auto iter = std::begin(*finalBuffer) + frameContentStart;
-        std::transform(iter, iter + framePayload.size(), framePayload.begin(), iter,
-                       [](char a, char b) { return b; });
-
-        return expected::makeValue<id3::buffer_t>(finalBuffer);
-    }
-
+	}
 };  // class tagReader
 
 
 const expected::Result<std::string> getFramePayload(const std::string& filename,
-                                           std::string_view tagKey) {
-    const tagReader TagR{filename, tagKey};
-    const auto ret = TagR.getFrameBlock();
-    if (ret.has_value()) {
-        return expected::makeValue<std::string>(ret.value().frameContent);
-    } else {
-        ID3_LOG_WARN("Tag {} Not found", std::string(tagKey));
-        return expected::makeError<std::string>("Not found");
-    }
+                                           std::string_view frameID) {
+	try {
+		const tagReader TagR{ filename, frameID };
+		
+		return expected::makeValue<std::string>(TagR.getFramePayload());
+	}
+	catch (id3::audio_tag_error& e) {
+		//std::cerr << e.what();
+		return expected::makeError<std::string>("Not found");
+	}
 }
 
-const std::optional<bool> setFramePayload(const std::string& filename, std::string_view tagKey,
+const std::optional<bool> setFramePayload(const std::string& filename, std::string_view frameID,
     std::string_view framePayload) {
 
-    const tagReader TagR{filename, tagKey};
+	try {
+		const tagReader TagR{filename, frameID};
 
-    return TagR.writeFramePayload(framePayload, 0, framePayload.size());
+		return TagR.writeFramePayload(framePayload, 0, framePayload.size());
+	}
+	catch (const id3::audio_tag_error& e) {
+		return false;
+	}
 }
 
-
 const expected::Result<std::string> GetTitle(const std::string& filename) {
-    std::string_view tagKey("TITLE");
+    std::string_view frameID("TITLE");
 
-    return getFramePayload(filename, tagKey);
+    return getFramePayload(filename, frameID);
 }
 
 const expected::Result<std::string> GetLeadArtist(const std::string& filename) {
-    std::string_view tagKey("ARTIST");
+    std::string_view frameID("ARTIST");
 
-    return getFramePayload(filename, tagKey);
+    return getFramePayload(filename, frameID);
 }
 
 const expected::Result<std::string> GetAlbum(const std::string& filename) {
-    std::string_view tagKey("ALBUM");
+    std::string_view frameID("ALBUM");
 
-    return getFramePayload(filename, tagKey);
+    return getFramePayload(filename, frameID);
 }
 
 const expected::Result<std::string> GetYear(const std::string& filename) {

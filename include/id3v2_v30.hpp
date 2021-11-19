@@ -1,7 +1,7 @@
 #ifndef _ID3V2_230
 #define _ID3V2_230
 
-#include <id3v2_base.hpp>
+#include <id3.hpp>
 
 namespace id3v2
 {
@@ -50,18 +50,18 @@ class v30
                 ,"TYER"//      [#TYER Year]
         };
 #endif
-        constexpr auto FrameIDSize(void)
+        constexpr unsigned int FrameIDSize(void)
         {
-            return ::id3::RetrieveSize(4);
+            return 4;
         }
 
-        constexpr auto FrameHeaderSize(void)
+        constexpr unsigned int FrameHeaderSize(void)
         {
-            return ::id3::RetrieveSize(10);
+            return 10;
         }
 
 
-        std::optional<uint32_t> GetFrameSize(buffer_t buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 

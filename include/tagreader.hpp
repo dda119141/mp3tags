@@ -33,47 +33,54 @@ const std::string GetId3v2Tag(
                 {
                         const auto params = [&](){
                             if (id3Version == "0x0300") {
-                                const id3v2::basicParameters paramLoc {
-                                    fileName,
-                                    id3v2::v30(),
-                                    tag.second
-                                };
+								const auto paramLoc = id3v2::basicParameters {
+									fileName
+									,id3v2::v30() // Tag version
+									,tag.second // Frame ID
+								};
+
                                 return paramLoc;
 
                             } else if (id3Version == "0x0400") {
-                                const id3v2::basicParameters paramLoc {
-                                    fileName,
-                                    id3v2::v40(),
-                                    tag.second
-                                };
-                                return paramLoc;
+								const auto paramLoc = id3v2::basicParameters{
+									fileName
+									,id3v2::v40() // Tag version
+									,tag.second // Frame ID
+								};
 
-                            } else if (id3Version == "0x0000") {
-                                const id3v2::basicParameters paramLoc {
-                                    fileName,
-                                    id3v2::v00(),
-                                    tag.second
-                                };
-                                return paramLoc;
+								return paramLoc;
+							
+							} else if (id3Version == "0x0000") {
+								const auto paramLoc = id3v2::basicParameters{
+									fileName
+									,id3v2::v00() // Tag version
+									,tag.second // Frame ID
+								};
 
-                            } else {
+								return paramLoc;
+
+							} else {
                                 const id3v2::basicParameters paramLoc { std::string("") } ;
                                 return paramLoc;
                             }
                         };
                     try {
-                        id3v2::TagReadWriter<std::string> obj(params());
+                        id3v2::TagReadWriter obj(params());
 
-                        const auto found = obj.getFramePayload<std::string>().value();
+                        const auto found = obj.getFramePayload();
                         return id3::stripLeft(found);
 
                     } catch (const std::runtime_error& e) {
                         std::cout << e.what();
                     }
+					catch (const id3::audio_tag_error & e) {
+						std::cout << e.what();
+					}
+
                 }
             }
 
-            return std::string(" :No value");
+            return std::string("");
         };
 
     return ret;

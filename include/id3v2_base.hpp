@@ -10,14 +10,216 @@
 #include <variant>
 
 #include "id3.hpp"
+#include <id3v2_v30.hpp>
+#include <id3v2_v40.hpp>
+#include <id3v2_v00.hpp>
+
 #include "logger.hpp"
 
 
 namespace id3v2 {
 
+using iD3Variant = std::variant <::id3v2::v00, ::id3v2::v30, ::id3v2::v40>;
+
 using namespace id3;
 
-const auto GetStringFromFile(const std::string& FileName, uint32_t num) {
+class basicParameters {
+private:
+	const std::string& filename;
+	std::string_view frameID = {};
+	const iD3Variant tagVersion;
+
+	buffer_t tagBuffer = {};
+	FrameSettings frameSettings = {};
+	std::string tagArea = {};
+	std::string_view framePayload = {};
+
+	basicParameters() = default;
+
+public:
+	explicit basicParameters(const std::string& Filename,
+		const iD3Variant& TagVersion
+		, std::string_view FrameID) :
+		filename(Filename)
+		, tagVersion(TagVersion)
+		, frameID(FrameID)
+	{
+	}
+
+	explicit basicParameters(const std::string& Filename,
+		const iD3Variant& TagVersion
+		, std::string_view FrameID
+		, std::string_view content) :
+		filename{ Filename }
+		, tagVersion{ TagVersion }
+		, frameID{ FrameID }
+		, framePayload{ content }
+	{
+	}
+
+	explicit basicParameters(const std::string& Filename,
+		const iD3Variant& TagVersion) :
+		tagVersion{ TagVersion }
+		, filename{ Filename }
+	{
+	}
+
+	explicit basicParameters(const std::string& Filename)
+	
+		: filename{ Filename }
+	{
+	}
+
+	const iD3Variant& get_tag_version() const
+	{
+		return tagVersion;
+	}
+
+	const std::string_view& get_frame_id() const
+	{
+		return frameID;
+	}
+
+	const std::string& get_filename() const
+	{
+		return filename;
+	}
+
+	basicParameters& with_frame_id(std::string_view FrameID)
+	{
+		frameID = FrameID;
+
+		return *this;
+	}
+
+	basicParameters& with_frame_payload(std::string_view FramePayload)
+	{
+		framePayload = FramePayload;
+
+		return *this;
+	}
+
+	const FrameSettings& get_frame_settings() const
+	{
+		return frameSettings;
+	}
+
+	std::string get_tag_area() const
+	{
+		return this->tagArea;
+	}
+
+	buffer_t get_tag_Buffer() const
+	{
+		return this->tagBuffer;
+	}
+
+	std::string_view get_frame_content_to_write() const
+	{
+		return this->framePayload;
+	}
+
+	basicParameters with_frame_settings(const FrameSettings& FrameSettings) const &
+	{
+		basicParameters obj(*this);
+
+		obj.frameSettings = FrameSettings;
+
+		return obj;
+	}
+	
+	basicParameters with_tag_area(const std::string& TagArea) &&
+	{
+		basicParameters obj(std::move(*this));
+
+		obj.tagArea = TagArea;
+
+		return obj;
+	}
+
+	basicParameters with_tag_buffer(buffer_t TagBuffer)	&&
+	{
+		basicParameters obj(std::move(*this));
+
+		obj.tagBuffer = TagBuffer;
+
+		return obj;
+	}
+};
+
+template <typename T>
+buffer_t fillTagBufferWithPayload(T content, id3::buffer_t tagBuffer, const FrameSettings& frameConfig) {
+
+	assert(frameConfig.getFramePayloadLength() >= content.size());
+
+	const auto PositionFramePayloadStart = frameConfig.getFramePayloadOffset();
+
+	id3::log()->info(" PositionTagStart: {}", PositionFramePayloadStart);
+
+	const auto payload_start_index = std::begin(*tagBuffer) + PositionFramePayloadStart;
+
+	std::transform(payload_start_index, payload_start_index + content.size(), content.begin(), payload_start_index,
+		[](char a, char b) { return b; });
+
+	std::transform(payload_start_index + content.size(), payload_start_index + frameConfig.getFramePayloadLength(),
+		content.begin(), payload_start_index + content.size(),
+		[](char a, char b) { return 0x00; });
+
+	return tagBuffer;
+}
+
+template <typename T>
+std::optional<T> GetFrameSize(buffer_t buff,
+	const iD3Variant& TagVersion,
+	uint32_t framePos) {
+	return std::visit(
+		overloaded{ [&](id3v2::v30 arg) {
+					   return arg.GetFrameSize(buff, framePos);
+				   },
+				   [&](id3v2::v40 arg) {
+					   return arg.GetFrameSize(buff, framePos);
+				   },
+				   [&](id3v2::v00 arg) {
+					   return arg.GetFrameSize(buff, framePos);
+				   } },
+		TagVersion);
+}
+
+uint32_t GetFrameHeaderSize(const iD3Variant& TagVersion) {
+	return std::visit(
+		overloaded{ [&](id3v2::v30 arg) { return arg.FrameHeaderSize(); },
+				   [&](id3v2::v40 arg) { return arg.FrameHeaderSize(); },
+				   [&](id3v2::v00 arg) { return arg.FrameHeaderSize(); } },
+		TagVersion);
+}
+
+std::optional<buffer_t> UpdateFrameSize(buffer_t buffer,
+	uint32_t extraSize,
+	uint32_t frameIDPosition) {
+
+	const uint32_t frameSizePositionInArea = frameIDPosition + 4;
+	constexpr uint32_t frameSizeLengthInArea = 4;
+	constexpr uint32_t frameSizeMaxValuePerElement = 127;
+
+	return updateAreaSize<uint32_t>(
+		buffer, extraSize, frameSizePositionInArea, frameSizeLengthInArea,
+		frameSizeMaxValuePerElement);
+}
+
+template <typename... Args>
+std::optional<buffer_t> updateFrameSizeIndex(const iD3Variant& TagVersion,
+	Args... args)
+{
+	return std::visit(
+		overloaded{
+			[&](id3v2::v30 arg) { return UpdateFrameSize(args...); },
+			[&](id3v2::v40 arg) { return UpdateFrameSize(args...); },
+			[&](id3v2::v00 arg) { return arg.UpdateFrameSize(args...); } },
+			TagVersion);
+}
+
+
+const auto CreateTagBufferFromFile(const std::string& FileName, uint32_t num) {
     std::ifstream fil(FileName);
     auto buffer = std::make_shared<std::vector<unsigned char>>(num, '0');
 
@@ -132,19 +334,16 @@ const auto GetTagSizeExclusiveHeader(buffer_t buffer) {
 
 std::optional<buffer_t> GetTagHeader(const std::string& FileName) {
     auto val =
-        GetStringFromFile(FileName, GetTagHeaderSize<uint32_t>());
+        CreateTagBufferFromFile(FileName, GetTagHeaderSize<uint32_t>());
 
     return val;
 }
 
-std::optional<shared_string_t> GetTagArea(buffer_t buffer) {
+std::string GetTagArea(buffer_t buffer) {
 
     const auto totalSize = GetTotalTagSize(buffer);
 
-    const auto tagArea = ExtractString<uint32_t>(buffer,
-             0, totalSize);
-
-    return tagArea;
+    return ExtractString(buffer, 0, totalSize);
 }
 
 template <typename T>
@@ -180,11 +379,11 @@ void GetTagNames(void) {
     return id3Type::tag_names;
 };
 
-std::optional<shared_string_t> GetID3FileIdentifier(buffer_t buffer) {
+std::string GetID3FileIdentifier(buffer_t buffer) {
     constexpr auto FileIdentifierStart = 0;
     constexpr auto FileIdentifierLength = 3;
 
-    return ExtractString<uint32_t>(buffer, FileIdentifierStart,
+    return ExtractString(buffer, FileIdentifierStart,
                                              FileIdentifierLength);
 
 #ifdef __TEST_CODE

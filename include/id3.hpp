@@ -21,12 +21,14 @@
 #include "logger.hpp"
 //#include "result.hpp"
 #include "tagfilesystem.hpp"
+#include "id3_exceptions.hpp"
 
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 
 namespace id3 {
+
 
 #if defined(HAS_FS_EXPERIMENTAL)
 namespace filesystem = std::experimental::filesystem;
@@ -42,66 +44,18 @@ using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
 /* Frame settings */
+
+class FramePropertiesBuilder; //forward declaration
+
 class FrameSettings {
     
 public:
     FrameSettings() {}
 
-    FrameSettings& with_frameID_offset(uint32_t id_offset)
-    {
-        frameIDStartPosition = id_offset;
-        return *this;
-    }
-
-    FrameSettings& with_frameID_length(uint32_t length)
-    {
-        frameIDLength = length;
-        return *this;
-    }
-
-
-    FrameSettings& with_framecontent_offset(uint32_t payload_offset)
-    {
-        frameContentStartPosition = payload_offset;
-        return *this;
-    }
-
-    FrameSettings& with_frame_length(uint32_t frame_length)
-    {
-        frameLength = frame_length;
-        return *this;
-    }
-
-    FrameSettings& with_encode_flag(uint32_t encode_flag)
-    {
-        encodeFlag = encode_flag;
-        return *this;
-    }
-
-    FrameSettings& with_do_swap(uint32_t dSwap)
-    {
-        doSwap = dSwap;
-        return *this;
-    }
-
-    FrameSettings with_additional_payload_size(uint32_t additionalPayload)
-    {
-        this->frameLength += additionalPayload;
-        this->framePayloadLength += additionalPayload;
-        return *this;
-    }
-
-    FrameSettings& with_audio_buffer(buffer_t audio_Buffer)
-    {
-        audioBuffer = audio_Buffer;
-        return *this;
-    }
-
-    FrameSettings& with_tag_buffer(buffer_t tag_Buffer)
-    {
-        tagBuffer = tag_Buffer;
-        return *this;
-    }
+	static std::unique_ptr<FramePropertiesBuilder> create()
+	{
+		return std::make_unique<FramePropertiesBuilder>();
+	}
 
     const uint32_t getFrameKeyOffset() const { 
         return frameIDStartPosition; 
@@ -126,12 +80,13 @@ public:
         else
             return frameLength; 
     }
+
     const uint32_t getEncodingValue() const { return encodeFlag; }
+
     const uint32_t getSwapValue() const { return doSwap; }
-    auto getTagBuffer() const { return tagBuffer; }
-    auto getAudioBuffer() const { return audioBuffer; }
 
 private:
+	friend class FramePropertiesBuilder;
     uint32_t frameIDStartPosition = {};
     uint32_t frameContentStartPosition = {};
     uint32_t frameIDLength = {};
@@ -139,8 +94,66 @@ private:
     uint32_t framePayloadLength = {};
     uint32_t encodeFlag = {};
     uint32_t doSwap = {};
-    buffer_t audioBuffer = {};
-    buffer_t tagBuffer = {};
+};
+
+class FramePropertiesBuilder {
+
+	FrameSettings frameProperties;
+
+public:
+	FramePropertiesBuilder& fromFrameProperties(const FrameSettings& framePropertiesIn)
+	{
+		frameProperties = framePropertiesIn;
+		return *this;
+	}
+
+	operator FrameSettings() const
+	{
+		return std::move(frameProperties);
+	}
+
+	FramePropertiesBuilder& with_frameID_offset(uint32_t id_offset)
+	{
+		frameProperties.frameIDStartPosition = id_offset;
+		return *this;
+	}
+
+	FramePropertiesBuilder& with_frameID_length(uint32_t length)
+	{
+		frameProperties.frameIDLength = length;
+		return *this;
+	}
+
+	FramePropertiesBuilder& with_framecontent_offset(uint32_t payload_offset)
+	{
+		frameProperties.frameContentStartPosition = payload_offset;
+		return *this;
+	}
+
+	FramePropertiesBuilder& with_frame_length(uint32_t frame_length)
+	{
+		frameProperties.frameLength = frame_length;
+		return *this;
+	}
+
+	FramePropertiesBuilder& with_encode_flag(uint32_t encode_flag)
+	{
+		frameProperties.encodeFlag = encode_flag;
+		return *this;
+	}
+
+	FramePropertiesBuilder& with_do_swap(uint32_t dSwap)
+	{
+		frameProperties.doSwap = dSwap;
+		return *this;
+	}
+
+	FramePropertiesBuilder with_additional_payload_size(uint32_t additionalPayload)
+	{
+		frameProperties.frameLength += additionalPayload;
+		frameProperties.framePayloadLength += additionalPayload;
+		return *this;
+	}
 };
 
 const std::string stripLeft(const std::string& valIn) {
@@ -153,15 +166,12 @@ const std::string stripLeft(const std::string& valIn) {
     return val;
 }
 
-std::optional<FrameSettings> contructNewFrameSettings(const FrameSettings& frameconfig,
+const auto NewFrameSettings(const FrameSettings& frameconfig,
                                          uint32_t additionalFramePayloadSize) 
 {
-    FrameSettings frameConf = frameconfig;
-
-    frameConf = frameConf
-        .with_frame_length(frameConf.getFrameLength() + additionalFramePayloadSize); 
-
-    return frameConf;
+	return FrameSettings::create()
+		->fromFrameProperties(frameconfig)
+		.with_frame_length(frameconfig.getFrameLength() + additionalFramePayloadSize);
 }
 
 template <typename T>
@@ -251,13 +261,13 @@ auto operator | (T&& _obj, F&& Function)
 }
 
 
-std::optional<bool> WriteFile(const std::string& FileName, const std::string& content,
+bool WriteFile(const std::string& FileName, const std::string& content,
                                  const FrameSettings& frameSettings) {
     std::fstream filWrite(FileName,
                           std::ios::binary | std::ios::in | std::ios::out);
 
     if (!filWrite.is_open()) {
-        return {};
+        return false;
     }
 
     filWrite.seekp(frameSettings.getFramePayloadOffset());
@@ -323,19 +333,15 @@ const uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
     return version;
 }
 
-template <typename T1>
-std::optional<shared_string_t> ExtractString(buffer_t buffer, T1 start,
-                                            T1 length) {
-    assert((start + length) <= buffer->size());
+std::string ExtractString(buffer_t buffer, uint32_t start,
+	uint32_t length) 
+{
+    assert((start + length) <= static_cast<uint32_t>(buffer->size()));
 
-    if (buffer->size() >= (start + length)) {
-        static_assert(std::is_integral<T1>::value,
-                      "second and third parameters should be integers");
-
-        auto obj = std::make_shared<std::string>(reinterpret_cast<const char*>(buffer->data() + start), length);
-
-        return obj;
-    } else {
+    if (static_cast<uint32_t>(buffer->size()) >= (start + length)) {
+   
+        return std::string(reinterpret_cast<const char*>(buffer->data() + start), length);
+	} else {
 
         ID3_LOG_ERROR("Buffer size {} < buffer length: {} ", buffer->size(), length);
         return {};
@@ -345,28 +351,26 @@ std::optional<shared_string_t> ExtractString(buffer_t buffer, T1 start,
 uint32_t GetTagSizeDefault(buffer_t buffer,
                     uint32_t length, uint32_t startPosition = 0, bool BigEndian = false) {
 
-    assert((startPosition + length) <= buffer->size());
+    assert((startPosition + length) <= static_cast<uint32_t>(buffer->size()));
 
-    using paire = std::pair<uint32_t, uint32_t>;
+    using pair_integers = std::pair<uint32_t, uint32_t>;
     std::vector<uint32_t> power_values(length);
     uint32_t n = 0;
 
     std::generate(power_values.begin(), power_values.end(), [&n]{ n+=8; return n-8; });
-
     if(BigEndian){
         std::reverse(power_values.begin(), power_values.begin() + power_values.size());
     }
 
-    std::vector<paire> result(power_values.size());
+    std::vector<pair_integers> result(power_values.size());
     const auto it = std::begin(*buffer) + startPosition;
-
     std::transform(it, it + length, power_values.begin(),
                    result.begin(),
                    [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
 
     const uint32_t val = std::accumulate(
         result.begin(), result.end(), 0,
-        [](int a, paire b) { return (a + (b.first * std::pow(2, b.second))); });
+        [](int a, pair_integers b) { return (a + (b.first * std::pow(2, b.second))); });
 
     return val;
 }
@@ -385,8 +389,8 @@ uint32_t GetTagSize(buffer_t buffer,
                     const std::vector<unsigned int>& power_values,
                     uint32_t index) {
 
-    using paire = std::pair<uint32_t, uint32_t>;
-    std::vector<paire> result(power_values.size());
+    using pair_integers = std::pair<uint32_t, uint32_t>;
+    std::vector<pair_integers> result(power_values.size());
     const auto it = std::begin(*buffer) + index;
 
     std::transform(it, it + power_values.size(), power_values.begin(),
@@ -395,7 +399,7 @@ uint32_t GetTagSize(buffer_t buffer,
 
     const uint32_t val = std::accumulate(
         result.begin(), result.end(), 0,
-        [](int a, paire b) { return (a + (b.first * std::pow(2, b.second))); });
+        [](int a, pair_integers b) { return (a + (b.first * std::pow(2, b.second))); });
 
     return val;
 }
@@ -454,16 +458,16 @@ std::optional<buffer_t> updateAreaSize(buffer_t buffer,
 }
 
 template <typename Type>
-class search_tag {
+class searchFrame {
 private:
     const Type& mTagArea;
     std::once_flag m_once;
     uint32_t loc = 0;
 
 public:
-    search_tag(const Type& tagArea) : mTagArea(tagArea) {}
+    searchFrame(const Type& tagArea) : mTagArea(tagArea) {}
 
-    std::optional<uint32_t> operator()(Type tag) {
+    uint32_t operator()(Type tag) {
         std::call_once(m_once, [this, &tag]() {
 
             const auto it = std::search(
@@ -473,7 +477,8 @@ public:
             if (it != mTagArea.cend()) {
                 loc = (it - mTagArea.cbegin());
             } else {
-                ID3_LOG_WARN("{}: tag not found: {}", __func__, tag);
+				const std::string ret = std::string("could not find frame ID: ") + std::string(tag);
+				throw audio_tag_error(ret.c_str());
             }
         });
 

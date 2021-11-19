@@ -48,20 +48,17 @@ struct tagReadWriter
                         reinterpret_cast<char*>(tagHeaderBuffer->data()),
                         tagHeaderLength);
 
-                    const std::optional<shared_string_t> stringExtracted = id3::ExtractString<uint32_t>(
+                    const auto stringExtracted = id3::ExtractString(
                                          tagHeaderBuffer, 0, tagHeaderLength);
 
-                    const auto ret = stringExtracted |
-                                     [](shared_string_t readTag_p) {
-                                         return *readTag_p == std::string("TAG");
-                                     };
+                    const auto ret = (stringExtracted == std::string("TAG"));
 
                     tagPayload = tagBegin + tagHeaderLength;
                     assert(::id3v1::GetTagSize() > tagHeaderLength);
                     tagPayloadLength = ::id3v1::GetTagSize() - tagHeaderLength;
 
                     if (!ret) {
-                        throw std::runtime_error("error id3v1: start {} and end {}");
+                        throw id3::id3_error("id3v1: no tag string available");
                     }
 
                     filRead.seekg(tagPayload);
@@ -83,9 +80,9 @@ const expected::Result<id3::buffer_t> GetBuffer(const std::string &FileName)
         const tagReadWriter tagRW{FileName};
         return expected::makeValue<id3::buffer_t>(tagRW.GetBuffer().value());
     }
-    catch (const std::exception &e)
+    catch (const id3::id3_error &e)
     {
-        std::cout << e.what() << std::endl;
+        //std::cout << e.what() << std::endl;
         return expected::makeError<id3::buffer_t>("id3v1 object not valid");
     }
 }
@@ -94,10 +91,9 @@ const expected::Result<std::string> GetTheFramePayload(id3::buffer_t buffer, uin
                                            uint32_t end) {
     assert(end > start);
 
-    return id3::ExtractString<uint32_t>(buffer, start, (end - start)) |
-           [](shared_string_t readTag) {
-               return expected::makeValue<std::string>(id3::stripLeft(*readTag));
-           };
+	auto tagAreaStr = id3::ExtractString(buffer, start, (end - start));
+
+    return expected::makeValue<std::string>(id3::stripLeft(tagAreaStr));
 }
 
 const std::optional<bool> SetFramePayload(const std::string& filename,
@@ -114,8 +110,8 @@ const std::optional<bool> SetFramePayload(const std::string& filename,
         return {};
     }
 
-    const auto frameSettings = id3::FrameSettings()
-        .with_frameID_offset(tagRW.GetTagPayload() + relativeFramePayloadStart)
+    const auto frameSettings = FrameSettings::create()
+        ->with_frameID_offset(tagRW.GetTagPayload() + relativeFramePayloadStart)
         .with_framecontent_offset(tagRW.GetTagPayload() + relativeFramePayloadStart)
         .with_frame_length(relativeFramePayloadEnd - relativeFramePayloadStart);
 

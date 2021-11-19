@@ -36,6 +36,9 @@ bool readTagsInFile(const std::string& mediafile,
     const std::string filename = mp3Path.string();
     const auto EndFilename = mp3Path.filename();
 
+	if (!fs::is_regular_file(mp3Path))
+		return false;
+
     if (tags.album) {
         cout << "Get album of file: " << EndFilename << " : ";
         cout << GetAlbum(filename) << "\n";

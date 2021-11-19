@@ -5,8 +5,7 @@
 #ifndef _ID3V2_000
 #define _ID3V2_000
 
-#include <id3v2_base.hpp>
-
+#include "id3.hpp"
 namespace id3v2
 {
 
@@ -80,17 +79,17 @@ class v00
                 ,"WXX " //User defined URL link frame
         };
 #endif
-        constexpr auto FrameIDSize(void)
+        constexpr unsigned int FrameIDSize(void)
         {
-            return ::id3v2::RetrieveSize(3);
+            return 3;
         }
 
-        constexpr auto FrameHeaderSize(void)
+        constexpr unsigned int FrameHeaderSize(void)
         {
-            return ::id3v2::RetrieveSize(6);
+            return 6;
         }
 
-        std::optional<uint32_t> GetFrameSize(buffer_t buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
@@ -110,7 +109,7 @@ class v00
             return {};
         }
 
-        std::optional<buffer_t> UpdateFrameSize(buffer_t buffer,
+        std::optional<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
                                                  uint32_t extraSize,
                                                  uint32_t tagLocation) {
 
@@ -118,7 +117,7 @@ class v00
             constexpr uint32_t frameSizeLengthInArea = 3;
             constexpr uint32_t frameSizeMaxValuePerElement = 127;
 
-            return updateAreaSize<uint32_t>(
+            return id3::updateAreaSize<uint32_t>(
                 buffer, extraSize, frameSizePositionInArea,
                 frameSizeLengthInArea, frameSizeMaxValuePerElement);
         }
