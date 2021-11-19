@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+#folders
+include/3rd-party/
