@@ -2,9 +2,11 @@
 // Email: dda119141@gmail.com
 // Distributed under the MIT License (http://opensource.org/licenses/MIT)
 
-#ifdef HAS_FS_EXPERIMENTAL
+#if defined(HAS_FS_EXPERIMENTAL)
 #include <experimental/filesystem>
-#elif HAS_FS
+#elif defined(HAS_FS)
+#include <filesystem>
+#else
 #include <filesystem>
 #endif
 

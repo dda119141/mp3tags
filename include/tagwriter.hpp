@@ -22,68 +22,72 @@ bool SetTag(const std::string& filename,
 
         | id3v2::checkForID3
 
-        | [](const std::vector<unsigned char>& buffer) {
+        | [](id3::buffer_t buffer) {
             return id3v2::GetID3Version(buffer);
         }
 
-        | [&](std::string id3Version) {
-            const auto writePayloadResult = [&](){
+		| [&](const std::string& id3Version) {
+
+            const auto writePayloadResult = [&]() -> bool
+			{
 
                 for (auto& tag : tags) {
                     if (id3Version == tag.first)  // tag.first is the id3 Version
                     {
                         const auto param = [&](){
                             if (id3Version == "0x0300") {
-
-                                const id3v2::basicParameters paramLoc
-                                {
-                                    filename,
-                                    id3v2::v30(),
-                                    tag.second,
-                                    content
-                                };
+								const auto paramLoc = id3v2::basicParameters {
+									filename,
+									id3v2::v30() 
+								}.with_frame_id(tag.second)
+								 .with_frame_payload(content);
 
                                 return paramLoc;
                             } else if (id3Version == "0x0400") {
-
-                                const id3v2::basicParameters paramLoc
+								const auto paramLoc = id3v2::basicParameters
                                 {
                                     filename,
-                                    id3v2::v40(),
-                                    tag.second,
-                                    content
-                                };
+                                    id3v2::v40() 
+								}.with_frame_id(tag.second)
+								 .with_frame_payload(content);
+
                                 return paramLoc;
                             } else if (id3Version == "0x0000") {
-                                const id3v2::basicParameters paramLoc
+								const auto paramLoc = id3v2::basicParameters
                                 {
                                     filename,
-                                    id3v2::v00(),
-                                    tag.second, /* Frame ID */
-                                    content
-                                };
+                                    id3v2::v00()
+								}.with_frame_id(tag.second)
+								 .with_frame_payload(content);
+
                                 return paramLoc;
                             } else {
-                                const id3v2::basicParameters paramLoc { std::string("") } ;
+								const auto paramLoc = id3v2::basicParameters{ std::string("")
+								};
                                 return paramLoc;
                             };
                         }();
 
-                        return id3v2::writeFramePayload(param);
+                        try {
+							const id3v2::TagReadWriter obj { param };
+							const id3v2::writer Writer{ obj };
+							return Writer.execute();
+                          
+                        } catch (const std::runtime_error& e) {
+                            std::cerr << "Runtime Error: " << e.what() << std::endl;
+                        }
                     }
                 }
 
                 ID3_LOG_WARN("{} failed", __func__);
-                return expected::makeError<bool>() << __func__ << " failed\n";
+
+                return false;
             };
 
             return writePayloadResult();
         };
 
-    if (ret.has_value())
-        return ret.value();
-    else
-        return false;
+		return ret;
 }
 
 bool SetAlbum(const std::string& filename, std::string_view content)

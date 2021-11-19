@@ -18,7 +18,11 @@ TEST_CASE("Read/Write from/to id3v2 tag") {
 
     std::string filename;
 
-    const std::string currentFilePath = fs::system_complete(__FILE__);
+#ifdef HAS_FS_EXPERIMENTAL
+	const std::string currentFilePath = fs::system_complete(__FILE__);
+#else
+	const std::string currentFilePath = fs::absolute(__FILE__).string();
+#endif
 
     cout << "current file path:" << currentFilePath << endl;
     const std::string mp3Path =

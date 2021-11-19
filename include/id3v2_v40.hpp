@@ -5,7 +5,7 @@
 #ifndef _ID3V2_V40
 #define _ID3V2_V40
 
-#include <id3v2_base.hpp>
+#include <id3.hpp>
 
 namespace id3v2
 {
@@ -64,22 +64,22 @@ class v40
 
         };
 #endif
-        constexpr auto FrameIDSize(void)
+        constexpr unsigned int FrameIDSize(void)
         {
-            return ::id3::RetrieveSize(4);
+            return 4;
         }
 
-        constexpr auto FrameHeaderSize(void)
+        constexpr unsigned int FrameHeaderSize(void)
         {
-            return ::id3::RetrieveSize(10);
+            return 10;
         }
 
 
-        std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t>& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
-            if(buffer.size() >= start)
+            if(buffer->size() >= start)
             {
                 using paire = std::pair<uint32_t, uint32_t>;
 
@@ -87,7 +87,7 @@ class v40
 
                 std::vector<paire> result(pow_val.size());
 
-                std::transform(std::begin(buffer) + start, std::begin(buffer) + start + pow_val.size(),
+                std::transform(std::begin(*buffer) + start, std::begin(*buffer) + start + pow_val.size(),
                         pow_val.begin(), result.begin(),
                         [](uint32_t a, uint32_t b){
                         return std::make_pair(a, b);
@@ -104,7 +104,7 @@ class v40
                 return val;
 
             } else	{
-                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
+                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(), start);
             }
 
             return {};

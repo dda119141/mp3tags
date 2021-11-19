@@ -14,7 +14,9 @@ struct DirectoryOptions {
     bool isEmpty() { return !(empty | remove ); }
 } DirectoryOption;
 
-namespace fs = std::experimental::filesystem;
+
+namespace fs = id3::filesystem;
+
 
 static bool deleteFiles(const fs::path& filePath)
 {
@@ -101,12 +103,17 @@ void removeObsoleteDirectory(const fs::path& filePath, const struct DirectoryOpt
 }
 
 
-bool readTags(const std::string& directory,
+bool removePaths(const std::string& directory,
                            const struct DirectoryOptions& directoryOption) {
     using std::cout;
     using std::endl;
 
-    const std::string currentFilePath = fs::system_complete(directory);
+#ifdef HAS_FS_EXPERIMENTAL
+	const std::string currentFilePath = fs::system_complete(directory);
+#else
+	const std::string currentFilePath = fs::absolute(directory).string();
+#endif
+
     const fs::path mp3Path = fs::path(currentFilePath);
 
     if (!fs::exists(mp3Path)) {
@@ -154,7 +161,7 @@ int main(int argc, const char** argv) {
     } else if(show_help) {
         std::cout << parser << std::endl;
     }else{
-        readTags(directory, DirectoryOption);
+        removePaths(directory, DirectoryOption);
     }
 
     return 0;

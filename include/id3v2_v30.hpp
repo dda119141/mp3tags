@@ -1,7 +1,7 @@
 #ifndef _ID3V2_230
 #define _ID3V2_230
 
-#include <id3v2_base.hpp>
+#include <id3.hpp>
 
 namespace id3v2
 {
@@ -50,33 +50,33 @@ class v30
                 ,"TYER"//      [#TYER Year]
         };
 #endif
-        constexpr auto FrameIDSize(void)
+        constexpr unsigned int FrameIDSize(void)
         {
-            return ::id3::RetrieveSize(4);
+            return 4;
         }
 
-        constexpr auto FrameHeaderSize(void)
+        constexpr unsigned int FrameHeaderSize(void)
         {
-            return ::id3::RetrieveSize(10);
+            return 10;
         }
 
 
-        std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t>& buffer, uint32_t index)
+        std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index)
         {
             const auto start = FrameIDSize() + index;
 
-            if(buffer.size() >= start)
+            if(buffer->size() >= start)
             {
-                uint32_t val = buffer[start + 0] * std::pow(2, 24);
+                uint32_t val = buffer->at(start + 0) * std::pow(2, 24);
 
-                val += buffer[start + 1] * std::pow(2, 16);
-                val += buffer[start + 2] * std::pow(2, 8);
-                val += buffer[start + 3] * std::pow(2, 0);
+                val += buffer->at(start + 1) * std::pow(2, 16);
+                val += buffer->at(start + 2) * std::pow(2, 8);
+                val += buffer->at(start + 3) * std::pow(2, 0);
 
                 return val;
 
             } else	{
-                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
+                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(), start);
             }
 
             return {};

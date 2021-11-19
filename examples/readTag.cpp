@@ -22,7 +22,11 @@ bool readTagsInFile(const std::string& mediafile,
     using std::cout;
     using std::endl;
 
+#ifdef HAS_FS_EXPERIMENTAL
     const std::string currentFilePath = fs::system_complete(mediafile);
+#else
+	const std::string currentFilePath = fs::absolute(mediafile).string();
+#endif
 
     const fs::path mp3Path = fs::path(currentFilePath);
     if (!fs::exists(mp3Path)) {
@@ -31,6 +35,9 @@ bool readTagsInFile(const std::string& mediafile,
     }
     const std::string filename = mp3Path.string();
     const auto EndFilename = mp3Path.filename();
+
+	if (!fs::is_regular_file(mp3Path))
+		return false;
 
     if (tags.album) {
         cout << "Get album of file: " << EndFilename << " : ";
@@ -59,11 +66,12 @@ bool readTagsInFile(const std::string& mediafile,
 
 bool readTags(const std::string& directory,
                            const struct tagOptions& tags) {
-    namespace fs = std::experimental::filesystem;
+	namespace fs = id3::filesystem;
+
     using std::cout;
     using std::endl;
 
-    const std::string currentFilePath = fs::system_complete(directory);
+    const std::string currentFilePath = fs::absolute(directory).string();
 
     const fs::path mp3Path = fs::path(currentFilePath);
     if (!fs::exists(mp3Path)) {
@@ -86,8 +94,7 @@ bool readTags(const std::string& directory,
 }
 
 int main(int argc, const char** argv) {
-
-    // Where we read in the argument value:
+   // Where we read in the argument value:
     bool show_help = false;
     std::string directory;
 

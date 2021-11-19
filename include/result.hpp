@@ -8,10 +8,6 @@
 #include <type_traits>
 #include <functional>
 #include <optional>
-#include <variant>
-
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 namespace expected {
 
@@ -163,15 +159,16 @@ namespace expected {
     template <typename T, typename E, typename Transform,
             typename Ret = typename std::result_of<Transform(T)>::type>
         auto operator | (const expected::Result_t<T, E>& r, Transform f)
-            -> typename std::enable_if_t<not std::is_integral<Ret>::value && not std::is_void<Ret>::value, Ret>
-    {
+            -> typename std::enable_if_t<!std::is_void<Ret>::value, Ret>
+	//	-> typename std::enable_if_t<!std::is_integral<Ret>::value && !std::is_void<Ret>::value, Ret>
+	{
             auto fuc = std::forward<Transform>(f);
 
             if (r.has_value()) {
                 return fuc(r.value());
             } else {
-                return Ret()(r.error());
-               // return Ret();
+               // return Ret()(r.error());
+                return Ret();
             }
      }
 

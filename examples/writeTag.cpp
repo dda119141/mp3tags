@@ -12,7 +12,11 @@ bool changeTagsInFile(const std::string& mediafile,
     using std::cout;
     using std::endl;
 
-    const std::string currentFilePath = fs::system_complete(mediafile);
+#ifdef HAS_FS_EXPERIMENTAL
+	const std::string currentFilePath = fs::system_complete(mediafile);
+#else
+	const std::string currentFilePath = fs::absolute(mediafile).string();
+#endif
 
     cout << "current file path:" << currentFilePath << endl;
     const fs::path mp3Path = fs::path(currentFilePath);
@@ -50,14 +54,18 @@ bool changeTagsInFile(const std::string& mediafile,
 
 bool changeTagsInDirectory(const std::string& directory,
                            const std::pair<std::string, std::string>& tags) {
-    namespace fs = std::experimental::filesystem;
+	namespace fs = id3::filesystem;
     using std::cout;
     using std::endl;
 
-    const std::string currentFilePath = fs::system_complete(directory);
+#ifdef HAS_FS_EXPERIMENTAL
+	const std::string currentFilePath = fs::system_complete(directory);
+#else
+	const std::string currentFilePath = fs::absolute(directory).string();
+#endif
 
     cout << "current file path:" << currentFilePath << endl;
-    const fs::path mp3Path = fs::path(currentFilePath);
+    const fs::path mp3Path = fs::path(currentFilePath).string();
     if (!fs::exists(mp3Path)) {
         std::cerr << "Path: " << currentFilePath << " does not exist" << endl;
         return false;

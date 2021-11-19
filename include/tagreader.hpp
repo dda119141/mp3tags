@@ -22,7 +22,7 @@ const std::string GetId3v2Tag(
 
         | id3v2::checkForID3
 
-        | [](const std::vector<unsigned char>& buffer) {
+        | [](id3::buffer_t buffer) {
             return id3v2::GetID3Version(buffer);
         }
 
@@ -33,58 +33,57 @@ const std::string GetId3v2Tag(
                 {
                         const auto params = [&](){
                             if (id3Version == "0x0300") {
-                                const id3v2::basicParameters paramLoc {
-                                    fileName,
-                                    id3v2::v30(),
-                                    tag.second
-                                };
+								const auto paramLoc = id3v2::basicParameters {
+									fileName
+									,id3v2::v30() // Tag version
+									,tag.second // Frame ID
+								};
+
                                 return paramLoc;
 
                             } else if (id3Version == "0x0400") {
-                                const id3v2::basicParameters paramLoc {
-                                    fileName,
-                                    id3v2::v40(),
-                                    tag.second
-                                };
-                                return paramLoc;
+								const auto paramLoc = id3v2::basicParameters{
+									fileName
+									,id3v2::v40() // Tag version
+									,tag.second // Frame ID
+								};
 
-                            } else if (id3Version == "0x0000") {
-                                const id3v2::basicParameters paramLoc {
-                                    fileName,
-                                    .tagVersion = id3v2::v00(),
-                                    tag.second
-                                };
-                                return paramLoc;
+								return paramLoc;
+							
+							} else if (id3Version == "0x0000") {
+								const auto paramLoc = id3v2::basicParameters{
+									fileName
+									,id3v2::v00() // Tag version
+									,tag.second // Frame ID
+								};
 
-                            } else {
+								return paramLoc;
+
+							} else {
                                 const id3v2::basicParameters paramLoc { std::string("") } ;
                                 return paramLoc;
                             }
                         };
-
                     try {
-                        id3v2::TagReadWriter<std::string> obj(params());
+                        id3v2::TagReadWriter obj(params());
 
-                        return obj.getFramePayload<std::string>();
+                        const auto found = obj.getFramePayload();
+                        return id3::stripLeft(found);
+
                     } catch (const std::runtime_error& e) {
-                        ID3_LOG_ERROR(e.what());
-                        std::cout << e.what() << '\n';
+                        std::cout << e.what();
                     }
+					catch (const id3::audio_tag_error & e) {
+						std::cout << e.what();
+					}
 
                 }
             }
 
-            return expected::makeError<std::string>()
-                   << "id3 version not supported"
-                   << "\n";
+            return std::string("");
         };
 
-    if (!ret.has_value()) {
-        // return "Tag not found";
-        return ret.error();
-    } else {
-        return id3::stripLeft(ret.value());
-    }
+    return ret;
 }
 
 template <typename Function1, typename Function2>
