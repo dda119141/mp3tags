@@ -91,6 +91,7 @@ private:
 
 		if (bool ret = (stringToCheck == tagToCheck);  !ret) {
 			ID3_LOG_WARN("error: {} and {}", stringToCheck, tagToCheck);
+			return ret;
 		}
 		else {
 			return ret;
