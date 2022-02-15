@@ -16,8 +16,6 @@ TEST_CASE("Read/Write from/to id3v2 tag") {
     using std::cout;
     using std::endl;
 
-    std::string filename;
-
 #ifdef HAS_FS_EXPERIMENTAL
 	const std::string currentFilePath = fs::system_complete(__FILE__);
 #else
@@ -33,7 +31,9 @@ TEST_CASE("Read/Write from/to id3v2 tag") {
         return filName.substr(pos+1);
     };
 
-    try {
+	std::string filename;
+
+	try {
         for (auto& filen : fs::directory_iterator(mp3Path)) {
             std::string _filename = filen.path().string();
 
