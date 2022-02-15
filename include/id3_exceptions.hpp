@@ -80,7 +80,7 @@ namespace id3
 #define ID3_ASSERT_MSG(expr, msg)
 #endif
 
-#define ID3_PRECONDITION(expr, msg)                                     \
+#define ID3_PRECONDITION_MSG(expr, msg)                                     \
     if (!(expr))                                                            \
     {                                                                       \
       ID3_THROW(id3_error,                                     \
@@ -88,6 +88,16 @@ namespace id3
                     "\n  " + __FILE__ + '(' + std::to_string(__LINE__) +    \
                     ")\n");                                               \
     }
+
+#define ID3_PRECONDITION(expr)                                     \
+    if (!(expr))                                                            \
+    {                                                                       \
+      ID3_THROW(id3_error,                                     \
+                    std::string("Precondition violation!\n") +         \
+                    __FILE__ + '(' + std::to_string(__LINE__) +    \
+                    ")\n");                                               \
+    }
+
 }
 #endif  // 
 

@@ -111,9 +111,10 @@ namespace id3v2
         return std::visit(
             overloaded{
 
-                [&](std::string_view arg) { return std::string(content); },
+				[&](std::string_view arg) { (void)arg;  return std::string(content); },
 
                 [&](std::u16string arg) {
+					(void)arg;
 
                     if (frameProperties.getSwapValue() == 0x01) {
                         std::string_view val =
@@ -128,6 +129,7 @@ namespace id3v2
                 },
 
                 [&](std::u32string arg) {
+					(void)arg;
                     const auto ret = std::string(content) + '\0';
                     return ret;
                 },
@@ -143,7 +145,7 @@ namespace id3v2
 		auto searchFramePosition =
 			id3::searchFrame<std::string_view>(tagArea);
 
-		return searchFramePosition(frameID);	
+		return searchFramePosition.execute(frameID);	
 	}
 
     class TagReadWriter {

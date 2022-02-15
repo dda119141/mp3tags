@@ -152,8 +152,11 @@ ConversionResult ConvertUTF16toUTF8 (
 		}
 		switch (bytesToWrite) {	/* note: everything falls through. */
 			case 4:	*--target = (ch | byteMark) & byteMask; ch >>= 6;
+				[[fallthrough]];
 			case 3:	*--target = (ch | byteMark) & byteMask; ch >>= 6;
+				[[fallthrough]];
 			case 2:	*--target = (ch | byteMark) & byteMask; ch >>= 6;
+				[[fallthrough]];
 			case 1:	*--target = (unsigned char)(ch | firstByteMark[bytesToWrite]);
 		}
 		target += bytesToWrite;
@@ -182,8 +185,11 @@ static Boolean isLegalUTF8(const unsigned char *source, int length) {
 	switch (length) {
 	default: return false;
 		/* Everything else falls through when "true"... */
+	[[fallthrough]];
 	case 4: if ((a = (*--srcptr)) < 0x80 || a > 0xBF) return false;
+	[[fallthrough]];
 	case 3: if ((a = (*--srcptr)) < 0x80 || a > 0xBF) return false;
+	[[fallthrough]];
 	case 2: if ((a = (*--srcptr)) > 0xBF) return false;
 		switch (*source) {
 		    /* no fall-through in this inner switch */
@@ -192,7 +198,8 @@ static Boolean isLegalUTF8(const unsigned char *source, int length) {
 		    case 0xF4: if (a > 0x8F) return false; break;
 		    default:  if (a < 0x80) return false;
 		}
-    	case 1: if (*source >= 0x80 && *source < 0xC2) return false;
+	[[fallthrough]];
+    case 1: if (*source >= 0x80 && *source < 0xC2) return false;
 		if (*source > 0xF4) return false;
 	}
 	return true;
@@ -278,8 +285,11 @@ ConversionResult ConvertUTF8toUTF16 (
 		 */
 		switch (extraBytesToRead) {
 			case 3:	ch += *source++; ch <<= 6;
+				[[fallthrough]];
 			case 2:	ch += *source++; ch <<= 6;
+				[[fallthrough]];
 			case 1:	ch += *source++; ch <<= 6;
+				[[fallthrough]];
 			case 0:	ch += *source++;
 		}
 		ch -= offsetsFromUTF8[extraBytesToRead];

@@ -96,7 +96,7 @@ namespace id3v2
 
 		std::once_flag m_once;
 
-		std::optional<bool> ReWriteFile(id3::buffer_t tagBuffer, uint32_t extraSize) {
+		void ReWriteFile(id3::buffer_t tagBuffer, uint32_t extraSize) {
 
 			std::ifstream filRead(fileParameter.get_filename(), std::ios::binary | std::ios::ate);
 
