@@ -57,15 +57,15 @@ public:
 		return std::make_unique<FramePropertiesBuilder>();
 	}
 
-    const uint32_t getFrameKeyOffset() const { 
+    uint32_t getFrameKeyOffset() const { 
         return frameIDStartPosition; 
     }
 
-    const uint32_t getFramePayloadOffset() const {
+    uint32_t getFramePayloadOffset() const {
         return frameContentStartPosition;
     }
 
-    const uint32_t getFramePayloadLength() const 
+    uint32_t getFramePayloadLength() const 
     {
         if (frameLength && frameIDLength)
             return (frameLength - frameIDLength);
@@ -73,7 +73,7 @@ public:
             return frameLength;
     }
 
-    const uint32_t getFrameLength() const 
+    uint32_t getFrameLength() const 
     {
         if (framePayloadLength && frameIDLength)
             return (framePayloadLength + frameIDLength);
@@ -81,9 +81,9 @@ public:
             return frameLength; 
     }
 
-    const uint32_t getEncodingValue() const { return encodeFlag; }
+    uint32_t getEncodingValue() const { return encodeFlag; }
 
-    const uint32_t getSwapValue() const { return doSwap; }
+    uint32_t getSwapValue() const { return doSwap; }
 
 private:
 	friend class FramePropertiesBuilder;
@@ -307,7 +307,7 @@ std::optional<bool> renameFile(const std::string& fileToRename,
 }
 
 template <typename T>
-const uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
+uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
                                 T num_of_bytes_in_hex) {
     integral_unsigned_asserts<T> eval;
     eval();
@@ -354,7 +354,8 @@ uint32_t GetTagSizeDefault(buffer_t buffer,
 	ID3_PRECONDITION((startPosition + length) <= static_cast<uint32_t>(buffer->size()));
 
     using pair_integers = std::pair<uint32_t, uint32_t>;
-    std::vector<uint32_t> power_values(length);
+	std::vector<uint32_t> power_values(length);
+
     uint32_t n = 0;
 
     std::generate(power_values.begin(), power_values.end(), [&n]{ n+=8; return n-8; });
@@ -362,7 +363,8 @@ uint32_t GetTagSizeDefault(buffer_t buffer,
         std::reverse(power_values.begin(), power_values.begin() + power_values.size());
     }
 
-    std::vector<pair_integers> result(power_values.size());
+	std::vector<pair_integers> result(power_values.size());
+
     const auto it = std::begin(*buffer) + startPosition;
     std::transform(it, it + length, power_values.begin(),
                    result.begin(),
@@ -380,7 +382,7 @@ bool replaceElementsInBuff(buffer_t buffIn, buffer_t buffOut,
     const auto iter = std::begin(*buffOut) + position;
 
     std::transform(iter, iter + buffIn->size(), buffIn->begin(), iter,
-                   [](char a, char b) { return b; });
+		[](char a, char b) { (void)a;  return b; });
 
     return true;
 }
@@ -390,7 +392,8 @@ uint32_t GetTagSize(buffer_t buffer,
                     uint32_t index) {
 
     using pair_integers = std::pair<uint32_t, uint32_t>;
-    std::vector<pair_integers> result(power_values.size());
+	std::vector<pair_integers> result(power_values.size());
+
     const auto it = std::begin(*buffer) + index;
 
     std::transform(it, it + power_values.size(), power_values.begin(),
@@ -416,7 +419,8 @@ std::optional<buffer_t> updateAreaSize(buffer_t buffer,
     auto ExtraSize = extraSize;
     auto extr = ExtraSize % maxValue;
 
-    buffer_t temp_vec = std::make_shared<std::vector<uint8_t>>(NumberOfElements);
+	buffer_t temp_vec = {};
+	temp_vec->reserve(NumberOfElements);
     std::copy(itIn, itIn + NumberOfElements, temp_vec->begin());
     auto it = temp_vec->begin();
 
@@ -427,7 +431,9 @@ std::optional<buffer_t> updateAreaSize(buffer_t buffer,
 
     std::transform(
         it, it + NumberOfElements, it, it, [&](uint32_t a, uint32_t b) {
-            extr = ExtraSize % maxValue;
+			(void)b;
+			
+			extr = ExtraSize % maxValue;
             a = (a >= maxValue) ? maxValue : a;
 
             if (ExtraSize >= maxValue) {
@@ -461,32 +467,34 @@ template <typename Type>
 class searchFrame {
 private:
     const Type& mTagArea;
-    std::once_flag m_once;
-    uint32_t loc = 0;
 
 public:
-    searchFrame(const Type& tagArea) : mTagArea(tagArea) {}
+    explicit searchFrame(const Type& tagArea) : mTagArea(tagArea) {}
 
-    uint32_t operator()(Type tag) {
-        std::call_once(m_once, [this, &tag]() {
+	searchFrame(searchFrame const&) = delete;
+	searchFrame& operator=(searchFrame const&) = delete;
 
-            const auto it = std::search(
-                mTagArea.cbegin(), mTagArea.cend(),
-                std::boyer_moore_searcher(tag.cbegin(), tag.cend()));
+    uint32_t execute(const Type& tag) const
+	{
+		static auto _execute = [ this ](const Type& TagArea, const Type& _tag) {
+			uint32_t loc = 0;
 
-            if (it != mTagArea.cend()) {
-                loc = (it - mTagArea.cbegin());
-            } else {
-				const std::string ret = std::string("could not find frame ID: ") + std::string(tag);
+			const auto it = std::search(
+				TagArea.cbegin(), TagArea.cend(),
+				std::boyer_moore_searcher(_tag.cbegin(), _tag.cend()));
+
+			if (it != TagArea.cend()) {
+				loc = (it - TagArea.cbegin());
+			}
+			else {
+				const std::string ret = std::string("could not find frame ID: ") + std::string(_tag);
 				throw audio_tag_error(ret.c_str());
-            }
-        });
+			}
 
-        if (loc != 0) {
-            return loc;
-        } else {
-            return {};
-        }
+			return loc;
+		};
+
+		return _execute(mTagArea, tag);
     }
 };
 

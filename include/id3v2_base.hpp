@@ -26,8 +26,8 @@ using namespace id3;
 class basicParameters {
 private:
 	const std::string& filename;
-	std::string_view frameID = {};
 	const iD3Variant tagVersion;
+	std::string_view frameID = {};
 
 	buffer_t tagBuffer = {};
 	FrameSettings frameSettings = {};
@@ -59,8 +59,8 @@ public:
 
 	explicit basicParameters(const std::string& Filename,
 		const iD3Variant& TagVersion) :
-		tagVersion{ TagVersion }
-		, filename{ Filename }
+		filename{ Filename }
+		, tagVersion{ TagVersion }
 	{
 	}
 
@@ -150,7 +150,7 @@ public:
 template <typename T>
 buffer_t fillTagBufferWithPayload(T content, id3::buffer_t tagBuffer, const FrameSettings& frameConfig) {
 
-	ID3_PRECONDITION(frameConfig.getFramePayloadLength() >= content.size(), 
+	ID3_PRECONDITION_MSG(frameConfig.getFramePayloadLength() >= content.size(), 
 		"Existing Frame Payload size < content size");
 
 	const auto PositionFramePayloadStart = frameConfig.getFramePayloadOffset();
@@ -160,11 +160,11 @@ buffer_t fillTagBufferWithPayload(T content, id3::buffer_t tagBuffer, const Fram
 	const auto payload_start_index = std::begin(*tagBuffer) + PositionFramePayloadStart;
 
 	std::transform(payload_start_index, payload_start_index + content.size(), content.begin(), payload_start_index,
-		[](char a, char b) { return b; });
+		[](char a, char b) { (void)a; return b; });
 
 	std::transform(payload_start_index + content.size(), payload_start_index + frameConfig.getFramePayloadLength(),
 		content.begin(), payload_start_index + content.size(),
-		[](char a, char b) { return 0x00; });
+		[](char a, char b) { (void)a; (void)b; return 0x00; });
 
 	return tagBuffer;
 }
@@ -213,8 +213,8 @@ std::optional<buffer_t> updateFrameSizeIndex(const iD3Variant& TagVersion,
 {
 	return std::visit(
 		overloaded{
-			[&](id3v2::v30 arg) { return UpdateFrameSize(args...); },
-			[&](id3v2::v40 arg) { return UpdateFrameSize(args...); },
+			[&](id3v2::v30 arg) { (void)arg; return UpdateFrameSize(args...); },
+			[&](id3v2::v40 arg) { (void)arg; return UpdateFrameSize(args...); },
 			[&](id3v2::v00 arg) { return arg.UpdateFrameSize(args...); } },
 			TagVersion);
 }
@@ -355,7 +355,8 @@ std::optional<std::vector<uint8_t>> processFrameHeaderFlags(
 
     const auto it = buffer->begin() + frameHeaderFlagsPosition;
 
-    std::vector<uint8_t> temp_vec(frameHeaderFlagsLength);
+	std::vector<uint8_t> temp_vec(frameHeaderFlagsLength);
+
     std::copy(it, it + 2, temp_vec.begin());
 
     std::bitset<8> frameStatusFlag(temp_vec[0]);

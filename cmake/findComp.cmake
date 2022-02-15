@@ -1,23 +1,11 @@
-# set everything up for c++ 17 features
-if(${CYGWIN})
-set(_CXX_VERSION "-std=gnu++17")
-elseif (MSVC_VERSION GREATER_EQUAL "1900")
-    include(CheckCXXCompilerFlag)
-    CHECK_CXX_COMPILER_FLAG("/std:c++latest" _cpp_latest_flag_supported)
-    if (_cpp_latest_flag_supported)
-        add_compile_options("/std:c++latest")
-    endif()
-else()
-	set(_CXX_VERSION "-std=c++17")
-endif()
 
 # Don't add this line if you will try_compile with boost.
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # test that filesystem header actually is there and works
-try_compile(HAS_FS "${CMAKE_BINARY_DIR}/temp"
-"${CMAKE_SOURCE_DIR}/cmake/tests/has_filesystem.cc"
-CMAKE_FLAGS ${_CXX_VERSION} LINK_LIBRARIES stdc++fs)
+#try_compile(HAS_FS "${CMAKE_BINARY_DIR}/temp"
+#"${CMAKE_SOURCE_DIR}/cmake/tests/has_filesystem.cc"
+#CMAKE_FLAGS ${_CXX_VERSION} LINK_LIBRARIES stdc++fs)
 
 try_compile(HAS_FS_EXPERIMENTAL "${CMAKE_BINARY_DIR}/temp"
 "${CMAKE_SOURCE_DIR}/cmake/tests/has_filesystem_experimental.cc"

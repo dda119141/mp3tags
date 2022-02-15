@@ -20,7 +20,6 @@ constexpr uint32_t GetTagSize(void) {
 struct tagReadWriter
 {
     private:
-        std::once_flag m_once;
         const std::string& FileName;
         uint32_t tagBegin = 0;
         uint32_t tagPayload = 0;
@@ -33,42 +32,39 @@ struct tagReadWriter
         FileName(fileName)
         ,buffer({})
         {
-            std::call_once(m_once,
-                [this]() {
-                    std::ifstream filRead(FileName,
-                                          std::ios::binary | std::ios::ate);
+            std::ifstream filRead(FileName,
+                                    std::ios::binary | std::ios::ate);
 
-                    const unsigned int dataSize = filRead.tellg();
-                    tagBegin = dataSize - ::id3v1::GetTagSize();
-                    filRead.seekg(tagBegin);
+            const unsigned int dataSize = filRead.tellg();
+            tagBegin = dataSize - ::id3v1::GetTagSize();
+            filRead.seekg(tagBegin);
 
-                    id3::buffer_t tagHeaderBuffer = std::make_shared<std::vector<uint8_t>>(tagHeaderLength,
-                                                               '0');
-                    filRead.read(
-                        reinterpret_cast<char*>(tagHeaderBuffer->data()),
-                        tagHeaderLength);
+            id3::buffer_t tagHeaderBuffer = std::make_shared<std::vector<uint8_t>>(tagHeaderLength,
+                                                        '0');
+            filRead.read(
+                reinterpret_cast<char*>(tagHeaderBuffer->data()),
+                tagHeaderLength);
 
-                    const auto stringExtracted = id3::ExtractString(
-                                         tagHeaderBuffer, 0, tagHeaderLength);
+            const auto stringExtracted = id3::ExtractString(
+                                    tagHeaderBuffer, 0, tagHeaderLength);
 
-                    const auto ret = (stringExtracted == std::string("TAG"));
+            const auto ret = (stringExtracted == std::string("TAG"));
 
-                    tagPayload = tagBegin + tagHeaderLength;
-                    assert(::id3v1::GetTagSize() > tagHeaderLength);
-                    tagPayloadLength = ::id3v1::GetTagSize() - tagHeaderLength;
+            tagPayload = tagBegin + tagHeaderLength;
+            assert(::id3v1::GetTagSize() > tagHeaderLength);
+            tagPayloadLength = ::id3v1::GetTagSize() - tagHeaderLength;
 
-                    if (!ret) {
-                        throw id3::id3_error("id3v1: no tag string available");
-                    }
+            if (!ret) {
+                throw id3::id3_error("id3v1: no tag string available");
+            }
 
-                    filRead.seekg(tagPayload);
-                    id3::buffer_t buffer1 = std::make_shared<std::vector<unsigned char>>(tagPayloadLength, '0');
-                    filRead.read(reinterpret_cast<char*>(buffer1->data()), tagPayloadLength);
-                    buffer = buffer1;
-                });
+            filRead.seekg(tagPayload);
+            id3::buffer_t buffer1 = std::make_shared<std::vector<unsigned char>>(tagPayloadLength, '0');
+            filRead.read(reinterpret_cast<char*>(buffer1->data()), tagPayloadLength);
+            buffer = buffer1;
         }
 
-        const uint32_t GetTagPayload() const { return tagPayload; }
+        uint32_t GetTagPayload() const { return tagPayload; }
 
         std::optional<id3::buffer_t> GetBuffer() const {return buffer;}
 };
@@ -77,7 +73,7 @@ const expected::Result<id3::buffer_t> GetBuffer(const std::string &FileName)
 {
     try
     {
-        const tagReadWriter tagRW{FileName};
+        static const tagReadWriter tagRW{FileName};
         return expected::makeValue<id3::buffer_t>(tagRW.GetBuffer().value());
     }
     catch (const id3::id3_error &e)
@@ -102,7 +98,7 @@ const std::optional<bool> SetFramePayload(const std::string& filename,
                                        uint32_t relativeFramePayloadEnd) {
     assert(relativeFramePayloadEnd > relativeFramePayloadStart);
 
-    const tagReadWriter tagRW{filename};
+    static const tagReadWriter tagRW{filename};
 
     if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
         ID3_LOG_ERROR("content length {} too big for frame area", content.size());
