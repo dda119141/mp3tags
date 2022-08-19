@@ -6,12 +6,10 @@
 #define _ID3V2_000
 
 #include "id3.hpp"
-namespace id3v2
-{
+namespace id3v2 {
 
-class v00
-{
-    public:
+class v00 {
+public:
 #if 0
         std::vector<std::string> tag_names{
             "BUF" // Recommended buffer size
@@ -79,50 +77,42 @@ class v00
                 ,"WXX " //User defined URL link frame
         };
 #endif
-        constexpr unsigned int FrameIDSize(void)
-        {
-            return 3;
-        }
+  constexpr unsigned int FrameIDSize(void) { return 3; }
 
-        constexpr unsigned int FrameHeaderSize(void)
-        {
-            return 6;
-        }
+  constexpr unsigned int FrameHeaderSize(void) { return 6; }
 
-        std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index)
-        {
-            const auto start = FrameIDSize() + index;
+  std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index) {
+    const auto start = FrameIDSize() + index;
 
-            if(buffer->size() >= start)
-            {
-                auto val = buffer->at(start + 0) * std::pow(2, 16);
+    if (buffer->size() >= start) {
+      auto val = buffer->at(start + 0) * std::pow(2, 16);
 
-                val += buffer->at(start + 1) * std::pow(2, 8);
-                val += buffer->at(start + 2) * std::pow(2, 0);
+      val += buffer->at(start + 1) * std::pow(2, 8);
+      val += buffer->at(start + 2) * std::pow(2, 0);
 
-                return val;
+      return val;
 
-            } else	{
-                ID3_LOG_ERROR("failed..: {} ..", start);
-            }
+    } else {
+      ID3_LOG_ERROR("failed..: {} ..", start);
+    }
 
-            return {};
-        }
+    return {};
+  }
 
-        std::optional<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
-                                                 uint32_t extraSize,
-                                                 uint32_t tagLocation) {
+  std::optional<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
+                                               uint32_t extraSize,
+                                               uint32_t tagLocation) {
 
-            const uint32_t frameSizePositionInArea = 3 + tagLocation;
-            constexpr uint32_t frameSizeLengthInArea = 3;
-            constexpr uint32_t frameSizeMaxValuePerElement = 127;
+    const uint32_t frameSizePositionInArea = 3 + tagLocation;
+    constexpr uint32_t frameSizeLengthInArea = 3;
+    constexpr uint32_t frameSizeMaxValuePerElement = 127;
 
-            return id3::updateAreaSize<uint32_t>(
-                buffer, extraSize, frameSizePositionInArea,
-                frameSizeLengthInArea, frameSizeMaxValuePerElement);
-        }
+    return id3::updateAreaSize<uint32_t>(
+        buffer, extraSize, frameSizePositionInArea, frameSizeLengthInArea,
+        frameSizeMaxValuePerElement);
+  }
 
-}; //v00
+}; // v00
 
-}; //id3v2
+};     // namespace id3v2
 #endif //_ID3V2_000
