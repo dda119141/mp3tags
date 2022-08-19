@@ -7,12 +7,10 @@
 
 #include <id3.hpp>
 
-namespace id3v2
-{
+namespace id3v2 {
 
-class v40
-{
-    public:
+class v40 {
+public:
 #if 0
         const std::vector<std::string> tag_names{
             "TALB" //     [#TALB Album/Movie/Show title]
@@ -64,53 +62,42 @@ class v40
 
         };
 #endif
-        constexpr unsigned int FrameIDSize(void)
-        {
-            return 4;
-        }
+  constexpr unsigned int FrameIDSize(void) { return 4; }
 
-        constexpr unsigned int FrameHeaderSize(void)
-        {
-            return 10;
-        }
+  constexpr unsigned int FrameHeaderSize(void) { return 10; }
 
+  std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index) {
+    const auto start = FrameIDSize() + index;
 
-        std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index)
-        {
-            const auto start = FrameIDSize() + index;
+    if (buffer->size() >= start) {
+      using paire = std::pair<uint32_t, uint32_t>;
 
-            if(buffer->size() >= start)
-            {
-                using paire = std::pair<uint32_t, uint32_t>;
+      const std::vector<uint32_t> pow_val = {24, 16, 8, 0};
 
-                const std::vector<uint32_t> pow_val = { 24, 16, 8, 0 };
+      std::vector<paire> result(pow_val.size());
 
-                std::vector<paire> result(pow_val.size());
+      std::transform(
+          std::begin(*buffer) + start,
+          std::begin(*buffer) + start + pow_val.size(), pow_val.begin(),
+          result.begin(),
+          [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
 
-                std::transform(std::begin(*buffer) + start, std::begin(*buffer) + start + pow_val.size(),
-                        pow_val.begin(), result.begin(),
-                        [](uint32_t a, uint32_t b){
-                        return std::make_pair(a, b);
-                        }
-                        );
+      const uint32_t val =
+          std::accumulate(result.begin(), result.end(), 0, [](int a, paire b) {
+            return (a + (b.first * std::pow(2, b.second)));
+          });
 
-                const uint32_t val = std::accumulate(result.begin(), result.end(), 0,
-                        [](int a, paire b)
-                        {
-                        return ( a + (b.first * std::pow(2, b.second)) );
-                        }
-                        );
+      return val;
 
-                return val;
+    } else {
+      ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(),
+                    start);
+    }
 
-            } else	{
-                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(), start);
-            }
+    return {};
+  }
 
-            return {};
-        }
+}; // v40
 
-}; //v40
-
-};
-#endif //ID3V2_V40
+};     // namespace id3v2
+#endif // ID3V2_V40

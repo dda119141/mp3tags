@@ -3,12 +3,10 @@
 
 #include <id3.hpp>
 
-namespace id3v2
-{
+namespace id3v2 {
 
-class v30
-{
-    public:
+class v30 {
+public:
 #if 0
         std::vector<std::string> tag_names{
             "TALB" //     [#TALB Album/Movie/Show title]
@@ -50,41 +48,31 @@ class v30
                 ,"TYER"//      [#TYER Year]
         };
 #endif
-        constexpr unsigned int FrameIDSize(void)
-        {
-            return 4;
-        }
+  constexpr unsigned int FrameIDSize(void) { return 4; }
 
-        constexpr unsigned int FrameHeaderSize(void)
-        {
-            return 10;
-        }
+  constexpr unsigned int FrameHeaderSize(void) { return 10; }
 
+  std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index) {
+    const auto start = FrameIDSize() + index;
 
-        std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index)
-        {
-            const auto start = FrameIDSize() + index;
+    if (buffer->size() >= start) {
+      uint32_t val = buffer->at(start + 0) * std::pow(2, 24);
 
-            if(buffer->size() >= start)
-            {
-                uint32_t val = buffer->at(start + 0) * std::pow(2, 24);
+      val += buffer->at(start + 1) * std::pow(2, 16);
+      val += buffer->at(start + 2) * std::pow(2, 8);
+      val += buffer->at(start + 3) * std::pow(2, 0);
 
-                val += buffer->at(start + 1) * std::pow(2, 16);
-                val += buffer->at(start + 2) * std::pow(2, 8);
-                val += buffer->at(start + 3) * std::pow(2, 0);
+      return val;
 
-                return val;
+    } else {
+      ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(),
+                    start);
+    }
 
-            } else	{
-                ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(), start);
-            }
+    return {};
+  }
 
-            return {};
-        }
+}; // v30
 
-
-
-}; //v30
-
-};
+};     // namespace id3v2
 #endif //_ID3V2_230
