@@ -5,244 +5,98 @@
 #ifndef TAGBASE_RESULT_HPP
 #define TAGBASE_RESULT_HPP
 
-#include <type_traits>
 #include <functional>
 #include <optional>
+#include <type_traits>
 
 namespace expected {
 
-    using uChar = std::vector<unsigned char>;
-    template <typename T, typename E>
-        class Result_t {
-            public:
-                Result_t()
-                {
-                }
+using uChar = std::vector<unsigned char>;
 
-                auto moveError(const E& error) {
-                    //m_error = std::move(E(std::forward<E>(error)));
-                    m_error = std::move(error);
-                    m_value = {};
+template <typename T> struct Result {
+public:
+  Result() noexcept = default;
 
-                    return *this;
-                }
+  constexpr Result(T &&t) noexcept : mOptional{std::forward<T>(t)} {}
 
-                auto moveValue(const T& value) {
-                    m_value = std::move(value);
-                    m_error = {};
+  void operator()(const std::string &error) { mError = error; }
 
-                    return *this;
-                }
+  template <typename E,
+            typename = std::enable_if_t<
+                (std::is_same<std::decay_t<E>, std::string>::value ||
+                 std::is_same<std::decay_t<E>, const char *>::value ||
+                 std::is_same<std::decay_t<E>, char *>::value)>>
+  void register_error(E &&error) {
+    mError = std::forward<E>(error);
+  }
 
-                Result_t<T, E> operator()(const E& error)
-                {
-                    m_error = std::move(error);
-                    m_value = {};
-                    return *this;
-                }
+  std::string error() const { return mError; }
 
-               bool has_value() const { return m_value.has_value(); }
+  constexpr bool has_value() const noexcept { return mOptional.has_value(); }
 
-                bool has_error() const { return m_error.has_value(); }
+  constexpr bool invalid() const noexcept { return !has_value(); }
 
-                T value() const {
-                    if (m_value.has_value())
-                        return m_value.value();
-                    else
-                        return {};
-                }
+  const auto value() const { return mOptional.value(); }
 
-                E error() const {
-                    if (m_error.has_value())
-                        return m_error.value();
-                    else
-                        return {};
-                }
+private:
+  std::string mError = {};
+  std::optional<T> mOptional = {};
+};
 
-                template <typename V>
-                auto operator << (const V& error)
-                {
-                    std::stringstream ss;
-                    ss << error;
-                    if(m_error.has_value())
-                         m_error = m_error.value() +  ss.str();
-                    else
-                        m_error = ss.str();
-                    return *this;
-                }
+template <typename T,
+          typename = std::enable_if_t<(
+              std::is_same<std::decay_t<T>, std::string>::value ||
+              std::is_same<std::decay_t<T>, char *>::value)>,
+          typename E = Result<T>>
+struct print_t {
+  auto operator<<(const E &obj) {
+    std::stringstream ss;
+    if (obj.has_value())
+      ss << obj.value();
+    else
+      ss << "Empty Object";
+  }
+};
 
-            private:
-                std::optional<E> m_error;
-                std::optional<T> m_value;
-        };
-
-    template <typename T>
-        using Result = Result_t<T, std::string>;
-
- template <typename T, typename E>
-        Result_t<T, E> makeError(const E& error) {
-            Result_t<T, E> obj;
-            obj.moveError(error);
-            return obj;
-        }
-
-  template <typename T>
-        Result<T> makeError(const char* error) {
-            Result_t<T, std::string> obj;
-            obj.moveError(std::string(error));
-            return obj;
-        }
-
-  template <typename T>
-        Result<T> makeError() {
-            Result_t<T, std::string> obj;
-            obj.moveError(std::string("Error: "));
-            return obj;
-        }
-
-    template <typename T>
-        auto makeError(std::string_view error)
-        -> decltype(makeError<T, std::string_view>(std::forward<std::string_view>(error)))
-        {
-            return makeError<T, std::string_view>(std::forward<std::string_view>(error));
-        }
-
-    template <typename T, typename E>
-        Result_t<T, E> makeValue(T&& value) {
-            Result_t<T, E> obj;
-            obj.moveValue(std::forward<T>(value));
-            return obj;
-        }
-
-  template <typename T>
-        Result<T> makeValue(const T& value) {
-            Result_t<T, std::string> obj;
-            obj.moveValue(value);
-            return obj;
-        }
-
-
-    template <typename T, typename E>
-        std::string getOutput(const Result_t<T, E>& obj)
-        {
-            std::stringstream str_obj;
-            if(auto ret1 = std::get_if<T>(&obj)){
-                str_obj << *ret1;
-            }
-            else if(auto ret2 = std::get_if<E>(&obj)){
-                str_obj << *ret2;
-            }
-
-            str_obj << "\n";
-
-            return str_obj.str();
-        }
-
-#if 0
-    template <typename T, typename E, typename Transform,
-            typename Ret = typename std::result_of<Transform(T)>::type>
-        Ret operator | (expected::Result_t<T, E>&& r, Transform f)
-       // -> decltype(f(std::forward<expected::Result_t<T, E>>(r).value()))
-    {
-            auto fuc = std::forward<Transform>(f);
-            auto obj = std::forward<expected::Result_t<T, E> >(r);
-
-            if (obj.has_value()) {
-                return fuc(obj.value());
-            } else {
-                return Ret()(obj.error());
-               // return Ret();
-            }
-    }
-#endif
-
-    template <typename T, typename E, typename Transform,
-            typename Ret = typename std::result_of<Transform(T)>::type>
-        auto operator | (const expected::Result_t<T, E>& r, Transform f)
-            -> typename std::enable_if_t<!std::is_void<Ret>::value, Ret>
-	//	-> typename std::enable_if_t<!std::is_integral<Ret>::value && !std::is_void<Ret>::value, Ret>
-	{
-            auto fuc = std::forward<Transform>(f);
-
-            if (r.has_value()) {
-                return fuc(r.value());
-            } else {
-               // return Ret()(r.error());
-                return Ret();
-            }
-     }
-
- template <typename T, typename E, typename Transform,
-            typename Ret = typename std::result_of<Transform(T)>::type>
-        auto operator | (const expected::Result_t<T, E>& r, Transform f)
-            -> typename std::enable_if_t<std::is_integral<Ret>::value, Ret>
-    {
-            auto fuc = std::forward<Transform>(f);
-
-            if (r.has_value()) {
-                return fuc(r.value());
-            } else {
-                return 0;
-            }
-     }
-
- template <typename T, typename E, typename Transform,
-            typename Ret = typename std::result_of<Transform(T)>::type>
-        auto operator | (const expected::Result_t<T, E>& r, Transform f)
-            -> typename std::enable_if_t<std::is_void<Ret>::value, Ret>
-    {
-            auto fuc = std::forward<Transform>(f);
-
-            if (r.has_value()) {
-                return fuc(r.value());
-            } else {
-                return;
-            }
-     }
-
-}  // namespace expected
-
-
-namespace expected
-{
-    using uChar = std::vector<unsigned char>;
-
-    Result<uChar> GetStringFromFile1(const std::string& FileName, uint32_t num )
-    {
-        std::ifstream fil(FileName);
-        std::vector<unsigned char> buffer(num, '0');
-
-        if(!fil.good()){
-            //std::cerr << "mp3 file could not be read\n";
-            //return {};
-            return makeError<uChar, std::string>("mp3 UUU file could not be read");
-        }
-
-        fil.read(reinterpret_cast<char*>(buffer.data()), num);
-
-        //return makeValue<uChar, std::string>(buffer);
-        return makeValue<uChar>(buffer);
-    }
-
-    std::optional<uChar> GetTagHeader1(const std::string& FileName )
-//    std::string GetTagHeader1(const std::string& FileName )
-    {
-        auto ret =
-            GetStringFromFile1(FileName, 10) | [&]( const uChar& obj )
-        {
-            std::cerr << "error " << "GetTagHeader1" << std::endl;
-
-            //return makeValue<bool, std::string>(true);
-           // return makeError<bool, std::string>(" ******* ");
-            //return makeError<uChar>(" ******* ");
-            return makeValue<uChar>(obj);
-            //return true;
-        };
-
-       return std::make_optional(ret.value());
-        //return ret.error();
-       // return "OK";
-    }
+template <typename E, typename T,
+          typename = std::enable_if_t<
+              (std::is_same<std::decay_t<T>, std::string>::value ||
+               std::is_same<std::decay_t<T>, const char *>::value)>>
+Result<E> makeError(T &&error) {
+  auto obj = Result<E>{};
+  obj.register_error(error);
+  return obj;
 }
 
-#endif  // TAGBASE_RESULT_HPP
+template <typename T> Result<T> makeValue(T value) {
+  return Result{std::forward<T>(value)};
+}
+
+template <typename T, typename Transform,
+          typename Ret = typename std::result_of<Transform(T)>::type>
+auto operator|(const expected::Result<T> &r, Transform f) {
+  auto fuc = std::forward<Transform>(f);
+
+  if (r.has_value()) {
+    return fuc(r.value());
+  } else {
+    return Ret();
+  }
+}
+
+auto testResultClass(const std::string &FileName, uint32_t num) {
+  std::ifstream fil(FileName);
+  std::vector<unsigned char> buffer(num, '0');
+
+  if (!fil.good()) {
+    return makeError<uChar>(std::string("mp3 UUU file could not be read"));
+  }
+
+  fil.read(reinterpret_cast<char *>(buffer.data()), num);
+
+  return makeValue<uChar>(buffer);
+}
+
+} // namespace expected
+
+#endif // TAGBASE_RESULT_HPP
