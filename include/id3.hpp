@@ -5,7 +5,9 @@
 #ifndef ID3_BASE
 #define ID3_BASE
 
+#include "id3_exceptions.hpp"
 #include "logger.hpp"
+#include "tagfilesystem.hpp"
 #include <algorithm>
 #include <bitset>
 #include <cmath>
@@ -19,8 +21,6 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
-#include "id3_exceptions.hpp"
-#include "tagfilesystem.hpp"
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
@@ -156,13 +156,6 @@ const auto NewFrameSettings(const FrameSettings &frameconfig,
 
 template <typename T> constexpr T RetrieveSize(T n) { return n; }
 
-template <typename T> struct integral_unsigned_asserts {
-  void operator()() {
-    static_assert((std::is_integral<T>::value || std::is_unsigned<T>::value),
-                  "parameter should be integers");
-  }
-};
-
 template <typename T, typename F>
 auto mbind(std::optional<T> &&_obj, F &&function)
     -> decltype(function(_obj.value())) {
@@ -175,41 +168,6 @@ auto mbind(std::optional<T> &&_obj, F &&function)
     return {};
   }
 }
-
-template <typename T, typename... Rest> struct is_any_of : std::false_type {};
-
-template <typename T, typename First>
-struct is_any_of<T, First> : std::is_same<T, First> {};
-
-template <typename T, typename First, typename... Rest>
-struct is_any_of<T, First, Rest...>
-    : std::integral_constant<bool, std::is_same<T, First>::value ||
-                                       is_any_of<T, Rest...>::value> {};
-
-#if 0
-template <typename T,
-        typename = std::enable_if_t<
-            is_any_of<std::decay_t<T>, 
-                std::optional<id3::FrameSettings>,
-                std::optional<std::vector<uint8_t>>,
-                std::optional<buffer_t>,
-                std::optional<std::string>,
-                std::optional<std::string_view>,
-                std::optional<bool>,
-                std::optional<uint32_t>>::value>,
-        typename F>
-auto operator | (T&& _obj, F&& Function)
-    -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value())) {
-    auto fuc = std::forward<F>(Function);
-    auto obj = std::forward<T>(_obj);
-
-    if (obj.has_value()) {
-        return fuc(obj.value());
-    } else {
-        return {};
-    }
-}
-#endif
 
 template <
     typename T,
@@ -282,8 +240,10 @@ std::optional<bool> renameFile(const std::string &fileToRename,
 template <typename T>
 uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
                           T num_of_bytes_in_hex) {
-  integral_unsigned_asserts<T> eval;
-  eval();
+
+  constexpr bool is_integrale_asset =
+      std::is_integral<T>::value || std::is_unsigned<T>::value;
+  static_assert(is_integrale_asset, "Parameter should be integer");
 
   ID3_PRECONDITION(buffer->size() > num_of_bytes_in_hex);
 
@@ -306,7 +266,8 @@ uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
   return version;
 }
 
-std::string ExtractString(buffer_t buffer, uint32_t start, uint32_t length) {
+inline std::string ExtractString(buffer_t buffer, uint32_t start,
+                                 uint32_t length) {
   ID3_PRECONDITION((start + length) <= static_cast<uint32_t>(buffer->size()));
 
   if (static_cast<uint32_t>(buffer->size()) >= (start + length)) {
@@ -355,8 +316,8 @@ uint32_t GetTagSizeDefault(buffer_t buffer, uint32_t length,
   return val;
 }
 
-bool replaceElementsInBuff(buffer_t buffIn, buffer_t buffOut,
-                           uint32_t position) {
+inline bool replaceElementsInBuff(buffer_t buffIn, buffer_t buffOut,
+                                  uint32_t position) {
   const auto iter = std::begin(*buffOut) + position;
 
   std::transform(iter, iter + buffIn->size(), buffIn->begin(), iter,

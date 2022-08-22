@@ -286,7 +286,6 @@ private:
         framePayloadToWrite.size()) // resize whole header
     {
       std::cerr << "frames ize does not fit\n";
-      // return false;
 
       const uint32_t extraLength = (framePayloadToWrite.size() -
                                     frameProperties.getFramePayloadLength());

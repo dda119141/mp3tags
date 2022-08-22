@@ -192,11 +192,6 @@ const auto CreateTagBufferFromFile(const std::string &FileName, uint32_t num) {
   std::ifstream fil(FileName);
   auto buffer = std::make_shared<std::vector<unsigned char>>(num, '0');
 
-  //    if (!fil.good()) {
-  //        return expected::makeError<std::vector<uint8_t>>() << __func__
-  //                                                    << (":failed\n");
-  //    }
-
   fil.read(reinterpret_cast<char *>(buffer->data()), num);
 
   return buffer;
@@ -205,8 +200,10 @@ const auto CreateTagBufferFromFile(const std::string &FileName, uint32_t num) {
 template <typename T>
 std::optional<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
                                             T num_of_bytes_in_hex) {
-  id3::integral_unsigned_asserts<T> eval;
-  eval();
+
+  constexpr bool is_integrale_asset =
+      std::is_integral<T>::value || std::is_unsigned<T>::value;
+  static_assert(is_integrale_asset, "Parameter should be integer");
 
   ID3_PRECONDITION(buffer->size() > num_of_bytes_in_hex);
 
