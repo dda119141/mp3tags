@@ -86,29 +86,29 @@ const std::optional<bool> SetFramePayload(const std::string &filename,
                                           std::string_view content,
                                           uint32_t relativeFramePayloadStart,
                                           uint32_t relativeFramePayloadEnd) {
-  assert(relativeFramePayloadEnd > relativeFramePayloadStart);
+	assert(relativeFramePayloadEnd > relativeFramePayloadStart);
 
-  static const tagReadWriter tagRW{filename};
+	static const tagReadWriter tagRW{filename};
 
-  if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
-    ID3_LOG_ERROR("content length {} too big for frame area", content.size());
+	if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
+		ID3_LOG_ERROR("content length {} too big for frame area", content.size());
 
-    return {};
-  }
+		return {};
+	}
 
-  const auto frameSettings =
-      FrameSettings::create()
-          ->with_frameID_offset(tagRW.GetTagPayload() +
-                                relativeFramePayloadStart)
-          .with_framecontent_offset(tagRW.GetTagPayload() +
-                                    relativeFramePayloadStart)
-          .with_frame_length(relativeFramePayloadEnd -
-                             relativeFramePayloadStart);
+	frameScopeProperties frameScopeProperties = {};
+	frameScopeProperties.frameIDStartPosition=tagRW.GetTagPayload() +
+		relativeFramePayloadStart;
+	frameScopeProperties.frameContentStartPosition=
+		tagRW.GetTagPayload() +
+		relativeFramePayloadStart;
+	frameScopeProperties.frameLength=relativeFramePayloadEnd -
+		relativeFramePayloadStart;
 
-  ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content),
-               tagRW.GetTagPayload());
+	ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content),
+			tagRW.GetTagPayload());
 
-  return WriteFile(filename, std::string(content), frameSettings);
+	return WriteFile(filename, std::string(content), frameScopeProperties);
 }
 
 const std::optional<bool> SetTitle(const std::string &filename,

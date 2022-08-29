@@ -29,39 +29,29 @@ GetId3v2Tag(const std::string &fileName,
             {
               const auto params = [&]() {
                 if (id3Version == "0x0300") {
-                  const auto paramLoc = id3v2::basicParameters{
-                      fileName, id3v2::v30() // Tag version
-                      ,
-                      tag.second // Frame ID
-                  };
-
-                  return paramLoc;
-
+                  return audioProperties_t{id3v2::fileScopeProperties{
+                      fileName,
+                      id3v2::v30(), // Tag version
+                      tag.second    // Frame ID
+                  }};
                 } else if (id3Version == "0x0400") {
-                  const auto paramLoc = id3v2::basicParameters{
-                      fileName, id3v2::v40() // Tag version
-                      ,
-                      tag.second // Frame ID
-                  };
-
-                  return paramLoc;
-
+                  return audioProperties_t{id3v2::fileScopeProperties{
+                      fileName,
+                      id3v2::v40(), // Tag version
+                      tag.second    // Frame ID
+                  }};
                 } else if (id3Version == "0x0000") {
-                  const auto paramLoc = id3v2::basicParameters{
-                      fileName, id3v2::v00() // Tag version
-                      ,
-                      tag.second // Frame ID
-                  };
-
-                  return paramLoc;
-
+                  return audioProperties_t{id3v2::fileScopeProperties{
+                      fileName,
+                      id3v2::v00(), // Tag version
+                      tag.second    // Frame ID
+                  }};
                 } else {
-                  const id3v2::basicParameters paramLoc{std::string("")};
-                  return paramLoc;
+                  return audioProperties_t{};
                 }
               };
               try {
-                id3v2::TagReadWriter obj(params());
+                id3v2::TagReader obj{params()};
 
                 const auto found = obj.getFramePayload();
                 return id3::stripLeft(found);

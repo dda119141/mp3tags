@@ -31,81 +31,67 @@ std::optional<buffer_t> checkForID3(buffer_t buffer) {
   }
 }
 
-FrameSettings getFrameSettingsFromEncodeByte(const FrameSettings &frSet,
-                                             buffer_t tagBuffer) {
-  // const auto& frameOffset = frSet->getFrameKeyOffset();
-  const auto &frameContentOffset = frSet.getFramePayloadOffset();
-  const auto &frameSize = frSet.getFrameLength();
+void getframeScopePropertiesFromEncodeByte(
+    frameScopeProperties &mframeScopeProperties, buffer_t tagBuffer) {
+
+  const auto &frameContentOffset =
+      mframeScopeProperties.frameContentStartPosition;
 
   switch (tagBuffer->at(frameContentOffset)) {
   case 0x0: {
-    return FrameSettings::create()
-        ->fromFrameProperties(frSet)
-        .with_framecontent_offset(frameContentOffset + 1)
-        .with_frame_length(frameSize - 1);
 
+    mframeScopeProperties.frameContentStartPosition += 1;
+    mframeScopeProperties.frameLength -= 1;
     break;
   }
   case 0x1: {
-    uint32_t doSwap = 0;
     const uint16_t encodeOder = (tagBuffer->at(frameContentOffset + 1) << 8 |
                                  tagBuffer->at(frameContentOffset + 2));
     if (encodeOder == 0xfeff) {
-      doSwap = 1;
+      mframeScopeProperties.doSwap = 1;
     }
 
-    return FrameSettings::create()
-        ->fromFrameProperties(frSet)
-        .with_framecontent_offset(frameContentOffset + 3)
-        .with_encode_flag(0x01)
-        .with_do_swap(doSwap)
-        .with_frame_length(frameSize - 3);
+    mframeScopeProperties.frameContentStartPosition += 3;
+    mframeScopeProperties.frameLength -= 3;
+    mframeScopeProperties.encodeFlag = 1;
     break;
   }
   case 0x2: { /* UTF-16BE [UTF-16] encoded Unicode [UNICODE] without
                  BOM */
-    return FrameSettings::create()
-        ->fromFrameProperties(frSet)
-        .with_framecontent_offset(frameContentOffset + 1)
-        .with_encode_flag(0x02)
-        .with_frame_length(frameSize - 1);
+    mframeScopeProperties.frameContentStartPosition += 1;
+    mframeScopeProperties.frameLength -= 1;
+    mframeScopeProperties.encodeFlag = 2;
     break;
   }
   case 0x3: { /* UTF-8 [UTF-8] encoded Unicode [UNICODE]. Terminated
                  with $00 */
-    return FrameSettings::create()
-        ->fromFrameProperties(frSet)
-        .with_framecontent_offset(frameContentOffset + 3)
-        .with_encode_flag(0x03)
-        .with_frame_length(frameSize - 3);
-
+    mframeScopeProperties.frameContentStartPosition += 3;
+    mframeScopeProperties.frameLength -= 3;
+    mframeScopeProperties.encodeFlag = 3;
     break;
   }
   default: {
-    return FrameSettings::create()
-        ->fromFrameProperties(frSet)
-        .with_framecontent_offset(frameContentOffset + 1)
-        .with_frame_length(frameSize - 1);
+    mframeScopeProperties.frameContentStartPosition += 1;
+    mframeScopeProperties.frameLength -= 1;
     break;
   }
   }
 }
 
 std::string formatFramePayload(std::string_view content,
-                               const FrameSettings &frameProperties) {
+                               const frameScopeProperties &frameProperties) {
 
-  using localVariant =
+  using payloadType =
       std::variant<std::string_view, std::u16string, std::u32string>;
 
-  const localVariant encodeValue = [&] {
-    localVariant varEncode;
+  const payloadType encodeValue = [&] {
+    payloadType varEncode;
 
-    if (frameProperties.getEncodingValue() == 0x01) {
+    if (frameProperties.encodeFlag == 0x01) {
       varEncode = std::u16string();
-    } else if (frameProperties.getEncodingValue() ==
-               0x02) { // unicode without BOM
+    } else if (frameProperties.encodeFlag == 0x02) { // unicode without BOM
       varEncode = std::string_view("");
-    } else if (frameProperties.getEncodingValue() == 0x03) { // UTF8 unicode
+    } else if (frameProperties.encodeFlag == 0x03) { // UTF8 unicode
       varEncode = std::u32string();
     }
 
@@ -123,7 +109,7 @@ std::string formatFramePayload(std::string_view content,
           [&](std::u16string arg) {
             (void)arg;
 
-            if (frameProperties.getSwapValue() == 0x01) {
+            if (frameProperties.doSwap == 0x01) {
               std::string_view val =
                   tagBase::getW16StringFromLatin<std::vector<uint8_t>>(content);
               const auto ret = tagBase::swapW16String(val);
@@ -154,31 +140,39 @@ uint32_t getFramePosition(std::string_view frameID,
   return searchFramePosition.execute(frameID);
 }
 
-class TagReadWriter {
+class TagReader {
 public:
-  explicit TagReadWriter(const ::id3v2::basicParameters &params) {
-    std::call_once(m_once, [&params, this]() {
-      tagBuffer = GetTagHeader(params.get_filename()) | GetTagSize |
+  explicit TagReader(id3::audioProperties_t Config) : audioProperties(Config) {
+
+    std::call_once(m_once, [this]() {
+      fileScopeProperties &fileProperties =
+          audioProperties.fileScopePropertiesObj;
+
+      tagBuffer = GetTagHeader(fileProperties.get_filename()) | GetTagSize |
                   [&](uint32_t tags_size) {
                     return CreateTagBufferFromFile(
-                        params.get_filename(),
+                        fileProperties.get_filename(),
                         tags_size + GetTagHeaderSize<uint32_t>());
                   };
 
-      if (params.get_frame_id().length() == 0)
+      if (fileProperties.get_frame_id().length() == 0)
         ID3V2_THROW("No frame ID parameter");
 
-      mParams = findFrameSettings(params);
+      audioProperties.frameScopePropertiesObj.emplace();
 
-      const auto &frameProperties = mParams->get_frame_settings();
+      frameScopeProperties &frameProperties =
+          audioProperties.frameScopePropertiesObj.value();
 
-      if (mParams->get_tag_area().size() == 0) {
+      retrieveFrameProperties(fileProperties);
+
+      if (fileProperties.get_tag_area().size() == 0) {
         ID3V2_THROW("tag area length = 0");
       }
-      if (mParams->get_tag_Buffer()->size() == 0) {
+      if (fileProperties.get_tag_Buffer()->size() == 0) {
         ID3V2_THROW("tag buffer length = 0");
       }
-      if (frameProperties.getFrameLength() > mParams->get_tag_area().size()) {
+      if (frameProperties.getFrameLength() >
+          fileProperties.get_tag_area().size()) {
         ID3V2_THROW("frame length > tag area length");
       }
       if (frameProperties.getFramePayloadLength() == 0) {
@@ -188,13 +182,13 @@ public:
   }
 
   const std::string getFramePayload() const {
-    const auto &frameProperties = mParams->get_frame_settings();
-
+    frameScopeProperties &frameProperties =
+        audioProperties.frameScopePropertiesObj.value();
     const auto framePayload =
-        ExtractString(tagBuffer, frameProperties.getFramePayloadOffset(),
+        ExtractString(tagBuffer, frameProperties.frameContentStartPosition,
                       frameProperties.getFramePayloadLength());
 
-    if (frameProperties.getSwapValue() == 0x01) {
+    if (frameProperties.doSwap == 0x01) {
       const auto tempPayload =
           tagBase::swapW16String(std::string_view(framePayload));
       return tempPayload;
@@ -203,81 +197,63 @@ public:
     }
   }
 
-  const std::shared_ptr<::id3v2::basicParameters> getIDParameters() const {
-    return mParams;
-  }
+  audioProperties_t *const GetMediaSettings() const { return &audioProperties; }
 
 private:
   mutable std::once_flag m_once;
-  std::shared_ptr<::id3v2::basicParameters> mParams;
+  audioProperties_t &audioProperties;
   buffer_t tagBuffer = {};
 
-  std::shared_ptr<::id3v2::basicParameters>
-  findFrameSettings(const basicParameters &params) {
+  void retrieveFrameProperties(const fileScopeProperties &params) {
+    frameScopeProperties &frameProperties =
+        audioProperties.frameScopePropertiesObj.value();
+
     const auto tagArea = GetTagArea(tagBuffer);
 
-    const auto framePos = getFramePosition(params.get_frame_id(), tagArea);
+    frameProperties.frameIDStartPosition =
+        getFramePosition(params.get_frame_id(), tagArea);
 
-    const auto FrameSize =
-        GetFrameSize<uint32_t>(tagBuffer, params.get_tag_version(), framePos)
+    frameProperties.frameLength =
+        GetFrameSize<uint32_t>(tagBuffer, params.get_tag_version(),
+                               frameProperties.frameIDStartPosition)
             .value();
+
+    frameProperties.frameContentStartPosition =
+        frameProperties.frameIDStartPosition +
+        GetFrameHeaderSize(params.get_tag_version());
 
     if (params.get_frame_id().find_first_of("T") ==
         0) // if frameID starts with T
     {
-      const auto framesettings =
-          FrameSettings::create()
-              ->with_frameID_offset(framePos)
-              .with_framecontent_offset(
-                  framePos + GetFrameHeaderSize(params.get_tag_version()))
-              .with_frame_length(FrameSize);
-
-      const auto framesettingsObj =
-          getFrameSettingsFromEncodeByte(framesettings, tagBuffer);
-
-      return std::make_shared<basicParameters>(
-          params.with_frame_settings(framesettingsObj)
-              .with_tag_area(tagArea)
-              .with_tag_buffer(tagBuffer));
-    } else {
-      const auto frameSettings =
-          FrameSettings::create()
-              ->with_frameID_offset(framePos)
-              .with_framecontent_offset(
-                  framePos + GetFrameHeaderSize(mParams->get_tag_version()))
-              .with_frame_length(FrameSize);
-
-      return std::make_shared<basicParameters>(
-          params.with_frame_settings(frameSettings)
-              .with_tag_area(tagArea)
-              .with_tag_buffer(tagBuffer));
+      getframeScopePropertiesFromEncodeByte(frameProperties, tagBuffer);
     }
+
+    audioProperties.TagArea = tagArea;
+    audioProperties.TagBuffer = tagBuffer;
   }
 };
 
 class writer {
 public:
-  explicit writer(const TagReadWriter &ReadWriteFrameObj)
-      : FrameReadWriterObj(ReadWriteFrameObj) {
-    const auto params = ReadWriteFrameObj.getIDParameters();
+  explicit writer(audioProperties_t *const audioPropertiesObjIn)
+      : audioPropertiesObj(audioPropertiesObjIn) {
 
-    if (params->get_frame_content_to_write().size() == 0) {
+    const auto &params = audioPropertiesObj->fileScopePropertiesObj;
+
+    if (!audioPropertiesObj->frameScopePropertiesObj.has_value()) {
+      ID3V2_THROW("frame properties not yet parsed from audio file");
+    }
+
+    if (params.get_frame_content_to_write().size() == 0) {
       ID3V2_THROW("frame payload to write size = 0");
     }
   }
 
   bool execute() const {
-    const auto params = FrameReadWriterObj.getIDParameters();
+    const auto &params = audioPropertiesObj->fileScopePropertiesObj;
 
-    return this->writeFramePayload(*params);
-  }
-
-private:
-  writer() = default;
-  const TagReadWriter &FrameReadWriterObj;
-
-  bool writeFramePayload(const basicParameters &params) const {
-    const auto &frameProperties = params.get_frame_settings();
+    const frameScopeProperties &frameProperties =
+        audioPropertiesObj->frameScopePropertiesObj.value();
 
     const std::string framePayloadToWrite = formatFramePayload(
         params.get_frame_content_to_write(), frameProperties);
@@ -285,12 +261,12 @@ private:
     if (frameProperties.getFramePayloadLength() <
         framePayloadToWrite.size()) // resize whole header
     {
-      std::cerr << "frames ize does not fit\n";
+      std::cerr << "frames size does not fit\n";
 
       const uint32_t extraLength = (framePayloadToWrite.size() -
                                     frameProperties.getFramePayloadLength());
 
-      const id3v2::FileExtended fileExtended{params, extraLength,
+      const id3v2::FileExtended fileExtended{audioPropertiesObj, extraLength,
                                              framePayloadToWrite};
 
       return fileExtended.get_status();
@@ -300,6 +276,10 @@ private:
                             frameProperties);
     }
   }
+
+private:
+  writer() = default;
+  audioProperties_t *const audioPropertiesObj;
 };
 
 template <typename id3Type> const auto is_tag(std::string name) {

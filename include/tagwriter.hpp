@@ -24,58 +24,56 @@ bool SetTag(const std::string &filename,
 
       | [](id3::buffer_t buffer) { return id3v2::GetID3Version(buffer); }
 
-      |
-      [&](const std::string &id3Version) {
-        const auto writePayloadResult = [&]() -> bool {
-          for (auto &tag : tags) {
-            if (id3Version == tag.first) // tag.first is the id3 Version
-            {
-              const auto param = [&]() {
-                if (id3Version == "0x0300") {
-                  const auto paramLoc =
-                      id3v2::basicParameters{filename, id3v2::v30()}
-                          .with_frame_id(tag.second)
-                          .with_frame_payload(content);
-
-                  return paramLoc;
-                } else if (id3Version == "0x0400") {
-                  const auto paramLoc =
-                      id3v2::basicParameters{filename, id3v2::v40()}
-                          .with_frame_id(tag.second)
-                          .with_frame_payload(content);
-
-                  return paramLoc;
-                } else if (id3Version == "0x0000") {
-                  const auto paramLoc =
-                      id3v2::basicParameters{filename, id3v2::v00()}
-                          .with_frame_id(tag.second)
-                          .with_frame_payload(content);
-
-                  return paramLoc;
-                } else {
-                  const auto paramLoc = id3v2::basicParameters{std::string("")};
-                  return paramLoc;
+      | [&](const std::string &id3Version) {
+          const auto writePayloadResult = [&]() -> bool {
+            for (auto &tag : tags) {
+              if (id3Version == tag.first) // tag.first is the id3 Version
+              {
+                const auto param = [&]() {
+                  if (id3Version == "0x0300") {
+                    return audioProperties_t{id3v2::fileScopeProperties{
+                        filename,     // filename
+                        id3v2::v30(), // Tag version
+                        tag.second,   // Frame ID
+                        content       // frame payload
+                    }};
+                  } else if (id3Version == "0x0400") {
+                    return audioProperties_t{id3v2::fileScopeProperties{
+                        filename,     // filename
+                        id3v2::v40(), // Tag version
+                        tag.second,   // Frame ID
+                        content       // frame payload
+                    }};
+                  } else if (id3Version == "0x0000") {
+                    return audioProperties_t{id3v2::fileScopeProperties{
+                        filename,     // filename
+                        id3v2::v00(), // Tag version
+                        tag.second,   // Frame ID
+                        content       // frame payload
+                    }};
+                  } else {
+                    return audioProperties_t{};
+                  };
                 };
-              }();
 
-              try {
-                const id3v2::TagReadWriter obj{param};
-                const id3v2::writer Writer{obj};
-                return Writer.execute();
+                try {
+                  const id3v2::TagReader obj{param()};
+                  const id3v2::writer Writer{obj.GetMediaSettings()};
+                  return Writer.execute();
 
-              } catch (const std::runtime_error &e) {
-                std::cerr << "Runtime Error: " << e.what() << std::endl;
+                } catch (const std::runtime_error &e) {
+                  std::cerr << "Runtime Error: " << e.what() << std::endl;
+                }
               }
             }
-          }
 
-          ID3_LOG_WARN("{} failed", __func__);
+            ID3_LOG_WARN("{} failed", __func__);
 
-          return false;
+            return false;
+          };
+
+          return writePayloadResult();
         };
-
-        return writePayloadResult();
-      };
 
   return ret;
 }

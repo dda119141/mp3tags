@@ -39,14 +39,44 @@ static const std::string modifiedEnding(".mod");
 using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
-/* Frame settings */
+typedef struct frameScopeProperties_t {
+  uint16_t frameIDStartPosition = {};
+  uint8_t doSwap = {};
+  uint8_t frameIDLength = {};
+  uint32_t frameContentStartPosition = {};
+  uint32_t frameLength = {};
+  uint32_t framePayloadLength = {};
+  uint32_t encodeFlag = {};
 
+  uint32_t getFramePayloadLength() const {
+    if (frameLength && frameIDLength)
+      return (frameLength - frameIDLength);
+    else
+      return frameLength;
+  }
+
+  uint32_t getFrameLength() const {
+    if (framePayloadLength && frameIDLength)
+      return (framePayloadLength + frameIDLength);
+    else
+      return frameLength;
+  }
+
+  void with_additional_payload_size(uint32_t additionalPayload) {
+    frameLength += additionalPayload;
+    framePayloadLength += additionalPayload;
+  }
+
+} frameScopeProperties;
+
+/* Frame settings */
+#if 0
 class FramePropertiesBuilder; // forward declaration
 
-class FrameSettings {
+class frameScopeProperties {
 
 public:
-  FrameSettings() {}
+  frameScopeProperties() {}
 
   static std::unique_ptr<FramePropertiesBuilder> create() {
     return std::make_unique<FramePropertiesBuilder>();
@@ -73,6 +103,15 @@ public:
   uint32_t getEncodingValue() const { return encodeFlag; }
 
   uint32_t getSwapValue() const { return doSwap; }
+#if 0
+  void with_encode_flag(uint32_t encode_flag) {
+    encodeFlag = encode_flag;
+  }
+
+  void with_do_swap(uint32_t dSwap) {
+    doSwap = dSwap;
+  }
+#endif
 
 private:
   friend class FramePropertiesBuilder;
@@ -87,16 +126,16 @@ private:
 
 class FramePropertiesBuilder {
 
-  FrameSettings frameProperties;
+  frameScopeProperties frameProperties;
 
 public:
   FramePropertiesBuilder &
-  fromFrameProperties(const FrameSettings &framePropertiesIn) {
+  fromFrameProperties(const frameScopeProperties &framePropertiesIn) {
     frameProperties = framePropertiesIn;
     return *this;
   }
 
-  operator FrameSettings() const { return std::move(frameProperties); }
+  operator frameScopeProperties() const { return std::move(frameProperties); }
 
   FramePropertiesBuilder &with_frameID_offset(uint32_t id_offset) {
     frameProperties.frameIDStartPosition = id_offset;
@@ -135,6 +174,7 @@ public:
     return *this;
   }
 };
+#endif
 
 const std::string stripLeft(const std::string &valIn) {
   auto val = valIn;
@@ -144,14 +184,6 @@ const std::string stripLeft(const std::string &valIn) {
       val.end());
 
   return val;
-}
-
-const auto NewFrameSettings(const FrameSettings &frameconfig,
-                            uint32_t additionalFramePayloadSize) {
-  return FrameSettings::create()
-      ->fromFrameProperties(frameconfig)
-      .with_frame_length(frameconfig.getFrameLength() +
-                         additionalFramePayloadSize);
 }
 
 template <typename T> constexpr T RetrieveSize(T n) { return n; }
@@ -179,7 +211,7 @@ template <
         std::is_same<std::decay_t<T>, std::optional<buffer_t>>::value ||
         std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
         std::is_same<std::decay_t<T>,
-                     std::optional<id3::FrameSettings>>::value)>,
+                     std::optional<id3::frameScopeProperties>>::value)>,
     typename F>
 auto operator|(T &&_obj, F &&Function)
     -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value())) {
@@ -194,7 +226,7 @@ auto operator|(T &&_obj, F &&Function)
 }
 
 bool WriteFile(const std::string &FileName, const std::string &content,
-               const FrameSettings &frameSettings) {
+               const frameScopeProperties &frameScopeProperties) {
   std::fstream filWrite(FileName,
                         std::ios::binary | std::ios::in | std::ios::out);
 
@@ -202,15 +234,17 @@ bool WriteFile(const std::string &FileName, const std::string &content,
     return false;
   }
 
-  filWrite.seekp(frameSettings.getFramePayloadOffset());
+  filWrite.seekp(frameScopeProperties.frameContentStartPosition);
 
   std::for_each(content.begin(), content.end(),
                 [&filWrite](const char &n) { filWrite << n; });
 
-  ID3_PRECONDITION(frameSettings.getFramePayloadLength() >= content.size());
+  ID3_PRECONDITION(frameScopeProperties.getFramePayloadLength() >=
+                   content.size());
 
   for (uint32_t i = 0;
-       i < (frameSettings.getFramePayloadLength() - content.size()); ++i) {
+       i < (frameScopeProperties.getFramePayloadLength() - content.size());
+       ++i) {
     filWrite << '\0';
   }
 

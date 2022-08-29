@@ -190,23 +190,22 @@ public:
     if (framePayload.size() > length) {
       APE_THROW("framePayload length too big for frame area");
     }
-
-    const auto frameGlobalConfig =
-        FrameSettings::create()
-            ->with_frameID_offset(frameProperties->frameStartPosition +
-                                  OffsetFromFrameStartToFrameID())
-            .with_framecontent_offset(frameProperties->frameContentPosition)
-            .with_frame_length(frameProperties->frameLength);
+	frameScopeProperties frameScopeProperties = {};
+	frameScopeProperties.frameIDStartPosition = frameProperties->frameStartPosition +
+                                  OffsetFromFrameStartToFrameID();
+	
+	frameScopeProperties.frameContentStartPosition = frameProperties->frameContentPosition;
+	frameScopeProperties.frameLength = frameProperties->frameLength;
 
     if (frameProperties->frameLength >= framePayload.size()) {
 
-      return WriteFile(filename, std::string(framePayload), frameGlobalConfig);
+      return WriteFile(filename, std::string(framePayload), frameScopeProperties);
     } else {
       const uint32_t additionalSize =
           framePayload.size() - frameProperties->frameLength;
 
       const auto writeBackAction =
-          extendTagBuffer(frameGlobalConfig, framePayload, additionalSize) |
+          extendTagBuffer(frameScopeProperties, framePayload, additionalSize) |
           [&](id3::buffer_t buffer) { return this->ReWriteFile(buffer); };
 
       return writeBackAction | [&](bool fileWritten) {
@@ -264,7 +263,7 @@ public:
   }
 
   const expected::Result<id3::buffer_t>
-  extendTagBuffer(const id3::FrameSettings &frameConfig,
+  extendTagBuffer(const id3::frameScopeProperties &frameConfig,
                   std::string_view framePayload,
                   uint32_t additionalSize) const {
 
@@ -275,10 +274,10 @@ public:
     const uint32_t tagsSizePositionInFooter =
         tagProperties->getTagFooterBegin() - relativeBufferPosition + 12;
     const uint32_t frameSizePositionInFrameHeader =
-        frameConfig.getFrameKeyOffset() - OffsetFromFrameStartToFrameID() -
+        frameConfig.frameIDStartPosition - OffsetFromFrameStartToFrameID() -
         relativeBufferPosition;
     const uint32_t frameContentStart =
-        frameConfig.getFramePayloadOffset() - relativeBufferPosition;
+        frameConfig.frameContentStartPosition - relativeBufferPosition;
 
     auto cBuffer = tagProperties->GetBuffer();
 

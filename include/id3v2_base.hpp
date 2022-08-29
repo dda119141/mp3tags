@@ -16,44 +16,40 @@
 
 #include "logger.hpp"
 
-namespace id3v2 {
+namespace id3 {
 
 using iD3Variant = std::variant<::id3v2::v00, ::id3v2::v30, ::id3v2::v40>;
 
-using namespace id3;
-
-class basicParameters {
+class fileScopeProperties {
 private:
-  const std::string &filename;
+  const std::string filename;
   const iD3Variant tagVersion;
   std::string_view frameID = {};
 
   buffer_t tagBuffer = {};
-  FrameSettings frameSettings = {};
   std::string tagArea = {};
   std::string_view framePayload = {};
 
-  basicParameters() = default;
-
 public:
-  explicit basicParameters(const std::string &Filename,
-                           const iD3Variant &TagVersion,
-                           std::string_view FrameID)
+  explicit fileScopeProperties(const std::string &Filename,
+                               const iD3Variant &TagVersion,
+                               std::string_view FrameID)
       : filename(Filename), tagVersion(TagVersion), frameID(FrameID) {}
 
-  explicit basicParameters(const std::string &Filename,
-                           const iD3Variant &TagVersion,
-                           std::string_view FrameID, std::string_view content)
+  explicit fileScopeProperties(const std::string &Filename,
+                               const iD3Variant &TagVersion,
+                               std::string_view FrameID,
+                               std::string_view content)
       : filename{Filename}, tagVersion{TagVersion}, frameID{FrameID},
         framePayload{content} {}
 
-  explicit basicParameters(const std::string &Filename,
-                           const iD3Variant &TagVersion)
+  explicit fileScopeProperties(const std::string &Filename,
+                               const iD3Variant &TagVersion)
       : filename{Filename}, tagVersion{TagVersion} {}
 
-  explicit basicParameters(const std::string &Filename)
-
-      : filename{Filename} {}
+  fileScopeProperties() = default;
+  fileScopeProperties(const fileScopeProperties &) = delete;
+  fileScopeProperties &operator=(const fileScopeProperties &) = delete;
 
   const iD3Variant &get_tag_version() const { return tagVersion; }
 
@@ -61,19 +57,11 @@ public:
 
   const std::string &get_filename() const { return filename; }
 
-  basicParameters &with_frame_id(std::string_view FrameID) {
+  fileScopeProperties &with_frame_id(std::string_view FrameID) {
     frameID = FrameID;
 
     return *this;
   }
-
-  basicParameters &with_frame_payload(std::string_view FramePayload) {
-    framePayload = FramePayload;
-
-    return *this;
-  }
-
-  const FrameSettings &get_frame_settings() const { return frameSettings; }
 
   std::string get_tag_area() const { return this->tagArea; }
 
@@ -82,41 +70,43 @@ public:
   std::string_view get_frame_content_to_write() const {
     return this->framePayload;
   }
-
-  basicParameters
-  with_frame_settings(const FrameSettings &FrameSettings) const & {
-    basicParameters obj(*this);
-
-    obj.frameSettings = FrameSettings;
-
-    return obj;
-  }
-
-  basicParameters with_tag_area(const std::string &TagArea) && {
-    basicParameters obj(std::move(*this));
-
-    obj.tagArea = TagArea;
-
-    return obj;
-  }
-
-  basicParameters with_tag_buffer(buffer_t TagBuffer) && {
-    basicParameters obj(std::move(*this));
-
-    obj.tagBuffer = TagBuffer;
-
-    return obj;
-  }
 };
+
+class AudioSettings_t {
+public:
+  AudioSettings_t() = default;
+  fileScopeProperties fileScopePropertiesObj;
+  std::optional<buffer_t> TagBuffer;
+  std::optional<std::string> TagArea;
+  std::optional<frameScopeProperties> frameScopePropertiesObj;
+};
+
+typedef struct AudioSettings_t audioProperties_t;
+
+} // namespace id3
+
+namespace id3v2 {
+
+using namespace id3;
+
+void CheckAudioPropertiesObject(audioProperties_t *const audioPropertiesObj) {
+  if (audioPropertiesObj == nullptr) {
+    ID3V2_THROW("frame properties object does not exists");
+  }
+
+  if (!audioPropertiesObj->frameScopePropertiesObj.has_value()) {
+    ID3V2_THROW("frame properties not yet parsed from audio file");
+  }
+}
 
 template <typename T>
 buffer_t fillTagBufferWithPayload(T content, id3::buffer_t tagBuffer,
-                                  const FrameSettings &frameConfig) {
+                                  const frameScopeProperties &frameConfig) {
 
   ID3_PRECONDITION_MSG(frameConfig.getFramePayloadLength() >= content.size(),
                        "Existing Frame Payload size < content size");
 
-  const auto PositionFramePayloadStart = frameConfig.getFramePayloadOffset();
+  const auto PositionFramePayloadStart = frameConfig.frameContentStartPosition;
 
   id3::log()->info(" PositionTagStart: {}", PositionFramePayloadStart);
 

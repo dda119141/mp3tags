@@ -35,7 +35,8 @@ function(ConfigureTarget _target)
 
 	target_compile_options(${_target} PRIVATE
 		 $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-         -Wall -Werror -Wfatal-errors -g -ftest-coverage -pthread -fprofile-arcs -std=c++17>
+         -Wall -Werror -g -ftest-coverage -pthread -fprofile-arcs -std=c++17>
+	 #-Wall -Werror -Wfatal-errors -g -ftest-coverage -pthread -fprofile-arcs -std=c++17>
 		 $<$<CXX_COMPILER_ID:MSVC>:
 			  /W4 /std:c++latest>)
 
