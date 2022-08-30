@@ -47,9 +47,9 @@ public:
   explicit ape_error(const std::string &msg) : audio_tag_error(msg.c_str()) {}
 };
 
-#define ID3V2_THROW(msg) ID3_THROW(id3_error, std::string("id3v2") + msg);
+#define ID3V2_THROW(msg) ID3_THROW(id3_error, std::string("id3v2 ") + msg);
 
-#define APE_THROW(msg) ID3_THROW(ape_error, std::string("ape") + msg);
+#define APE_THROW(msg) ID3_THROW(ape_error, std::string("ape ") + msg);
 
 #ifdef ID3_ENABLE_ASSERT
 #define ID3_ASSERT_MSG(expr, msg)                                              \

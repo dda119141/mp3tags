@@ -57,8 +57,11 @@ bool SetTag(const std::string &filename,
                 };
 
                 try {
-                  const id3v2::TagReader obj{param()};
-                  const id3v2::writer Writer{obj.GetMediaSettings()};
+                  const auto obj =
+                      std::make_unique<id3v2::TagReader>(std::move(param()));
+
+                  const id3v2::writer Writer{*obj};
+
                   return Writer.execute();
 
                 } catch (const std::runtime_error &e) {
@@ -122,15 +125,17 @@ bool SetGenre(const std::string &filename, std::string_view content) {
       {"0x0300", "TCON"},
       {"0x0000", "TCO"},
   };
-  const auto ret1 = ape::SetGenre(filename, content);
-  const auto ret = id3v1::SetGenre(filename, content);
+  const auto ret = ape::SetGenre(filename, content);
+  const auto ret1 = id3v1::SetGenre(filename, content);
 
-  if (ret.has_value() || ret1.has_value()) {
+  if (ret.has_value()) {
 
-    SetTag(filename, tags, content);
+    return ret.value();
+  } else if (ret1.has_value()) {
 
     return ret1.value();
   } else {
+
     return SetTag(filename, tags, content);
   }
 }

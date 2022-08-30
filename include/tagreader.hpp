@@ -51,9 +51,10 @@ GetId3v2Tag(const std::string &fileName,
                 }
               };
               try {
-                id3v2::TagReader obj{params()};
+                const auto obj =
+                    std::make_unique<id3v2::TagReader>(std::move(params()));
 
-                const auto found = obj.getFramePayload();
+                const auto found = obj->getFramePayload();
                 return id3::stripLeft(found);
 
               } catch (const id3::audio_tag_error &e) {

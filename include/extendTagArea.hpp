@@ -15,7 +15,7 @@ private:
   buffer_t tagBuffer;
 
 public:
-  explicit bufferExtended(AudioSettings_t *const audioProperties,
+  explicit bufferExtended(const AudioSettings_t *const audioProperties,
                           uint32_t additionalSize) {
 
     CheckAudioPropertiesObject(audioProperties);
@@ -64,7 +64,7 @@ public:
 
 class FileExtended {
 public:
-  explicit FileExtended(audioProperties_t *const audioProperties,
+  explicit FileExtended(const audioProperties_t *const audioProperties,
                         uint32_t additionalSize, const std::string &content)
       : audioPropertiesObj(audioProperties) {
 
@@ -73,26 +73,26 @@ public:
     const auto &frameProperties =
         audioPropertiesObj->frameScopePropertiesObj.value();
 
-    std::call_once(m_once, [&content, frameProperties, additionalSize, this] {
-      const auto Buffer_obj =
-          bufferExtended{audioPropertiesObj, additionalSize};
+    const auto Buffer_obj = bufferExtended{audioPropertiesObj, additionalSize};
 
-      const auto filled_buffer = fillTagBufferWithPayload<std::string_view>(
-          content, Buffer_obj.get_tag_buffer(), frameProperties);
+    printf("%s frame ID start: %d\n", __FILE__,
+           frameProperties.frameIDStartPosition);
 
-      this->ReWriteFile(filled_buffer, additionalSize);
+    printf("%s frame ID length: %d\n", __FILE__, frameProperties.frameLength);
 
-      status = true;
-    });
+    const auto filled_buffer = fillTagBufferWithPayload<std::string_view>(
+        content, Buffer_obj.get_tag_buffer(), frameProperties);
+
+    this->ReWriteFile(filled_buffer, additionalSize);
+
+    status = true;
   }
 
   bool get_status() const { return status; }
 
 private:
-  audioProperties_t *const audioPropertiesObj;
+  const audioProperties_t *const audioPropertiesObj;
   bool status = false;
-
-  std::once_flag m_once;
 
   void ReWriteFile(id3::buffer_t tagBuffer, uint32_t extraSize) {
     const auto &fileParameter = audioPropertiesObj->fileScopePropertiesObj;

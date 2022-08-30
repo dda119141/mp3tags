@@ -190,16 +190,18 @@ public:
     if (framePayload.size() > length) {
       APE_THROW("framePayload length too big for frame area");
     }
-	frameScopeProperties frameScopeProperties = {};
-	frameScopeProperties.frameIDStartPosition = frameProperties->frameStartPosition +
-                                  OffsetFromFrameStartToFrameID();
-	
-	frameScopeProperties.frameContentStartPosition = frameProperties->frameContentPosition;
-	frameScopeProperties.frameLength = frameProperties->frameLength;
+    frameScopeProperties frameScopeProperties = {};
+    frameScopeProperties.frameIDStartPosition =
+        frameProperties->frameStartPosition + OffsetFromFrameStartToFrameID();
+
+    frameScopeProperties.frameContentStartPosition =
+        frameProperties->frameContentPosition;
+    frameScopeProperties.frameLength = frameProperties->frameLength;
 
     if (frameProperties->frameLength >= framePayload.size()) {
 
-      return WriteFile(filename, std::string(framePayload), frameScopeProperties);
+      return WriteFile(filename, std::string(framePayload),
+                       frameScopeProperties);
     } else {
       const uint32_t additionalSize =
           framePayload.size() - frameProperties->frameLength;
@@ -359,11 +361,11 @@ private:
 const expected::Result<std::string> getFramePayload(const std::string &filename,
                                                     std::string_view frameID) {
   try {
-    static const tagReader TagR{filename, frameID};
+    const tagReader TagR{filename, frameID};
 
     return expected::makeValue<std::string>(TagR.getFramePayload());
   } catch (id3::audio_tag_error &e) {
-    // std::cerr << e.what();
+
     return expected::makeError<std::string>("Not found");
   }
 }
@@ -373,7 +375,7 @@ const std::optional<bool> setFramePayload(const std::string &filename,
                                           std::string_view framePayload) {
 
   try {
-    static const tagReader TagR{filename, frameID};
+    const tagReader TagR{filename, frameID};
 
     return TagR.writeFramePayload(framePayload, framePayload.size());
   } catch (const id3::audio_tag_error &e) {

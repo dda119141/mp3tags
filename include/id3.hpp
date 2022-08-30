@@ -39,6 +39,7 @@ static const std::string modifiedEnding(".mod");
 using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
+/* Frame settings */
 typedef struct frameScopeProperties_t {
   uint16_t frameIDStartPosition = {};
   uint8_t doSwap = {};
@@ -68,113 +69,6 @@ typedef struct frameScopeProperties_t {
   }
 
 } frameScopeProperties;
-
-/* Frame settings */
-#if 0
-class FramePropertiesBuilder; // forward declaration
-
-class frameScopeProperties {
-
-public:
-  frameScopeProperties() {}
-
-  static std::unique_ptr<FramePropertiesBuilder> create() {
-    return std::make_unique<FramePropertiesBuilder>();
-  }
-
-  uint32_t getFrameKeyOffset() const { return frameIDStartPosition; }
-
-  uint32_t getFramePayloadOffset() const { return frameContentStartPosition; }
-
-  uint32_t getFramePayloadLength() const {
-    if (frameLength && frameIDLength)
-      return (frameLength - frameIDLength);
-    else
-      return frameLength;
-  }
-
-  uint32_t getFrameLength() const {
-    if (framePayloadLength && frameIDLength)
-      return (framePayloadLength + frameIDLength);
-    else
-      return frameLength;
-  }
-
-  uint32_t getEncodingValue() const { return encodeFlag; }
-
-  uint32_t getSwapValue() const { return doSwap; }
-#if 0
-  void with_encode_flag(uint32_t encode_flag) {
-    encodeFlag = encode_flag;
-  }
-
-  void with_do_swap(uint32_t dSwap) {
-    doSwap = dSwap;
-  }
-#endif
-
-private:
-  friend class FramePropertiesBuilder;
-  uint32_t frameIDStartPosition = {};
-  uint32_t frameContentStartPosition = {};
-  uint32_t frameIDLength = {};
-  uint32_t frameLength = {};
-  uint32_t framePayloadLength = {};
-  uint32_t encodeFlag = {};
-  uint32_t doSwap = {};
-};
-
-class FramePropertiesBuilder {
-
-  frameScopeProperties frameProperties;
-
-public:
-  FramePropertiesBuilder &
-  fromFrameProperties(const frameScopeProperties &framePropertiesIn) {
-    frameProperties = framePropertiesIn;
-    return *this;
-  }
-
-  operator frameScopeProperties() const { return std::move(frameProperties); }
-
-  FramePropertiesBuilder &with_frameID_offset(uint32_t id_offset) {
-    frameProperties.frameIDStartPosition = id_offset;
-    return *this;
-  }
-
-  FramePropertiesBuilder &with_frameID_length(uint32_t length) {
-    frameProperties.frameIDLength = length;
-    return *this;
-  }
-
-  FramePropertiesBuilder &with_framecontent_offset(uint32_t payload_offset) {
-    frameProperties.frameContentStartPosition = payload_offset;
-    return *this;
-  }
-
-  FramePropertiesBuilder &with_frame_length(uint32_t frame_length) {
-    frameProperties.frameLength = frame_length;
-    return *this;
-  }
-
-  FramePropertiesBuilder &with_encode_flag(uint32_t encode_flag) {
-    frameProperties.encodeFlag = encode_flag;
-    return *this;
-  }
-
-  FramePropertiesBuilder &with_do_swap(uint32_t dSwap) {
-    frameProperties.doSwap = dSwap;
-    return *this;
-  }
-
-  FramePropertiesBuilder
-  with_additional_payload_size(uint32_t additionalPayload) {
-    frameProperties.frameLength += additionalPayload;
-    frameProperties.framePayloadLength += additionalPayload;
-    return *this;
-  }
-};
-#endif
 
 const std::string stripLeft(const std::string &valIn) {
   auto val = valIn;
@@ -448,7 +342,7 @@ public:
   searchFrame &operator=(searchFrame const &) = delete;
 
   uint32_t execute(const Type &tag) const {
-    static auto _execute = [this](const Type &TagArea, const Type &_tag) {
+    auto _execute = [this](const Type &TagArea, const Type &_tag) {
       uint32_t loc = 0;
 
       const auto it =

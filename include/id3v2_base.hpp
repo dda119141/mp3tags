@@ -26,8 +26,6 @@ private:
   const iD3Variant tagVersion;
   std::string_view frameID = {};
 
-  buffer_t tagBuffer = {};
-  std::string tagArea = {};
   std::string_view framePayload = {};
 
 public:
@@ -48,8 +46,10 @@ public:
       : filename{Filename}, tagVersion{TagVersion} {}
 
   fileScopeProperties() = default;
-  fileScopeProperties(const fileScopeProperties &) = delete;
-  fileScopeProperties &operator=(const fileScopeProperties &) = delete;
+  fileScopeProperties(const fileScopeProperties &) = default;
+  fileScopeProperties &operator=(const fileScopeProperties &) = default;
+  fileScopeProperties(fileScopeProperties &&) = default;
+  ~fileScopeProperties() = default;
 
   const iD3Variant &get_tag_version() const { return tagVersion; }
 
@@ -62,10 +62,6 @@ public:
 
     return *this;
   }
-
-  std::string get_tag_area() const { return this->tagArea; }
-
-  buffer_t get_tag_Buffer() const { return this->tagBuffer; }
 
   std::string_view get_frame_content_to_write() const {
     return this->framePayload;
@@ -89,7 +85,8 @@ namespace id3v2 {
 
 using namespace id3;
 
-void CheckAudioPropertiesObject(audioProperties_t *const audioPropertiesObj) {
+void CheckAudioPropertiesObject(
+    const audioProperties_t *const audioPropertiesObj) {
   if (audioPropertiesObj == nullptr) {
     ID3V2_THROW("frame properties object does not exists");
   }

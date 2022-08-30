@@ -65,8 +65,10 @@ public:
 
 const expected::Result<id3::buffer_t> GetBuffer(const std::string &FileName) {
   try {
-    static const tagReadWriter tagRW{FileName};
+    const tagReadWriter tagRW{FileName};
+
     return expected::makeValue<id3::buffer_t>(tagRW.GetBuffer().value());
+
   } catch (const id3::id3_error &e) {
     // std::cout << e.what() << std::endl;
     return expected::makeError<id3::buffer_t>("id3v1 object not valid");
@@ -86,29 +88,28 @@ const std::optional<bool> SetFramePayload(const std::string &filename,
                                           std::string_view content,
                                           uint32_t relativeFramePayloadStart,
                                           uint32_t relativeFramePayloadEnd) {
-	assert(relativeFramePayloadEnd > relativeFramePayloadStart);
+  assert(relativeFramePayloadEnd > relativeFramePayloadStart);
 
-	static const tagReadWriter tagRW{filename};
+  const tagReadWriter tagRW{filename};
 
-	if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
-		ID3_LOG_ERROR("content length {} too big for frame area", content.size());
+  if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
+    ID3_LOG_ERROR("content length {} too big for frame area", content.size());
 
-		return {};
-	}
+    return {};
+  }
 
-	frameScopeProperties frameScopeProperties = {};
-	frameScopeProperties.frameIDStartPosition=tagRW.GetTagPayload() +
-		relativeFramePayloadStart;
-	frameScopeProperties.frameContentStartPosition=
-		tagRW.GetTagPayload() +
-		relativeFramePayloadStart;
-	frameScopeProperties.frameLength=relativeFramePayloadEnd -
-		relativeFramePayloadStart;
+  frameScopeProperties frameScopeProperties = {};
+  frameScopeProperties.frameIDStartPosition =
+      tagRW.GetTagPayload() + relativeFramePayloadStart;
+  frameScopeProperties.frameContentStartPosition =
+      tagRW.GetTagPayload() + relativeFramePayloadStart;
+  frameScopeProperties.frameLength =
+      relativeFramePayloadEnd - relativeFramePayloadStart;
 
-	ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content),
-			tagRW.GetTagPayload());
+  ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content),
+               tagRW.GetTagPayload());
 
-	return WriteFile(filename, std::string(content), frameScopeProperties);
+  return WriteFile(filename, std::string(content), frameScopeProperties);
 }
 
 const std::optional<bool> SetTitle(const std::string &filename,

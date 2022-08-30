@@ -20,6 +20,7 @@
 #define DEBUG
 
 namespace id3v2 {
+
 std::optional<buffer_t> checkForID3(buffer_t buffer) {
   const auto ID3_Identifier = GetID3FileIdentifier(buffer);
 
@@ -135,54 +136,59 @@ uint32_t getFramePosition(std::string_view frameID,
                           const std::string &tagAreaOpt) {
   const auto &tagArea = tagAreaOpt;
 
-  auto searchFramePosition = id3::searchFrame<std::string_view>(tagArea);
+  const auto searchFramePosition = id3::searchFrame<std::string_view>(tagArea);
 
   return searchFramePosition.execute(frameID);
 }
 
+class writer;
+
 class TagReader {
 public:
-  explicit TagReader(id3::audioProperties_t Config) : audioProperties(Config) {
+  explicit TagReader(id3::audioProperties_t &&Config)
+      : audioProperties(std::move(Config)) {
 
-    std::call_once(m_once, [this]() {
-      fileScopeProperties &fileProperties =
-          audioProperties.fileScopePropertiesObj;
+    fileScopeProperties &fileProperties =
+        this->audioProperties.fileScopePropertiesObj;
 
-      tagBuffer = GetTagHeader(fileProperties.get_filename()) | GetTagSize |
-                  [&](uint32_t tags_size) {
-                    return CreateTagBufferFromFile(
-                        fileProperties.get_filename(),
-                        tags_size + GetTagHeaderSize<uint32_t>());
-                  };
+    tagBuffer = GetTagHeader(fileProperties.get_filename()) | GetTagSize |
+                [&](uint32_t tags_size) {
+                  return CreateTagBufferFromFile(
+                      fileProperties.get_filename(),
+                      tags_size + GetTagHeaderSize<uint32_t>());
+                };
 
-      if (fileProperties.get_frame_id().length() == 0)
-        ID3V2_THROW("No frame ID parameter");
+    if (fileProperties.get_frame_id().length() == 0)
+      ID3V2_THROW("No frame ID parameter");
 
-      audioProperties.frameScopePropertiesObj.emplace();
+    this->audioProperties.frameScopePropertiesObj.emplace();
 
-      frameScopeProperties &frameProperties =
-          audioProperties.frameScopePropertiesObj.value();
+    frameScopeProperties &frameProperties =
+        this->audioProperties.frameScopePropertiesObj.value();
 
-      retrieveFrameProperties(fileProperties);
+    retrieveFrameProperties(fileProperties);
 
-      if (fileProperties.get_tag_area().size() == 0) {
-        ID3V2_THROW("tag area length = 0");
-      }
-      if (fileProperties.get_tag_Buffer()->size() == 0) {
-        ID3V2_THROW("tag buffer length = 0");
-      }
-      if (frameProperties.getFrameLength() >
-          fileProperties.get_tag_area().size()) {
-        ID3V2_THROW("frame length > tag area length");
-      }
-      if (frameProperties.getFramePayloadLength() == 0) {
-        ID3V2_THROW("frame payload length == 0");
-      }
-    });
+    if (!audioProperties.TagArea.has_value()) {
+      ID3V2_THROW("tag area length = 0");
+    }
+    if (!audioProperties.TagBuffer.has_value()) {
+      ID3V2_THROW("tag buffer length = 0");
+    }
+    if (frameProperties.getFrameLength() >
+        audioProperties.TagArea.value().size()) {
+      ID3V2_THROW("frame length > tag area length");
+    }
+    if (frameProperties.getFramePayloadLength() == 0) {
+      ID3V2_THROW("frame payload length == 0");
+    }
+
+    printf("%s frame ID start: %d\n", __FILE__,
+           frameProperties.frameIDStartPosition);
+    printf("%s frame ID length: %d\n", __FILE__, frameProperties.frameLength);
   }
 
   const std::string getFramePayload() const {
-    frameScopeProperties &frameProperties =
+    const frameScopeProperties &frameProperties =
         audioProperties.frameScopePropertiesObj.value();
     const auto framePayload =
         ExtractString(tagBuffer, frameProperties.frameContentStartPosition,
@@ -197,12 +203,13 @@ public:
     }
   }
 
-  audioProperties_t *const GetMediaSettings() const { return &audioProperties; }
+  // audioProperties_t *const GetMediaSettings() const { return
+  // &audioProperties; }
 
 private:
-  mutable std::once_flag m_once;
-  audioProperties_t &audioProperties;
+  audioProperties_t audioProperties;
   buffer_t tagBuffer = {};
+  friend class id3v2::writer;
 
   void retrieveFrameProperties(const fileScopeProperties &params) {
     frameScopeProperties &frameProperties =
@@ -235,14 +242,12 @@ private:
 
 class writer {
 public:
-  explicit writer(audioProperties_t *const audioPropertiesObjIn)
-      : audioPropertiesObj(audioPropertiesObjIn) {
+  explicit writer(const TagReader &tagReaderIn)
+      : audioPropertiesObj(&tagReaderIn.audioProperties) {
+
+    CheckAudioPropertiesObject(audioPropertiesObj);
 
     const auto &params = audioPropertiesObj->fileScopePropertiesObj;
-
-    if (!audioPropertiesObj->frameScopePropertiesObj.has_value()) {
-      ID3V2_THROW("frame properties not yet parsed from audio file");
-    }
 
     if (params.get_frame_content_to_write().size() == 0) {
       ID3V2_THROW("frame payload to write size = 0");
@@ -266,8 +271,8 @@ public:
       const uint32_t extraLength = (framePayloadToWrite.size() -
                                     frameProperties.getFramePayloadLength());
 
-      const id3v2::FileExtended fileExtended{audioPropertiesObj, extraLength,
-                                             framePayloadToWrite};
+      static const id3v2::FileExtended fileExtended{
+          audioPropertiesObj, extraLength, framePayloadToWrite};
 
       return fileExtended.get_status();
 
@@ -279,7 +284,7 @@ public:
 
 private:
   writer() = default;
-  audioProperties_t *const audioPropertiesObj;
+  const audioProperties_t *const audioPropertiesObj;
 };
 
 template <typename id3Type> const auto is_tag(std::string name) {
