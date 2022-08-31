@@ -8,6 +8,7 @@
 #include "id3.hpp"
 #include "logger.hpp"
 #include "result.hpp"
+#include <iostream>
 
 using namespace id3;
 

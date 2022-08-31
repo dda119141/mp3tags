@@ -63,6 +63,8 @@ bool SetTag(const std::string &filename,
                   const id3v2::writer Writer{*obj};
 
                   return Writer.execute();
+                } catch (const id3::audio_tag_error &e) {
+                  std::cout << e.what();
 
                 } catch (const std::runtime_error &e) {
                   std::cerr << "Runtime Error: " << e.what() << std::endl;

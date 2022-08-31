@@ -182,9 +182,11 @@ public:
       ID3V2_THROW("frame payload length == 0");
     }
 
+#if 1
     printf("%s frame ID start: %d\n", __FILE__,
            frameProperties.frameIDStartPosition);
     printf("%s frame ID length: %d\n", __FILE__, frameProperties.frameLength);
+#endif
   }
 
   const std::string getFramePayload() const {
@@ -202,9 +204,6 @@ public:
       return framePayload;
     }
   }
-
-  // audioProperties_t *const GetMediaSettings() const { return
-  // &audioProperties; }
 
 private:
   audioProperties_t audioProperties;

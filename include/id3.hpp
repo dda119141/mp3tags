@@ -352,8 +352,9 @@ public:
       if (it != TagArea.cend()) {
         loc = (it - TagArea.cbegin());
       } else {
-        const std::string ret =
-            std::string("could not find frame ID: ") + std::string(_tag);
+        const std::string ret = std::string("could not find frame ID: ") +
+                                std::string(_tag) + std::string("\n");
+
         throw audio_tag_error(ret.c_str());
       }
 

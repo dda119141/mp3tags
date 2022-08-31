@@ -104,17 +104,16 @@ private:
 
     std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
 
-    {
-      if (id3v1TagSizeIfPresent)
-        footerPreambleOffsetFromEndOfFile =
-            id3v1::GetTagSize() + ape::GetTagFooterSize();
-      else
-        footerPreambleOffsetFromEndOfFile = ape::GetTagFooterSize();
+    if (id3v1TagSizeIfPresent)
+      footerPreambleOffsetFromEndOfFile =
+          id3v1::GetTagSize() + ape::GetTagFooterSize();
+    else
+      footerPreambleOffsetFromEndOfFile = ape::GetTagFooterSize();
 
-      mfileSize = filRead.tellg();
-      mTagFooterBegin = mfileSize - footerPreambleOffsetFromEndOfFile;
-      filRead.seekg(mTagFooterBegin);
-    }
+    mfileSize = filRead.tellg();
+    mTagFooterBegin = mfileSize - footerPreambleOffsetFromEndOfFile;
+    filRead.seekg(mTagFooterBegin);
+
     if (uint32_t APEpreambleLength = 8;
         !checkAPEtag(filRead, APEpreambleLength, std::string("APETAGEX"))) {
       APE_THROW("APE apeTagProperties: APETAGEX is not there");
@@ -328,7 +327,8 @@ private:
     const auto tagArea = id3::ExtractString(buffer, 0, buffer->size());
 
     constexpr uint32_t frameKeyTerminatorLength = 1;
-    auto searchFramePosition = id3::searchFrame<std::string_view>(tagArea);
+    const auto searchFramePosition =
+        id3::searchFrame<std::string_view>{tagArea};
     const auto frameIDPosition = searchFramePosition.execute(frameID);
 
     const uint32_t frameContentPosition =
@@ -379,6 +379,8 @@ const std::optional<bool> setFramePayload(const std::string &filename,
 
     return TagR.writeFramePayload(framePayload, framePayload.size());
   } catch (const id3::audio_tag_error &e) {
+    std::cerr << "ape tag: " << e.what() << std::endl;
+
     return false;
   }
 }
