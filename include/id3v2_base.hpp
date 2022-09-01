@@ -280,7 +280,7 @@ std::optional<buffer_t> GetTagHeader(const std::string &FileName) {
   return val;
 }
 
-std::string GetTagArea(buffer_t buffer) {
+std::string_view GetTagArea(buffer_t buffer) {
 
   const auto totalSize = GetTotalTagSize(buffer);
 

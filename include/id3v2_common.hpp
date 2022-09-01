@@ -132,8 +132,7 @@ std::string formatFramePayload(std::string_view content,
       encodeValue);
 }
 
-uint32_t getFramePosition(std::string_view frameID,
-                          const std::string &tagAreaOpt) {
+auto getFramePosition(std::string_view frameID, const std::string &tagAreaOpt) {
   const auto &tagArea = tagAreaOpt;
 
   const auto searchFramePosition = id3::searchFrame<std::string_view>(tagArea);
@@ -166,20 +165,10 @@ public:
     frameScopeProperties &frameProperties =
         this->audioProperties.frameScopePropertiesObj.value();
 
-    retrieveFrameProperties(fileProperties);
+    m_status = retrieveFrameProperties(fileProperties);
 
-    if (!audioProperties.TagArea.has_value()) {
-      ID3V2_THROW("tag area length = 0");
-    }
-    if (!audioProperties.TagBuffer.has_value()) {
-      ID3V2_THROW("tag buffer length = 0");
-    }
-    if (frameProperties.getFrameLength() >
-        audioProperties.TagArea.value().size()) {
-      ID3V2_THROW("frame length > tag area length");
-    }
-    if (frameProperties.getFramePayloadLength() == 0) {
-      ID3V2_THROW("frame payload length == 0");
+    if (m_status.rstatus != rstatus_t::no_error) {
+      ID3V2_THROW("Tag or Frame Properties error");
     }
 
 #if 1
@@ -208,16 +197,25 @@ public:
 private:
   audioProperties_t audioProperties;
   buffer_t tagBuffer = {};
+  execution_status_t m_status;
   friend class id3v2::writer;
 
-  void retrieveFrameProperties(const fileScopeProperties &params) {
+  execution_status_t
+  retrieveFrameProperties(const fileScopeProperties &params) {
     frameScopeProperties &frameProperties =
         audioProperties.frameScopePropertiesObj.value();
 
     const auto tagArea = GetTagArea(tagBuffer);
+    if (tagArea.size() == 0) {
+      return get_status_no_tag_exists();
+    }
 
-    frameProperties.frameIDStartPosition =
-        getFramePosition(params.get_frame_id(), tagArea);
+    auto id3Status = getFramePosition(params.get_frame_id(), tagArea);
+    if (id3Status.rstatus != rstatus_t::no_error) {
+      return id3Status;
+    }
+
+    frameProperties.frameIDStartPosition = id3Status.frameIDPosition;
 
     frameProperties.frameLength =
         GetFrameSize<uint32_t>(tagBuffer, params.get_tag_version(),
@@ -236,6 +234,8 @@ private:
 
     audioProperties.TagArea = tagArea;
     audioProperties.TagBuffer = tagBuffer;
+
+    return id3Status;
   }
 };
 

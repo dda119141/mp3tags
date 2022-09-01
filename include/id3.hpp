@@ -39,6 +39,55 @@ static const std::string modifiedEnding(".mod");
 using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
+enum class severity_t { high = 1, middle, low };
+enum class frame_type_val_t { id3v1, id3v2, ape };
+
+struct frame_type {
+  unsigned int id3v1_present : 1;
+  unsigned int id3v2_present : 1;
+  unsigned int ape_present : 1;
+};
+
+enum class rstatus_t {
+  no_error = 0,
+  no_TagLength = 1, // tag container does not exists
+  no_frameID,
+  frameID_bad_position,
+  no_framePayloadLength,
+  frameLengthHigherThanTagLength
+};
+
+typedef struct execution_status {
+  severity_t severity : 3;
+  frame_type_val_t frame_type_val : 3;
+  rstatus_t rstatus : 4;
+  unsigned int frameIDPosition : 16;
+} execution_status_t;
+
+typedef struct mp3_execution_status {
+  struct frame_type frame_type_v;
+  execution_status_t status;
+} mp3_execution_status_t;
+
+constexpr execution_status_t get_status_no_tag_exists() {
+  execution_status_t val = {};
+  val.rstatus = rstatus_t::no_TagLength;
+  return val;
+}
+
+constexpr execution_status_t get_status_no_frame_ID() {
+  execution_status_t val = {};
+  val.rstatus = rstatus_t::no_frameID;
+  return val;
+}
+
+constexpr execution_status_t get_status_frame_ID_pos(unsigned int pos) {
+  execution_status_t val = {};
+  val.rstatus = rstatus_t::no_error;
+  val.frameIDPosition = pos;
+  return val;
+}
+
 /* Frame settings */
 typedef struct frameScopeProperties_t {
   uint16_t frameIDStartPosition = {};
@@ -194,14 +243,14 @@ uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
   return version;
 }
 
-inline std::string ExtractString(buffer_t buffer, uint32_t start,
-                                 uint32_t length) {
+inline std::string_view ExtractString(buffer_t buffer, uint32_t start,
+                                      uint32_t length) {
   ID3_PRECONDITION((start + length) <= static_cast<uint32_t>(buffer->size()));
 
   if (static_cast<uint32_t>(buffer->size()) >= (start + length)) {
 
-    return std::string(reinterpret_cast<const char *>(buffer->data() + start),
-                       length);
+    return std::string_view(
+        reinterpret_cast<const char *>(buffer->data() + start), length);
   } else {
 
     ID3_LOG_ERROR("Buffer size {} < buffer length: {} ", buffer->size(),
@@ -257,6 +306,12 @@ inline bool replaceElementsInBuff(buffer_t buffIn, buffer_t buffOut,
   return true;
 }
 
+/*
+Taken from id3.org:
+An ID3 tag is a data container within an MP3 audio file stored
+ in a prescribed format. This data commonly contains the Artist name,
+ Song title, Year and Genre of the current audio file
+*/
 uint32_t GetTagSize(buffer_t buffer,
                     const std::vector<unsigned int> &power_values,
                     uint32_t index) {
@@ -341,7 +396,7 @@ public:
   searchFrame(searchFrame const &) = delete;
   searchFrame &operator=(searchFrame const &) = delete;
 
-  uint32_t execute(const Type &tag) const {
+  execution_status_t execute(const Type &tag) const {
     auto _execute = [this](const Type &TagArea, const Type &_tag) {
       uint32_t loc = 0;
 
@@ -351,14 +406,15 @@ public:
 
       if (it != TagArea.cend()) {
         loc = (it - TagArea.cbegin());
+
+        return get_status_frame_ID_pos(loc);
       } else {
+
         const std::string ret = std::string("could not find frame ID: ") +
                                 std::string(_tag) + std::string("\n");
 
-        throw audio_tag_error(ret.c_str());
+        return get_status_no_frame_ID();
       }
-
-      return loc;
     };
 
     return _execute(mTagArea, tag);

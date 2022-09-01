@@ -176,7 +176,7 @@ public:
       }
     }
     if (bContinue) {
-      getFrameProperties();
+      m_status = getFrameProperties();
     }
   }
 
@@ -318,10 +318,11 @@ public:
 private:
   const std::string &filename;
   std::string_view frameID;
+  id3::execution_status_t m_status;
   std::unique_ptr<apeTagProperties> tagProperties;
   std::unique_ptr<frameProperties_t> frameProperties = {};
 
-  void getFrameProperties() {
+  id3::execution_status_t getFrameProperties() {
     auto buffer = tagProperties->GetBuffer();
 
     const auto tagArea = id3::ExtractString(buffer, 0, buffer->size());
@@ -329,20 +330,21 @@ private:
     constexpr uint32_t frameKeyTerminatorLength = 1;
     const auto searchFramePosition =
         id3::searchFrame<std::string_view>{tagArea};
-    const auto frameIDPosition = searchFramePosition.execute(frameID);
-
-    const uint32_t frameContentPosition =
-        frameIDPosition + frameID.size() + frameKeyTerminatorLength;
-
-    if (!frameContentPosition) {
-      APE_THROW("frameContentPosition = 0");
+    auto frameIDstatus = searchFramePosition.execute(frameID);
+    if (frameIDstatus.rstatus != rstatus_t::no_error) {
+      return frameIDstatus;
     }
-    if (frameIDPosition < OffsetFromFrameStartToFrameID()) {
-      APE_THROW("Frame ID position < OffsetFromFrameStartToFrameID")
+    const uint32_t frameContentPosition = frameIDstatus.frameIDPosition +
+                                          frameID.size() +
+                                          frameKeyTerminatorLength;
+
+    if (frameIDstatus.frameIDPosition < OffsetFromFrameStartToFrameID()) {
+      frameIDstatus.rstatus = rstatus_t::frameID_bad_position;
+      return frameIDstatus;
     }
 
     const uint32_t frameStartPosition =
-        frameIDPosition - OffsetFromFrameStartToFrameID();
+        frameIDstatus.frameIDPosition - OffsetFromFrameStartToFrameID();
     const uint32_t frameLength =
         id3::GetTagSizeDefault(buffer, 4, frameStartPosition);
 
@@ -355,6 +357,8 @@ private:
 
     frameProperties->frameContent =
         extractTheTag(buffer, frameContentPosition, frameLength);
+
+    return frameIDstatus;
   }
 }; // class tagReader
 
