@@ -53,7 +53,7 @@ public:
 
   const iD3Variant &get_tag_version() const { return tagVersion; }
 
-  const std::string_view &get_frame_id() const { return frameID; }
+  std::string_view get_frame_id() const { return frameID; }
 
   const std::string &get_filename() const { return filename; }
 
@@ -280,7 +280,7 @@ std::optional<buffer_t> GetTagHeader(const std::string &FileName) {
   return val;
 }
 
-std::string_view GetTagArea(buffer_t buffer) {
+std::string GetTagArea(buffer_t buffer) {
 
   const auto totalSize = GetTotalTagSize(buffer);
 

@@ -132,10 +132,10 @@ std::string formatFramePayload(std::string_view content,
       encodeValue);
 }
 
-auto getFramePosition(std::string_view frameID, const std::string &tagAreaOpt) {
-  const auto &tagArea = tagAreaOpt;
+auto getFramePosition(std::string_view frameID, std::string_view tagAreaIn) {
 
-  const auto searchFramePosition = id3::searchFrame<std::string_view>(tagArea);
+  const auto searchFramePosition =
+      id3::searchFrame<std::string_view>(tagAreaIn);
 
   return searchFramePosition.execute(frameID);
 }
@@ -162,32 +162,21 @@ public:
 
     this->audioProperties.frameScopePropertiesObj.emplace();
 
-    frameScopeProperties &frameProperties =
-        this->audioProperties.frameScopePropertiesObj.value();
-
     m_status = retrieveFrameProperties(fileProperties);
-
     if (m_status.rstatus != rstatus_t::no_error) {
-      ID3V2_THROW("Tag or Frame Properties error");
+      ID3V2_THROW(get_message_from_status(m_status.rstatus));
     }
-
-#if 1
-    printf("%s frame ID start: %d\n", __FILE__,
-           frameProperties.frameIDStartPosition);
-    printf("%s frame ID length: %d\n", __FILE__, frameProperties.frameLength);
-#endif
   }
 
-  const std::string getFramePayload() const {
+  std::string getFramePayload() const {
     const frameScopeProperties &frameProperties =
         audioProperties.frameScopePropertiesObj.value();
-    const auto framePayload =
+    auto framePayload =
         ExtractString(tagBuffer, frameProperties.frameContentStartPosition,
                       frameProperties.getFramePayloadLength());
 
     if (frameProperties.doSwap == 0x01) {
-      const auto tempPayload =
-          tagBase::swapW16String(std::string_view(framePayload));
+      const auto tempPayload = tagBase::swapW16String(framePayload);
       return tempPayload;
     } else {
       return framePayload;

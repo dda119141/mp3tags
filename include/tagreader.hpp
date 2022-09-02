@@ -12,7 +12,7 @@
 #include <id3v2_v30.hpp>
 #include <id3v2_v40.hpp>
 
-const std::string
+std::string
 GetId3v2Tag(const std::string &fileName,
             const std::vector<std::pair<std::string, std::string_view>> &tags) {
 
@@ -54,7 +54,7 @@ GetId3v2Tag(const std::string &fileName,
                 const auto obj =
                     std::make_unique<id3v2::TagReader>(std::move(params()));
 
-                const auto found = obj->getFramePayload();
+                std::string found{obj->getFramePayload()};
                 return id3::stripLeft(found);
 
               } catch (const id3::audio_tag_error &e) {
@@ -65,31 +65,31 @@ GetId3v2Tag(const std::string &fileName,
             }
           }
 
-          return std::string("");
+          return std::string{};
         };
 
   return ret;
 }
 
 template <typename Function1, typename Function2>
-const std::string
+std::string
 GetTag(const std::string &filename,
        const std::vector<std::pair<std::string, std::string_view>> &id3v2Tags,
        Function1 fuc1, Function2 fuc2) {
   const auto retApe = fuc1(filename);
-  if (retApe.has_value()) {
-    return retApe.value();
+  if (retApe != std::string{}) {
+    return retApe;
   }
 
   const auto retId3v1 = fuc2(filename);
-  if (retId3v1.has_value()) {
-    return retId3v1.value();
+  if (retId3v1 != std::string{}) {
+    return retId3v1;
   }
 
   return GetId3v2Tag(filename, id3v2Tags);
 }
 
-const std::string GetAlbum(const std::string &filename) {
+const auto GetAlbum(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TALB"},
       {"0x0300", "TALB"},
@@ -99,7 +99,7 @@ const std::string GetAlbum(const std::string &filename) {
   return GetTag(filename, id3v2Tags, ape::GetAlbum, id3v1::GetAlbum);
 }
 
-const std::string GetLeadArtist(const std::string &filename) {
+const auto GetLeadArtist(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TPE1"},
       {"0x0300", "TPE1"},
@@ -109,7 +109,7 @@ const std::string GetLeadArtist(const std::string &filename) {
   return GetTag(filename, id3v2Tags, ape::GetLeadArtist, id3v1::GetLeadArtist);
 }
 
-const std::string GetComposer(const std::string &filename) {
+const auto GetComposer(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TCOM"},
       {"0x0300", "TCOM"},
@@ -119,7 +119,7 @@ const std::string GetComposer(const std::string &filename) {
   return GetId3v2Tag(filename, id3v2Tags);
 }
 
-const std::string GetDate(const std::string &filename) {
+const auto GetDate(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0300", "TDAT"},
       {"0x0400", "TDRC"},
@@ -130,7 +130,7 @@ const std::string GetDate(const std::string &filename) {
 }
 
 // Also known as Genre
-const std::string GetContentType(const std::string &filename) {
+const auto GetContentType(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TCON"},
       {"0x0300", "TCON"},
@@ -140,7 +140,7 @@ const std::string GetContentType(const std::string &filename) {
   return GetTag(filename, id3v2Tags, ape::GetGenre, id3v1::GetGenre);
 }
 
-const std::string GetComment(const std::string &filename) {
+const auto GetComment(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "COMM"},
       {"0x0300", "COMM"},
@@ -150,7 +150,7 @@ const std::string GetComment(const std::string &filename) {
   return GetTag(filename, id3v2Tags, ape::GetComment, id3v1::GetComment);
 }
 
-const std::string GetTextWriter(const std::string &filename) {
+const auto GetTextWriter(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TEXT"},
       {"0x0300", "TEXT"},
@@ -160,7 +160,7 @@ const std::string GetTextWriter(const std::string &filename) {
   return GetId3v2Tag(filename, id3v2Tags);
 }
 
-const std::string GetYear(const std::string &filename) {
+const auto GetYear(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TDRC"},
       {"0x0300", "TYER"},
@@ -170,7 +170,7 @@ const std::string GetYear(const std::string &filename) {
   return GetTag(filename, id3v2Tags, ape::GetYear, id3v1::GetYear);
 }
 
-const std::string GetFileType(const std::string &filename) {
+const auto GetFileType(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0300", "TFLT"},
       {"0x0000", "TFT"},
@@ -179,7 +179,7 @@ const std::string GetFileType(const std::string &filename) {
   return GetId3v2Tag(filename, id3v2Tags);
 }
 
-const std::string GetTitle(const std::string &filename) {
+const auto GetTitle(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TIT2"},
       {"0x0300", "TIT2"},
@@ -189,7 +189,7 @@ const std::string GetTitle(const std::string &filename) {
   return GetTag(filename, id3v2Tags, ape::GetTitle, id3v1::GetTitle);
 }
 
-const std::string GetContentGroupDescription(const std::string &filename) {
+const auto GetContentGroupDescription(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TIT1"},
       {"0x0300", "TIT1"},
@@ -199,7 +199,7 @@ const std::string GetContentGroupDescription(const std::string &filename) {
   return GetId3v2Tag(filename, id3v2Tags);
 }
 
-const std::string GetTrackPosition(const std::string &filename) {
+const auto GetTrackPosition(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TRCK"},
       {"0x0300", "TRCK"},
@@ -209,7 +209,7 @@ const std::string GetTrackPosition(const std::string &filename) {
   return GetId3v2Tag(filename, id3v2Tags);
 }
 
-const std::string GetBandOrchestra(const std::string &filename) {
+const auto GetBandOrchestra(const std::string &filename) {
   const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
       {"0x0400", "TPE2"},
       {"0x0300", "TPE2"},

@@ -57,11 +57,31 @@ enum class rstatus_t {
   frameLengthHigherThanTagLength
 };
 
+auto get_message_from_status(const rstatus_t &status) {
+  switch (status) {
+  case rstatus_t::no_error:
+    return std::string{"No Error"};
+    break;
+  case rstatus_t::no_frameID:
+    return std::string{"Frame ID could not be retrieved"};
+    break;
+  case rstatus_t::frameID_bad_position:
+    return std::string{"Bad Frame ID Position"};
+    break;
+  case rstatus_t::frameLengthHigherThanTagLength:
+    return std::string{"Frame length > Tag length"};
+    break;
+  default:
+    break;
+  }
+  return std::string("");
+}
+
 typedef struct execution_status {
   severity_t severity : 3;
   frame_type_val_t frame_type_val : 3;
   rstatus_t rstatus : 4;
-  unsigned int frameIDPosition : 16;
+  unsigned int frameIDPosition : 32;
 } execution_status_t;
 
 typedef struct mp3_execution_status {
@@ -90,13 +110,13 @@ constexpr execution_status_t get_status_frame_ID_pos(unsigned int pos) {
 
 /* Frame settings */
 typedef struct frameScopeProperties_t {
-  uint16_t frameIDStartPosition = {};
+  uint32_t frameIDStartPosition = {};
   uint8_t doSwap = {};
   uint8_t frameIDLength = {};
   uint32_t frameContentStartPosition = {};
   uint32_t frameLength = {};
   uint32_t framePayloadLength = {};
-  uint32_t encodeFlag = {};
+  uint16_t encodeFlag = {};
 
   uint32_t getFramePayloadLength() const {
     if (frameLength && frameIDLength)
@@ -119,14 +139,12 @@ typedef struct frameScopeProperties_t {
 
 } frameScopeProperties;
 
-const std::string stripLeft(const std::string &valIn) {
-  auto val = valIn;
+inline std::string &stripLeft(std::string &valIn) {
+  valIn.erase(
+      remove_if(valIn.begin(), valIn.end(), [](char c) { return !isprint(c); }),
+      valIn.end());
 
-  val.erase(
-      remove_if(val.begin(), val.end(), [](char c) { return !isprint(c); }),
-      val.end());
-
-  return val;
+  return valIn;
 }
 
 template <typename T> constexpr T RetrieveSize(T n) { return n; }
@@ -243,14 +261,14 @@ uint32_t GetValFromBuffer(id3::buffer_t buffer, T index,
   return version;
 }
 
-inline std::string_view ExtractString(buffer_t buffer, uint32_t start,
-                                      uint32_t length) {
+inline std::string ExtractString(buffer_t buffer, uint32_t start,
+                                 uint32_t length) {
   ID3_PRECONDITION((start + length) <= static_cast<uint32_t>(buffer->size()));
 
   if (static_cast<uint32_t>(buffer->size()) >= (start + length)) {
 
-    return std::string_view(
-        reinterpret_cast<const char *>(buffer->data() + start), length);
+    return std::string(reinterpret_cast<const char *>(buffer->data() + start),
+                       length);
   } else {
 
     ID3_LOG_ERROR("Buffer size {} < buffer length: {} ", buffer->size(),

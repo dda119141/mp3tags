@@ -14,7 +14,7 @@ using namespace id3;
 
 namespace id3v1 {
 
-constexpr uint32_t GetTagSize(void) { return 128; }
+constexpr uint32_t GetTagSize = 128;
 
 struct tagReadWriter {
 private:
@@ -31,7 +31,7 @@ public:
     std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
 
     const unsigned int dataSize = filRead.tellg();
-    tagBegin = dataSize - ::id3v1::GetTagSize();
+    tagBegin = dataSize - ::id3v1::GetTagSize;
     filRead.seekg(tagBegin);
 
     id3::buffer_t tagHeaderBuffer =
@@ -41,16 +41,16 @@ public:
 
     const auto stringExtracted =
         id3::ExtractString(tagHeaderBuffer, 0, tagHeaderLength);
-
     const auto ret = (stringExtracted == std::string("TAG"));
-
-    tagPayload = tagBegin + tagHeaderLength;
-    assert(::id3v1::GetTagSize() > tagHeaderLength);
-    tagPayloadLength = ::id3v1::GetTagSize() - tagHeaderLength;
-
     if (!ret) {
       throw id3::id3_error("id3v1: no tag string available");
     }
+
+    tagPayload = tagBegin + tagHeaderLength;
+    if (::id3v1::GetTagSize < tagHeaderLength)
+      throw id3::id3_error("id3v1: no tag string available");
+
+    tagPayloadLength = ::id3v1::GetTagSize - tagHeaderLength;
 
     filRead.seekg(tagPayload);
     id3::buffer_t buffer1 =
@@ -71,18 +71,39 @@ const expected::Result<id3::buffer_t> GetBuffer(const std::string &FileName) {
     return expected::makeValue<id3::buffer_t>(tagRW.GetBuffer().value());
 
   } catch (const id3::id3_error &e) {
-    // std::cout << e.what() << std::endl;
+    //  std::cout << e.what() << std::endl;
     return expected::makeError<id3::buffer_t>("id3v1 object not valid");
   }
 }
 
-const expected::Result<std::string>
-GetTheFramePayload(id3::buffer_t buffer, uint32_t start, uint32_t end) {
-  assert(end > start);
+class frameObj_t {
+public:
+  explicit frameObj_t(id3::buffer_t buf, uint32_t frameStartPosIn,
+                      uint32_t frameEndPosIn)
+      : tagBuffer(buf), frameStartPos(frameStartPosIn),
+        frameEndPos(frameEndPosIn) {
 
-  auto tagAreaStr = id3::ExtractString(buffer, start, (end - start));
+    if (frameStartPos > frameEndPos)
+      throw id3::id3_error("id3v1: no tag string available");
 
-  return expected::makeValue<std::string>(id3::stripLeft(tagAreaStr));
+    frameContent = id3::ExtractString(tagBuffer, frameStartPos,
+                                      (frameEndPos - frameStartPos));
+
+    id3::stripLeft(frameContent.value());
+  }
+
+  id3::buffer_t tagBuffer;
+  uint32_t frameStartPos = 0;
+  uint32_t frameEndPos = 0;
+  std::optional<std::string> frameContent = {};
+};
+
+const auto GetTheFramePayload(id3::buffer_t buffer, uint32_t start,
+                              uint32_t end) {
+
+  const frameObj_t frameObj{buffer, start, end};
+
+  return frameObj.frameContent.value();
 }
 
 const std::optional<bool> SetFramePayload(const std::string &filename,
@@ -173,39 +194,40 @@ const std::optional<bool> SetGenre(const std::string &filename,
   }
 }
 
-const expected::Result<std::string> GetTitle(const std::string &filename) {
+const auto GetTitle(const std::string &filename) {
   return id3v1::GetBuffer(filename) |
          [](id3::buffer_t buffer) { return GetTheFramePayload(buffer, 0, 30); };
 }
 
-const expected::Result<std::string> GetLeadArtist(const std::string &filename) {
+const auto GetLeadArtist(const std::string &filename) {
   return id3v1::GetBuffer(filename) | [](id3::buffer_t buffer) {
     return GetTheFramePayload(buffer, 30, 60);
   };
 }
 
-const expected::Result<std::string> GetAlbum(const std::string &filename) {
+const auto GetAlbum(const std::string &filename) {
   return id3v1::GetBuffer(filename) | [](id3::buffer_t buffer) {
     return GetTheFramePayload(buffer, 60, 90);
   };
 }
 
-const expected::Result<std::string> GetYear(const std::string &filename) {
+const auto GetYear(const std::string &filename) {
   return id3v1::GetBuffer(filename) | [](id3::buffer_t buffer) {
     return GetTheFramePayload(buffer, 90, 94);
   };
 }
 
-const expected::Result<std::string> GetComment(const std::string &filename) {
+const auto GetComment(const std::string &filename) {
   return id3v1::GetBuffer(filename) | [](id3::buffer_t buffer) {
     return GetTheFramePayload(buffer, 94, 124);
   };
 }
 
-const expected::Result<std::string> GetGenre(const std::string &filename) {
-  return id3v1::GetBuffer(filename) | [](id3::buffer_t buffer) {
+const auto GetGenre(const std::string &filename) {
+  const auto ret = id3v1::GetBuffer(filename) | [](id3::buffer_t buffer) {
     return GetTheFramePayload(buffer, 124, 125);
   };
+  return ret;
 }
 
 }; // end namespace id3v1
