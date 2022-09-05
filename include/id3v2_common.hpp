@@ -163,7 +163,7 @@ public:
     this->audioProperties.frameScopePropertiesObj.emplace();
 
     m_status = retrieveFrameProperties(fileProperties);
-    if (m_status.rstatus != rstatus_t::no_error) {
+    if (m_status.rstatus != rstatus_t::noError) {
       ID3V2_THROW(get_message_from_status(m_status.rstatus));
     }
   }
@@ -200,7 +200,7 @@ private:
     }
 
     auto id3Status = getFramePosition(params.get_frame_id(), tagArea);
-    if (id3Status.rstatus != rstatus_t::no_error) {
+    if (id3Status.rstatus != rstatus_t::noError) {
       return id3Status;
     }
 
@@ -242,7 +242,7 @@ public:
     }
   }
 
-  bool execute() const {
+  auto execute() const {
     const auto &params = audioPropertiesObj->fileScopePropertiesObj;
 
     const frameScopeProperties &frameProperties =

@@ -189,7 +189,6 @@ const auto CreateTagBufferFromFile(const std::string &FileName, uint32_t num) {
 template <typename T>
 std::optional<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
                                             T num_of_bytes_in_hex) {
-
   constexpr bool is_integrale_asset =
       std::is_integral<T>::value || std::is_unsigned<T>::value;
   static_assert(is_integrale_asset, "Parameter should be integer");

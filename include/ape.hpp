@@ -103,7 +103,7 @@ private:
 
     if (id3v1TagSizeIfPresent)
       footerPreambleOffsetFromEndOfFile =
-          id3v1::GetTagSize + ape::GetTagFooterSize();
+          id3v1::TagSize + ape::GetTagFooterSize();
     else
       footerPreambleOffsetFromEndOfFile = ape::GetTagFooterSize();
 
@@ -174,7 +174,7 @@ public:
     }
     if (bContinue) {
       m_status = getFrameProperties();
-      if (m_status.rstatus != rstatus_t::no_error) {
+      if (m_status.rstatus != rstatus_t::noError) {
         APE_THROW(get_message_from_status(m_status.rstatus));
       }
     }
@@ -184,10 +184,10 @@ public:
     return frameProperties->frameContent.value();
   }
 
-  std::optional<bool> writeFramePayload(std::string_view framePayload,
-                                        uint32_t length) const {
+  auto writeFramePayload(std::string_view framePayload, uint32_t length) const {
     if (framePayload.size() > length) {
-      APE_THROW("framePayload length too big for frame area");
+      return get_status_error(tag_type_val_t::ape,
+                              rstatus_t::ContentLengthBiggerThanFrameArea);
     }
     frameScopeProperties frameScopeProperties = {};
     frameScopeProperties.frameIDStartPosition =
@@ -209,10 +209,16 @@ public:
           extendTagBuffer(frameScopeProperties, framePayload, additionalSize) |
           [&](id3::buffer_t buffer) { return this->ReWriteFile(buffer); };
 
-      return writeBackAction | [&](bool fileWritten) {
+      auto ret = writeBackAction | [&](bool fileWritten) {
         (void)fileWritten;
         return id3::renameFile(filename + ape::modifiedEnding, filename);
       };
+      if (ret)
+        return id3::get_status_error(id3::tag_type_val_t::ape,
+                                     id3::rstatus_t::noError);
+      else
+        return id3::get_status_error(id3::tag_type_val_t::ape,
+                                     id3::rstatus_t::fileRenamingError);
     }
   }
 
@@ -331,7 +337,7 @@ private:
     const auto searchFramePosition =
         id3::searchFrame<std::string_view>{tagArea};
     auto frameIDstatus = searchFramePosition.execute(frameID);
-    if (frameIDstatus.rstatus != rstatus_t::no_error) {
+    if (frameIDstatus.rstatus != rstatus_t::noError) {
       return frameIDstatus;
     }
     const uint32_t frameContentPosition = frameIDstatus.frameIDPosition +
@@ -339,7 +345,7 @@ private:
                                           frameKeyTerminatorLength;
 
     if (frameIDstatus.frameIDPosition < OffsetFromFrameStartToFrameID()) {
-      frameIDstatus.rstatus = rstatus_t::frameID_bad_position;
+      frameIDstatus.rstatus = rstatus_t::frameIDBadPositionError;
       return frameIDstatus;
     }
 
@@ -374,20 +380,12 @@ const auto getFramePayload(const std::string &filename,
   }
 }
 
-const std::optional<bool> setFramePayload(const std::string &filename,
-                                          std::string_view frameID,
-                                          std::string_view framePayload) {
+auto setFramePayload(const std::string &filename, std::string_view frameID,
+                     std::string_view framePayload) {
+  const tagReader TagR{filename, frameID};
 
-  try {
-    const tagReader TagR{filename, frameID};
-
-    return TagR.writeFramePayload(framePayload, framePayload.size());
-  } catch (const id3::audio_tag_error &e) {
-    std::cerr << "ape tag: " << e.what() << std::endl;
-
-    return false;
-  }
-}
+  return TagR.writeFramePayload(framePayload, framePayload.size());
+} // namespace ape
 
 auto GetTitle(const std::string &filename) {
   std::string_view frameID("TITLE");
@@ -423,41 +421,33 @@ auto GetComposer(const std::string &filename) {
   return getFramePayload(filename, std::string_view("COMPOSER"));
 }
 
-const std::optional<bool> SetTitle(const std::string &filename,
-                                   std::string_view content) {
+auto SetTitle(const std::string &filename, std::string_view content) {
   return ape::setFramePayload(filename, std::string_view("TITLE"), content);
 }
 
-const std::optional<bool> SetAlbum(const std::string &filename,
-                                   std::string_view content) {
+auto SetAlbum(const std::string &filename, std::string_view content) {
   return ape::setFramePayload(filename, std::string_view("ALBUM"), content);
 }
 
-const std::optional<bool> SetLeadArtist(const std::string &filename,
-                                        std::string_view content) {
+auto SetLeadArtist(const std::string &filename, std::string_view content) {
   return ape::setFramePayload(filename, std::string_view("ARTIST"), content);
 }
 
-const std::optional<bool> SetYear(const std::string &filename,
-                                  std::string_view content) {
+auto SetYear(const std::string &filename, std::string_view content) {
   return ape::setFramePayload(filename, std::string_view("YEAR"), content);
 }
 
-const std::optional<bool> SetComment(const std::string &filename,
-                                     std::string_view content) {
+auto SetComment(const std::string &filename, std::string_view content) {
   return ape::setFramePayload(filename, std::string_view("COMMENT"), content);
 }
 
-const std::optional<bool> SetGenre(const std::string &filename,
-                                   std::string_view content) {
+auto SetGenre(const std::string &filename, std::string_view content) {
   return ape::setFramePayload(filename, std::string_view("GENRE"), content);
 }
 
-const std::optional<bool> SetComposer(const std::string &filename,
-                                      std::string_view content) {
+auto SetComposer(const std::string &filename, std::string_view content) {
   return ape::setFramePayload(filename, std::string_view("COMPOSER"), content);
 }
-
 }; // end namespace ape
 
 #endif // APE_BASE

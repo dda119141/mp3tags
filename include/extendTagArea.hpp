@@ -84,15 +84,13 @@ public:
         content, Buffer_obj.get_tag_buffer(), frameProperties);
 
     this->ReWriteFile(filled_buffer, additionalSize);
-
-    status = true;
   }
 
-  bool get_status() const { return status; }
+  auto get_status() const { return status; }
 
 private:
   const audioProperties_t *const audioPropertiesObj;
-  bool status = false;
+  execution_status_t status{};
 
   void ReWriteFile(id3::buffer_t tagBuffer, uint32_t extraSize) {
     const auto &fileParameter = audioPropertiesObj->fileScopePropertiesObj;

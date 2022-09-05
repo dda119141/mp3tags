@@ -39,8 +39,8 @@ static const std::string modifiedEnding(".mod");
 using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
-enum class severity_t { high = 1, middle, low };
-enum class frame_type_val_t { id3v1, id3v2, ape };
+enum class severity_t { idle = 0, high, middle, low };
+enum class tag_type_val_t { idle = 0, id3v1, id3v2, ape };
 
 struct frame_type {
   unsigned int id3v1_present : 1;
@@ -49,27 +49,43 @@ struct frame_type {
 };
 
 enum class rstatus_t {
-  no_error = 0,
-  no_TagLength = 1, // tag container does not exists
-  no_frameID,
-  frameID_bad_position,
+  noError = 0,
+  fileOpeningError,
+  fileRenamingError,
+  noTag,
+  noTagLengthError,                 // tag container does not exists
+  tagSizeBiggerThanTagHeaderLength, // tag size > tag header length
+  noFrameIDError,
+  frameIDBadPositionError,
   no_framePayloadLength,
-  frameLengthHigherThanTagLength
+  frameLengthBiggerThanTagLength,
+  ContentLengthBiggerThanFrameArea, // Content to write does not fit in
+  PayloadStartAfterPayloadEnd
 };
 
-auto get_message_from_status(const rstatus_t &status) {
+const auto get_message_from_status(const rstatus_t &status) {
   switch (status) {
-  case rstatus_t::no_error:
+  case rstatus_t::noError:
     return std::string{"No Error"};
     break;
-  case rstatus_t::no_frameID:
+  case rstatus_t::noFrameIDError:
     return std::string{"Frame ID could not be retrieved"};
     break;
-  case rstatus_t::frameID_bad_position:
+  case rstatus_t::frameIDBadPositionError:
     return std::string{"Bad Frame ID Position"};
     break;
-  case rstatus_t::frameLengthHigherThanTagLength:
+  case rstatus_t::frameLengthBiggerThanTagLength:
     return std::string{"Frame length > Tag length"};
+    break;
+  case rstatus_t::PayloadStartAfterPayloadEnd:
+    return std::string{"Payload Start Position > Payload End Position"};
+    break;
+  case rstatus_t::ContentLengthBiggerThanFrameArea:
+    return std::string{
+        "Content Length to write > Existing Frame Payload Length"};
+    break;
+  case rstatus_t::fileOpeningError:
+    return std::string{"Error: Could not open file"};
     break;
   default:
     break;
@@ -79,8 +95,8 @@ auto get_message_from_status(const rstatus_t &status) {
 
 typedef struct execution_status {
   severity_t severity : 3;
-  frame_type_val_t frame_type_val : 3;
-  rstatus_t rstatus : 4;
+  tag_type_val_t frame_type_val : 3;
+  rstatus_t rstatus : 5;
   unsigned int frameIDPosition : 32;
 } execution_status_t;
 
@@ -89,28 +105,41 @@ typedef struct mp3_execution_status {
   execution_status_t status;
 } mp3_execution_status_t;
 
+constexpr execution_status_t get_status_error(tag_type_val_t frameTypeIn,
+                                              rstatus_t statusIn) {
+  execution_status_t val = {};
+  val.frame_type_val = frameTypeIn;
+  val.rstatus = statusIn;
+  return val;
+}
+
 constexpr execution_status_t get_status_no_tag_exists() {
   execution_status_t val = {};
-  val.rstatus = rstatus_t::no_TagLength;
+  val.rstatus = rstatus_t::noTagLengthError;
   return val;
 }
 
 constexpr execution_status_t get_status_no_frame_ID() {
   execution_status_t val = {};
-  val.rstatus = rstatus_t::no_frameID;
+  val.rstatus = rstatus_t::noFrameIDError;
   return val;
 }
 
 constexpr execution_status_t get_status_frame_ID_pos(unsigned int pos) {
   execution_status_t val = {};
-  val.rstatus = rstatus_t::no_error;
+  val.rstatus = rstatus_t::noError;
   val.frameIDPosition = pos;
   return val;
+}
+
+constexpr bool get_execution_status_b(execution_status_t valIn) {
+  return (valIn.rstatus == rstatus_t::noError);
 }
 
 /* Frame settings */
 typedef struct frameScopeProperties_t {
   uint32_t frameIDStartPosition = {};
+  tag_type_val_t tagType;
   uint8_t doSwap = {};
   uint8_t frameIDLength = {};
   uint32_t frameContentStartPosition = {};
@@ -186,13 +215,15 @@ auto operator|(T &&_obj, F &&Function)
   }
 }
 
-bool WriteFile(const std::string &FileName, const std::string &content,
-               const frameScopeProperties &frameScopeProperties) {
+execution_status_t WriteFile(const std::string &FileName,
+                             const std::string &content,
+                             const frameScopeProperties &frameScopeProperties) {
   std::fstream filWrite(FileName,
                         std::ios::binary | std::ios::in | std::ios::out);
 
   if (!filWrite.is_open()) {
-    return false;
+    return get_status_error(frameScopeProperties.tagType,
+                            rstatus_t::fileOpeningError);
   }
 
   filWrite.seekp(frameScopeProperties.frameContentStartPosition);
@@ -209,7 +240,7 @@ bool WriteFile(const std::string &FileName, const std::string &content,
     filWrite << '\0';
   }
 
-  return true;
+  return execution_status_t{};
 }
 
 std::optional<bool> renameFile(const std::string &fileToRename,
@@ -285,7 +316,6 @@ uint32_t GetTagSizeDefault(buffer_t buffer, uint32_t length,
 
   using pair_integers = std::pair<uint32_t, uint32_t>;
   std::vector<uint32_t> power_values(length);
-
   uint32_t n = 0;
 
   std::generate(power_values.begin(), power_values.end(), [&n] {
@@ -427,9 +457,6 @@ public:
 
         return get_status_frame_ID_pos(loc);
       } else {
-
-        const std::string ret = std::string("could not find frame ID: ") +
-                                std::string(_tag) + std::string("\n");
 
         return get_status_no_frame_ID();
       }

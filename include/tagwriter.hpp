@@ -14,9 +14,10 @@
 #include <optional>
 #include <string_conversion.hpp>
 
-bool SetTag(const std::string &filename,
-            const std::vector<std::pair<std::string, std::string_view>> &tags,
-            std::string_view content) {
+auto id3v2_SetFrameContent(
+    const std::string &filename,
+    const std::vector<std::pair<std::string, std::string_view>> &tags,
+    std::string_view content) {
   const auto ret =
       id3v2::GetTagHeader(filename)
 
@@ -25,7 +26,7 @@ bool SetTag(const std::string &filename,
       | [](id3::buffer_t buffer) { return id3v2::GetID3Version(buffer); }
 
       | [&](const std::string &id3Version) {
-          const auto writePayloadResult = [&]() -> bool {
+          const auto writePayloadResult = [&]() -> id3::execution_status_t {
             for (auto &tag : tags) {
               if (id3Version == tag.first) // tag.first is the id3 Version
               {
@@ -74,7 +75,7 @@ bool SetTag(const std::string &filename,
 
             ID3_LOG_WARN("{} failed", __func__);
 
-            return false;
+            return id3::execution_status_t{};
           };
 
           return writePayloadResult();
@@ -83,6 +84,28 @@ bool SetTag(const std::string &filename,
   return ret;
 }
 
+template <typename Function1>
+auto SetFramePayload(
+    const std::string &filename,
+    const std::vector<std::pair<std::string, std::string_view>> &id3v2Tags,
+    std::string_view content, Function1 fuc1) {
+
+  const auto retId3v1 = fuc1(filename, content);
+  auto ret = id3::get_execution_status_b(retId3v1);
+
+  const auto retId3v2 = id3v2_SetFrameContent(filename, id3v2Tags, content);
+  ret |= id3::get_execution_status_b(retId3v2);
+
+  return ret;
+}
+
+class setHandle {
+public:
+  explicit setHandle(
+      const std::string &filename, std::string_view content,
+      const std::vector<std::pair<std::string, std::string_view>> tags) {}
+};
+
 bool SetAlbum(const std::string &filename, std::string_view content) {
   const std::vector<std::pair<std::string, std::string_view>> tags{
       {"0x0400", "TALB"},
@@ -90,17 +113,11 @@ bool SetAlbum(const std::string &filename, std::string_view content) {
       {"0x0000", "TAL"},
   };
 
-  const auto ret1 = ape::SetAlbum(filename, content);
-  const auto ret = id3v1::SetAlbum(filename, content);
+  const auto retApe = ape::SetAlbum(filename, content);
+  auto ret = id3::get_execution_status_b(retApe);
+  const auto retId3 = SetFramePayload(filename, tags, content, id3v1::SetAlbum);
 
-  if (ret.has_value() || ret1.has_value()) {
-
-    SetTag(filename, tags, content);
-
-    return ret.value();
-  } else {
-    return SetTag(filename, tags, content);
-  }
+  return (ret | retId3);
 }
 
 bool SetLeadArtist(const std::string &filename, std::string_view content) {
@@ -109,16 +126,13 @@ bool SetLeadArtist(const std::string &filename, std::string_view content) {
       {"0x0300", "TPE1"},
       {"0x0000", "TP1"},
   };
-  const auto ret = id3v1::SetLeadArtist(filename, content);
 
-  if (ret.has_value()) {
+  const auto retApe = ape::SetLeadArtist(filename, content);
+  auto ret = id3::get_execution_status_b(retApe);
+  const auto retId3 =
+      SetFramePayload(filename, tags, content, id3v1::SetLeadArtist);
 
-    SetTag(filename, tags, content);
-
-    return ret.value();
-  } else {
-    return SetTag(filename, tags, content);
-  }
+  return (ret | retId3);
 }
 
 bool SetGenre(const std::string &filename, std::string_view content) {
@@ -127,19 +141,12 @@ bool SetGenre(const std::string &filename, std::string_view content) {
       {"0x0300", "TCON"},
       {"0x0000", "TCO"},
   };
-  const auto ret = ape::SetGenre(filename, content);
-  const auto ret1 = id3v1::SetGenre(filename, content);
 
-  if (ret.has_value()) {
+  const auto retApe = ape::SetGenre(filename, content);
+  auto ret = id3::get_execution_status_b(retApe);
+  const auto retId3 = SetFramePayload(filename, tags, content, id3v1::SetGenre);
 
-    return ret.value();
-  } else if (ret1.has_value()) {
-
-    return ret1.value();
-  } else {
-
-    return SetTag(filename, tags, content);
-  }
+  return (ret | retId3);
 }
 
 bool SetBandOrchestra(const std::string &filename, std::string_view content) {
@@ -149,7 +156,8 @@ bool SetBandOrchestra(const std::string &filename, std::string_view content) {
       {"0x0000", "TP2"},
   };
 
-  return SetTag(filename, tags, content);
+  const auto ret = id3v2_SetFrameContent(filename, tags, content);
+  return id3::get_execution_status_b(ret);
 }
 
 bool SetComposer(const std::string &filename, std::string_view content) {
@@ -159,7 +167,8 @@ bool SetComposer(const std::string &filename, std::string_view content) {
       {"0x0000", "TCM"},
   };
 
-  return SetTag(filename, tags, content);
+  const auto ret = id3v2_SetFrameContent(filename, tags, content);
+  return id3::get_execution_status_b(ret);
 }
 
 bool SetDate(const std::string &filename, std::string_view content) {
@@ -169,7 +178,8 @@ bool SetDate(const std::string &filename, std::string_view content) {
       {"0x0000", "TDA"},
   };
 
-  return SetTag(filename, tags, content);
+  const auto ret = id3v2_SetFrameContent(filename, tags, content);
+  return id3::get_execution_status_b(ret);
 }
 
 bool SetTextWriter(const std::string &filename, std::string_view content) {
@@ -179,7 +189,8 @@ bool SetTextWriter(const std::string &filename, std::string_view content) {
       {"0x0000", "TXT"},
   };
 
-  return SetTag(filename, tags, content);
+  const auto ret = id3v2_SetFrameContent(filename, tags, content);
+  return id3::get_execution_status_b(ret);
 }
 
 bool SetTitle(const std::string &filename, std::string_view content) {
@@ -188,17 +199,12 @@ bool SetTitle(const std::string &filename, std::string_view content) {
       {"0x0300", "TIT2"},
       {"0x0000", "TT2"},
   };
-  const auto ret1 = ape::SetTitle(filename, content);
-  const auto ret = id3v1::SetTitle(filename, content);
 
-  if (ret.has_value() || ret1.has_value()) {
+  const auto retApe = ape::SetTitle(filename, content);
+  const auto ret = id3::get_execution_status_b(retApe);
+  const auto retId3 = SetFramePayload(filename, tags, content, id3v1::SetTitle);
 
-    SetTag(filename, tags, content);
-
-    return ret.value();
-  } else {
-    return SetTag(filename, tags, content);
-  }
+  return (ret | retId3);
 }
 
 bool SetYear(const std::string &filename, std::string_view content) {
@@ -207,16 +213,10 @@ bool SetYear(const std::string &filename, std::string_view content) {
       {"0x0300", "TYER"},
       {"0x0000", "TYE"},
   };
-  const auto ret = id3v1::SetYear(filename, content);
 
-  if (ret.has_value()) {
+  const auto retId3 = SetFramePayload(filename, tags, content, id3v1::SetYear);
 
-    SetTag(filename, tags, content);
-
-    return ret.value();
-  } else {
-    return SetTag(filename, tags, content);
-  }
+  return retId3;
 }
 
 #if 0
@@ -229,7 +229,7 @@ const std::string_view GetContentType(const std::string_view& filename)
         {"0x0000", "TCO"},
     };
 
-    return SetTag(filename, tags);
+    return id3v2_SetFrameContent(filename, tags);
 }
 
 const std::string_view GetTextWriter(const std::string_view& filename)
@@ -241,7 +241,7 @@ const std::string_view GetTextWriter(const std::string_view& filename)
         {"0x0000", "TXT"},
     };
 
-    return SetTag(filename, tags);
+    return id3v2_SetFrameContent(filename, tags);
 }
 
 const std::string_view GetFileType(const std::string_view& filename)
@@ -252,7 +252,7 @@ const std::string_view GetFileType(const std::string_view& filename)
         {"0x0000", "TFT"},
     };
 
-    return SetTag(filename, tags);
+    return id3v2_SetFrameContent(filename, tags);
 }
 
 const std::string_view GetContentGroupDescription(const std::string_view& filename)
@@ -264,7 +264,7 @@ const std::string_view GetContentGroupDescription(const std::string_view& filena
         {"0x0000", "TT1"},
     };
 
-    return SetTag(filename, tags);
+    return id3v2_SetFrameContent(filename, tags);
 }
 
 const std::string_view GetTrackPosition(const std::string_view& filename)
@@ -276,7 +276,7 @@ const std::string_view GetTrackPosition(const std::string_view& filename)
         {"0x0000", "TRK"},
     };
 
-    return SetTag(filename, tags);
+    return id3v2_SetFrameContent(filename, tags);
 }
 
 #endif
