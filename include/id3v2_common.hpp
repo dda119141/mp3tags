@@ -150,12 +150,12 @@ public:
     fileScopeProperties &fileProperties =
         this->audioProperties.fileScopePropertiesObj;
 
-    tagBuffer = GetTagHeader(fileProperties.get_filename()) | GetTagSize |
-                [&](uint32_t tags_size) {
-                  return CreateTagBufferFromFile(
-                      fileProperties.get_filename(),
-                      tags_size + GetTagHeaderSize<uint32_t>());
-                };
+    tagBuffer =
+        GetTagHeader(fileProperties.get_filename()) | GetTagSize |
+        [&](uint32_t tags_size) {
+          return CreateTagBufferFromFile(fileProperties.get_filename(),
+                                         tags_size + id3v2::TagHeaderSize);
+        };
 
     if (fileProperties.get_frame_id().length() == 0)
       ID3V2_THROW("No frame ID parameter");

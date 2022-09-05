@@ -27,7 +27,7 @@ public:
     constexpr uint32_t frameSizePositionInFrameHeader = 4;
 
     tagBuffer = CreateTagBufferFromFile(fileParameter.get_filename(),
-                                        GetTagHeaderSize<uint32_t>());
+                                        id3v2::TagHeaderSize);
 
     if (frameProperties.frameIDStartPosition +
             frameProperties.getFramePayloadLength() <

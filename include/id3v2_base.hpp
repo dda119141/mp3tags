@@ -85,6 +85,8 @@ namespace id3v2 {
 
 using namespace id3;
 
+constexpr int TagHeaderSize = 10;
+
 void CheckAudioPropertiesObject(
     const audioProperties_t *const audioPropertiesObj) {
   if (audioPropertiesObj == nullptr) {
@@ -217,8 +219,6 @@ template <typename T> std::string u8_to_u16_string(T val) {
       [](std::string arg1, char arg2) { return arg1 + '\0' + arg2; });
 }
 
-template <typename T> constexpr T GetTagHeaderSize(void) { return 10; }
-
 template <typename T> constexpr T RetrieveSize(T n) { return n; }
 
 std::optional<buffer_t> updateTagSize(buffer_t buffer, uint32_t extraSize) {
@@ -238,7 +238,7 @@ std::optional<uint32_t> GetTagSize(buffer_t buffer) {
 
   const auto val = id3::GetTagSize(buffer, pow_val, TagIndex);
 
-  ID3_PRECONDITION(val > GetTagHeaderSize<uint32_t>());
+  ID3_PRECONDITION(val > TagHeaderSize);
 
   return val;
 
@@ -263,19 +263,17 @@ std::optional<uint32_t> GetTagSize(buffer_t buffer) {
 }
 
 const auto GetTotalTagSize(buffer_t buffer) {
-  return GetTagSize(buffer) | [=](const uint32_t Tagsize) {
-    return Tagsize + GetTagHeaderSize<uint32_t>();
-  };
+  return GetTagSize(buffer) |
+         [=](const uint32_t Tagsize) { return Tagsize + TagHeaderSize; };
 }
 
 const auto GetTagSizeExclusiveHeader(buffer_t buffer) {
-  return GetTagSize(buffer) | [](const int tag_size) {
-    return (tag_size - GetTagHeaderSize<uint32_t>());
-  };
+  return GetTagSize(buffer) |
+         [](const int tag_size) { return (tag_size - TagHeaderSize); };
 }
 
 std::optional<buffer_t> GetTagHeader(const std::string &FileName) {
-  auto val = CreateTagBufferFromFile(FileName, GetTagHeaderSize<uint32_t>());
+  auto val = CreateTagBufferFromFile(FileName, TagHeaderSize);
 
   return val;
 }
@@ -325,13 +323,6 @@ std::string GetID3FileIdentifier(buffer_t buffer) {
   constexpr auto FileIdentifierLength = 3;
 
   return ExtractString(buffer, FileIdentifierStart, FileIdentifierLength);
-
-#ifdef __TEST_CODE
-  auto y = [&buffer]() -> std::string {
-    return Get_ID3_header_element(buffer, 0, 3);
-  };
-  return y();
-#endif
 }
 
 std::optional<std::string> GetID3Version(id3::buffer_t buffer) {
