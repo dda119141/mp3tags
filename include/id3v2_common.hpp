@@ -79,8 +79,8 @@ void getframeScopePropertiesFromEncodeByte(
   }
 }
 
-std::string formatFramePayload(std::string_view content,
-                               const frameScopeProperties &frameProperties) {
+const auto formatFramePayload(std::string_view content,
+                              const frameScopeProperties &frameProperties) {
 
   using payloadType =
       std::variant<std::string_view, std::u16string, std::u32string>;
@@ -132,12 +132,15 @@ std::string formatFramePayload(std::string_view content,
       encodeValue);
 }
 
-auto getFramePosition(std::string_view frameID, std::string_view tagAreaIn) {
+const auto getFramePosition(std::string_view frameID,
+                            std::string_view tagAreaIn) {
 
   const auto searchFramePosition =
       id3::searchFrame<std::string_view>(tagAreaIn);
 
-  return searchFramePosition.execute(frameID);
+  const auto ret = searchFramePosition.execute(frameID);
+
+  return get_execution_status(tag_type_t::id3v2, ret);
 }
 
 class writer;
@@ -168,18 +171,26 @@ public:
     }
   }
 
-  std::string getFramePayload() const {
-    const frameScopeProperties &frameProperties =
-        audioProperties.frameScopePropertiesObj.value();
-    auto framePayload =
-        ExtractString(tagBuffer, frameProperties.frameContentStartPosition,
-                      frameProperties.getFramePayloadLength());
+  const auto getFramePayload() const {
 
-    if (frameProperties.doSwap == 0x01) {
-      const auto tempPayload = tagBase::swapW16String(framePayload);
-      return tempPayload;
+    if (m_status.rstatus != rstatus_t::noError) {
+      return frameContent_t{m_status, {}};
+
     } else {
-      return framePayload;
+      const frameScopeProperties &frameProperties =
+          audioProperties.frameScopePropertiesObj.value();
+      auto framePayload =
+          ExtractString(tagBuffer, frameProperties.frameContentStartPosition,
+                        frameProperties.getFramePayloadLength());
+
+      id3::stripLeft(framePayload);
+
+      if (frameProperties.doSwap == 0x01) {
+        const auto tempPayload = tagBase::swapW16String(framePayload);
+        return frameContent_t{this->m_status, tempPayload};
+      } else {
+        return frameContent_t{this->m_status, framePayload};
+      }
     }
   }
 
@@ -196,7 +207,7 @@ private:
 
     const auto tagArea = GetTagArea(tagBuffer);
     if (tagArea.size() == 0) {
-      return get_status_no_tag_exists();
+      return get_status_no_tag_exists(tag_type_t::id3v2);
     }
 
     auto id3Status = getFramePosition(params.get_frame_id(), tagArea);

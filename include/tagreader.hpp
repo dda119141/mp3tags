@@ -12,7 +12,7 @@
 #include <id3v2_v30.hpp>
 #include <id3v2_v40.hpp>
 
-std::string
+const auto
 GetId3v2Tag(const std::string &fileName,
             const std::vector<std::pair<std::string, std::string_view>> &tags) {
 
@@ -53,9 +53,9 @@ GetId3v2Tag(const std::string &fileName,
               try {
                 const auto obj =
                     std::make_unique<id3v2::TagReader>(std::move(params()));
+                const auto found = obj->getFramePayload();
 
-                std::string found{obj->getFramePayload()};
-                return id3::stripLeft(found);
+                return found;
 
               } catch (const id3::audio_tag_error &e) {
                 std::cout << e.what();
@@ -65,24 +65,24 @@ GetId3v2Tag(const std::string &fileName,
             }
           }
 
-          return std::string{};
+          return frameContent_t{};
         };
 
   return ret;
 }
 
 template <typename Function1, typename Function2>
-std::string
+const auto
 GetTag(const std::string &filename,
        const std::vector<std::pair<std::string, std::string_view>> &id3v2Tags,
        Function1 fuc1, Function2 fuc2) {
   const auto retApe = fuc1(filename);
-  if (retApe != std::string{}) {
+  if (retApe.parseStatus.rstatus == rstatus_t::noError) {
     return retApe;
   }
 
   const auto retId3v1 = fuc2(filename);
-  if (retId3v1 != std::string{}) {
+  if (retId3v1.parseStatus.rstatus == rstatus_t::noError) {
     return retId3v1;
   }
 
@@ -96,7 +96,9 @@ const auto GetAlbum(const std::string &filename) {
       {"0x0000", "TAL"},
   };
 
-  return GetTag(filename, id3v2Tags, ape::GetAlbum, id3v1::GetAlbum);
+  const auto ret = GetTag(filename, id3v2Tags, ape::GetAlbum, id3v1::GetAlbum);
+
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetLeadArtist(const std::string &filename) {
@@ -106,7 +108,9 @@ const auto GetLeadArtist(const std::string &filename) {
       {"0x0000", "TP1"},
   };
 
-  return GetTag(filename, id3v2Tags, ape::GetLeadArtist, id3v1::GetLeadArtist);
+  const auto ret =
+      GetTag(filename, id3v2Tags, ape::GetLeadArtist, id3v1::GetLeadArtist);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetComposer(const std::string &filename) {
@@ -116,7 +120,9 @@ const auto GetComposer(const std::string &filename) {
       {"0x0000", "TCM"},
   };
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto ret = GetId3v2Tag(filename, id3v2Tags);
+
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetDate(const std::string &filename) {
@@ -126,7 +132,8 @@ const auto GetDate(const std::string &filename) {
       {"0x0000", "TDA"},
   };
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto ret = GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
 // Also known as Genre
@@ -137,7 +144,8 @@ const auto GetContentType(const std::string &filename) {
       {"0x0000", "TCO"},
   };
 
-  return GetTag(filename, id3v2Tags, ape::GetGenre, id3v1::GetGenre);
+  const auto ret = GetTag(filename, id3v2Tags, ape::GetGenre, id3v1::GetGenre);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetComment(const std::string &filename) {
@@ -147,7 +155,9 @@ const auto GetComment(const std::string &filename) {
       {"0x0000", "COM"},
   };
 
-  return GetTag(filename, id3v2Tags, ape::GetComment, id3v1::GetComment);
+  const auto ret =
+      GetTag(filename, id3v2Tags, ape::GetComment, id3v1::GetComment);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetTextWriter(const std::string &filename) {
@@ -157,7 +167,8 @@ const auto GetTextWriter(const std::string &filename) {
       {"0x0000", "TXT"},
   };
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto ret = GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetYear(const std::string &filename) {
@@ -167,7 +178,8 @@ const auto GetYear(const std::string &filename) {
       {"0x0000", "TYE"},
   };
 
-  return GetTag(filename, id3v2Tags, ape::GetYear, id3v1::GetYear);
+  const auto ret = GetTag(filename, id3v2Tags, ape::GetYear, id3v1::GetYear);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetFileType(const std::string &filename) {
@@ -176,7 +188,8 @@ const auto GetFileType(const std::string &filename) {
       {"0x0000", "TFT"},
   };
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto ret = GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetTitle(const std::string &filename) {
@@ -186,7 +199,8 @@ const auto GetTitle(const std::string &filename) {
       {"0x0000", "TT2"},
   };
 
-  return GetTag(filename, id3v2Tags, ape::GetTitle, id3v1::GetTitle);
+  const auto ret = GetTag(filename, id3v2Tags, ape::GetTitle, id3v1::GetTitle);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetContentGroupDescription(const std::string &filename) {
@@ -196,7 +210,8 @@ const auto GetContentGroupDescription(const std::string &filename) {
       {"0x0000", "TT1"},
   };
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto ret = GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetTrackPosition(const std::string &filename) {
@@ -206,7 +221,8 @@ const auto GetTrackPosition(const std::string &filename) {
       {"0x0000", "TRK"},
   };
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto ret = GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
 const auto GetBandOrchestra(const std::string &filename) {
@@ -216,7 +232,8 @@ const auto GetBandOrchestra(const std::string &filename) {
       {"0x0000", "TP2"},
   };
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto ret = GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
 #endif //_TAG_READER

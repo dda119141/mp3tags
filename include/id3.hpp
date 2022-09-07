@@ -40,19 +40,21 @@ using buffer_t = std::shared_ptr<std::vector<uint8_t>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
 enum class severity_t { idle = 0, high, middle, low };
-enum class tag_type_val_t { idle = 0, id3v1, id3v2, ape };
+enum class tag_type_t { idle = 0, id3v1, id3v2, ape };
 
-struct frame_type {
+struct tag_presence_t {
   unsigned int id3v1_present : 1;
   unsigned int id3v2_present : 1;
   unsigned int ape_present : 1;
 };
 
 enum class rstatus_t {
-  noError = 0,
+  idle = 0,
+  noError,
   fileOpeningError,
   fileRenamingError,
   noTag,
+  tagVersionError,
   noTagLengthError,                 // tag container does not exists
   tagSizeBiggerThanTagHeaderLength, // tag size > tag header length
   noFrameIDError,
@@ -62,6 +64,30 @@ enum class rstatus_t {
   ContentLengthBiggerThanFrameArea, // Content to write does not fit in
   PayloadStartAfterPayloadEnd
 };
+
+typedef struct execution_status {
+  severity_t severity : 3;
+  tag_type_t frame_type_val : 3;
+  rstatus_t rstatus : 5;
+  unsigned int frameIDPosition : 32;
+} execution_status_t;
+
+typedef struct mp3_execution_status {
+  struct tag_presence_t frame_type_v;
+  execution_status_t status;
+} mp3_execution_status_t;
+
+typedef struct frameContent_s {
+  execution_status_t parseStatus;
+  std::optional<const std::string> payload;
+} frameContent_t;
+
+typedef struct frameBuffer_s {
+  execution_status_t parseStatus;
+  buffer_t tagBuffer;
+  uint32_t start;
+  uint32_t end;
+} frameBuffer_t;
 
 const auto get_message_from_status(const rstatus_t &status) {
   switch (status) {
@@ -87,40 +113,47 @@ const auto get_message_from_status(const rstatus_t &status) {
   case rstatus_t::fileOpeningError:
     return std::string{"Error: Could not open file"};
     break;
+  case rstatus_t::tagVersionError:
+    return std::string{"Error: Wrong Tag Version"};
+    break;
   default:
     break;
   }
   return std::string("");
 }
 
-typedef struct execution_status {
-  severity_t severity : 3;
-  tag_type_val_t frame_type_val : 3;
-  rstatus_t rstatus : 5;
-  unsigned int frameIDPosition : 32;
-} execution_status_t;
+constexpr auto noStatusErrorFrom(execution_status_t statusIn) {
+  if (statusIn.rstatus == rstatus_t::noError) {
+    return true;
+  } else {
+    return false;
+  }
+}
 
-typedef struct mp3_execution_status {
-  struct frame_type frame_type_v;
-  execution_status_t status;
-} mp3_execution_status_t;
-
-constexpr execution_status_t get_status_error(tag_type_val_t frameTypeIn,
-                                              rstatus_t statusIn) {
+constexpr auto get_status_error(tag_type_t frameTypeIn, rstatus_t statusIn) {
   execution_status_t val = {};
   val.frame_type_val = frameTypeIn;
   val.rstatus = statusIn;
   return val;
 }
 
-constexpr execution_status_t get_status_no_tag_exists() {
+constexpr auto get_execution_status(tag_type_t frameTypeIn,
+                                    execution_status_t statusIn) {
+  execution_status_t val = statusIn;
+  val.frame_type_val = frameTypeIn;
+  return val;
+}
+
+constexpr execution_status_t get_status_no_tag_exists(tag_type_t tagTypeIn) {
   execution_status_t val = {};
+  val.frame_type_val = tagTypeIn;
   val.rstatus = rstatus_t::noTagLengthError;
   return val;
 }
 
-constexpr execution_status_t get_status_no_frame_ID() {
+constexpr execution_status_t get_status_no_frame_ID(tag_type_t tagTypeIn) {
   execution_status_t val = {};
+  val.frame_type_val = tagTypeIn;
   val.rstatus = rstatus_t::noFrameIDError;
   return val;
 }
@@ -139,7 +172,7 @@ constexpr bool get_execution_status_b(execution_status_t valIn) {
 /* Frame settings */
 typedef struct frameScopeProperties_t {
   uint32_t frameIDStartPosition = {};
-  tag_type_val_t tagType;
+  tag_type_t tagType;
   uint8_t doSwap = {};
   uint8_t frameIDLength = {};
   uint32_t frameContentStartPosition = {};
@@ -458,7 +491,7 @@ public:
         return get_status_frame_ID_pos(loc);
       } else {
 
-        return get_status_no_frame_ID();
+        return get_status_no_frame_ID(tag_type_t::idle);
       }
     };
 
