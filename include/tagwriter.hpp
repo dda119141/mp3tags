@@ -99,13 +99,6 @@ auto SetFramePayload(
   return ret;
 }
 
-class setHandle {
-public:
-  explicit setHandle(
-      const std::string &filename, std::string_view content,
-      const std::vector<std::pair<std::string, std::string_view>> tags) {}
-};
-
 bool SetAlbum(const std::string &filename, std::string_view content) {
   const std::vector<std::pair<std::string, std::string_view>> tags{
       {"0x0400", "TALB"},

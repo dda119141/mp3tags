@@ -16,8 +16,50 @@
 
 #include "logger.hpp"
 
-namespace id3 {
+namespace id3v2 {
 
+enum class tag_t { idle = 0, v00, v30, v40, NrOfTypes_t };
+using frame_t = std::vector<std::pair<tag_t, std::string_view>>;
+
+constexpr auto getIndex(tag_t val) {
+  switch (val) {
+  case tag_t::idle:
+    return -1;
+    break;
+
+  case tag_t::v00:
+    return 0;
+    break;
+
+  case tag_t::v30:
+    return 1;
+    break;
+
+  case tag_t::v40:
+    return 2;
+    break;
+  case tag_t::NrOfTypes_t:
+    return 3;
+    break;
+  }
+  return -1;
+}
+
+using frameArray_t = std::array<std::string, getIndex(tag_t::NrOfTypes_t)>;
+
+template <typename T> class frameID_s {
+public:
+  explicit frameID_s(T frames) {
+    for (auto frame : frames) {
+      mFrames.at(getIndex(frame.first)) = frame.second;
+    }
+  }
+  frameArray_t mFrames;
+};
+
+} // namespace id3v2
+
+namespace id3 {
 using iD3Variant = std::variant<::id3v2::v00, ::id3v2::v30, ::id3v2::v40>;
 
 class fileScopeProperties {
@@ -25,7 +67,6 @@ private:
   const std::string filename;
   const iD3Variant tagVersion;
   std::string_view frameID = {};
-
   std::string_view framePayload = {};
 
 public:
@@ -84,7 +125,6 @@ typedef struct AudioSettings_t audioProperties_t;
 namespace id3v2 {
 
 using namespace id3;
-
 constexpr int TagHeaderSize = 10;
 
 void CheckAudioPropertiesObject(
