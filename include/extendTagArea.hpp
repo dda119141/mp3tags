@@ -10,124 +10,114 @@
 
 namespace id3v2 {
 
-class bufferExtended {
-private:
-  buffer_t tagBuffer;
+void ExtendTagBuffer(const AudioSettings_t *const audioProperties,
+                     std::vector<uint8_t> &tagBuffer, uint32_t additionalSize) {
 
-public:
-  explicit bufferExtended(const AudioSettings_t *const audioProperties,
-                          uint32_t additionalSize) {
+  const auto &frameProperties =
+      audioProperties->frameScopePropertiesObj.value();
 
-    CheckAudioPropertiesObject(audioProperties);
+  tagBuffer.reserve(tagBuffer.size() + additionalSize);
 
-    const auto &fileParameter = audioProperties->fileScopePropertiesObj;
-    const auto &frameProperties =
-        audioProperties->frameScopePropertiesObj.value();
-    constexpr uint32_t tagsSizePositionInHeader = 6;
-    constexpr uint32_t frameSizePositionInFrameHeader = 4;
+  const auto tagSizeBuffer = updateTagSize(tagBuffer, additionalSize);
 
-    tagBuffer = CreateTagBufferFromFile(fileParameter.get_filename(),
-                                        id3v2::TagHeaderSize);
+  const auto frameSizeBuff =
+      updateFrameSizeIndex<std::vector<uint8_t>, uint32_t, uint32_t>(
+          audioProperties->fileScopePropertiesObj.get_tag_version(), tagBuffer,
+          additionalSize, frameProperties.frameIDStartPosition);
 
-    if (frameProperties.frameIDStartPosition +
-            frameProperties.getFramePayloadLength() <
-        tagBuffer->size()) {
-      ID3V2_THROW("error : Frame Key Offset + Payload length > total tag size");
-    }
-    if (tagBuffer->size() < 10) {
-      ID3V2_THROW("error : tagBuffer length < 10");
-    }
+  id3::replaceElementsInBuff(tagSizeBuffer.value(), tagBuffer,
+                             tagSizePositionInHeader);
 
-    const auto tagSizeBuffer = updateTagSize(tagBuffer, additionalSize);
+  id3::replaceElementsInBuff(frameSizeBuff.value(), tagBuffer,
+                             frameProperties.frameIDStartPosition +
+                                 frameSizePositionInFrameHeader);
 
-    const auto frameSizeBuff =
-        updateFrameSizeIndex<buffer_t, uint32_t, uint32_t>(
-            fileParameter.get_tag_version(), tagBuffer, additionalSize,
-            frameProperties.frameIDStartPosition);
+  const auto it = tagBuffer.begin() +
+                  frameProperties.frameContentStartPosition +
+                  frameProperties.getFramePayloadLength();
 
-    id3::replaceElementsInBuff(tagSizeBuffer.value(), tagBuffer,
-                               tagsSizePositionInHeader);
-
-    id3::replaceElementsInBuff(frameSizeBuff.value(), tagBuffer,
-                               frameProperties.frameIDStartPosition +
-                                   frameSizePositionInFrameHeader);
-
-    const auto it = tagBuffer->begin() +
-                    frameProperties.frameContentStartPosition +
-                    frameProperties.getFramePayloadLength();
-
-    tagBuffer->insert(it, additionalSize, 0);
-  }
-
-  buffer_t get_tag_buffer() const { return tagBuffer; }
-};
+  tagBuffer.insert(it, additionalSize, 0);
+}
 
 class FileExtended {
 public:
-  explicit FileExtended(const audioProperties_t *const audioProperties,
+  explicit FileExtended(std::vector<uint8_t> &tagBufIn,
+                        const audioProperties_t *const audioProperties,
                         uint32_t additionalSize, const std::string &content)
-      : audioPropertiesObj(audioProperties) {
+      : mTagBuffer(tagBufIn), audioPropertiesObj(audioProperties) {
 
     CheckAudioPropertiesObject(audioPropertiesObj);
 
     const auto &frameProperties =
         audioPropertiesObj->frameScopePropertiesObj.value();
+    const auto &fileParameter = audioPropertiesObj->fileScopePropertiesObj;
 
-    const auto Buffer_obj = bufferExtended{audioPropertiesObj, additionalSize};
+    if (frameProperties.frameIDStartPosition +
+            frameProperties.getFramePayloadLength() >
+        mTagBuffer.size()) {
+      ID3V2_THROW("error : Frame Key Offset + Payload length > total tag size");
+    }
+    if (mTagBuffer.size() < id3v2::TagHeaderSize) {
+      ID3V2_THROW("error : tagBuffer length < TagHeaderSize");
+    }
 
-    printf("%s frame ID start: %d\n", __FILE__,
-           frameProperties.frameIDStartPosition);
+    ExtendTagBuffer(audioPropertiesObj, mTagBuffer, additionalSize);
 
-    printf("%s frame ID length: %d\n", __FILE__, frameProperties.frameLength);
+    fillTagBufferWithPayload<std::string_view>(content, mTagBuffer,
+                                               frameProperties);
 
-    const auto filled_buffer = fillTagBufferWithPayload<std::string_view>(
-        content, Buffer_obj.get_tag_buffer(), frameProperties);
-
-    this->ReWriteFile(filled_buffer, additionalSize);
+    if (this->ReWriteFile(mTagBuffer, additionalSize)) {
+      id3::renameFile(fileParameter.get_filename() + modifiedEnding,
+                      fileParameter.get_filename());
+    }
   }
 
   auto get_status() const { return status; }
 
 private:
+  std::vector<uint8_t> mTagBuffer;
   const audioProperties_t *const audioPropertiesObj;
   execution_status_t status{};
 
-  void ReWriteFile(id3::buffer_t tagBuffer, uint32_t extraSize) {
+  bool ReWriteFile(const std::vector<uint8_t> &tagBuffer, uint32_t extraSize) {
     const auto &fileParameter = audioPropertiesObj->fileScopePropertiesObj;
 
     std::ifstream filRead(fileParameter.get_filename(),
                           std::ios::binary | std::ios::ate);
 
-    const auto _headerAndTagsSize = GetTotalTagSize(tagBuffer);
-    const uint32_t tagsSizeOld = _headerAndTagsSize - extraSize;
+    const auto extendedTagSize = tagBuffer.size();
+    const uint32_t initialTagSize = extendedTagSize - extraSize;
 
     uint32_t fileSize = filRead.tellg();
-    if (fileSize < tagsSizeOld) {
+    if (fileSize < initialTagSize) {
       ID3V2_THROW("error : file size > total old tag size");
     }
-    if (fileSize < tagBuffer->size()) {
+    if (fileSize < tagBuffer.size()) {
       ID3V2_THROW("error : file size < new tag size");
     }
-    fileSize -= tagsSizeOld;
 
     /* go to the real audio payload position and read it
             into buffer bufRead */
-    filRead.seekg(tagsSizeOld);
-    auto bufRead = std::make_shared<std::vector<uint8_t>>();
-    bufRead->reserve(fileSize);
-    filRead.read(reinterpret_cast<char *>(&bufRead->at(0)), fileSize);
+    const auto audioSizeWithoutId3v2Tag = fileSize - initialTagSize;
+    filRead.seekg(id3v2::TagHeaderStartPosition + initialTagSize);
+    auto bufRead =
+        std::make_unique<std::vector<uint8_t>>(audioSizeWithoutId3v2Tag);
+    filRead.read(reinterpret_cast<char *>(&bufRead->at(0)),
+                 audioSizeWithoutId3v2Tag);
 
     /* create new file and write tag buffer */
     std::ofstream filWrite(fileParameter.get_filename() + modifiedEnding,
                            std::ios::binary | std::ios::app);
 
-    std::for_each(std::begin(*tagBuffer), std::end(*tagBuffer),
+    /* write tag buffer into file */
+    std::for_each(std::begin(tagBuffer), std::end(tagBuffer),
                   [&filWrite](const char &n) { filWrite << n; });
 
-    /* now write real audio payload*/
-    std::for_each(bufRead->begin(), bufRead->begin() + fileSize,
+    /* now write real audio payload into Buffer*/
+    std::for_each(bufRead->begin(), bufRead->end(),
                   [&filWrite](const char &n) { filWrite << n; });
-  };
+    return true;
+  }
 };
 
 } // namespace id3v2

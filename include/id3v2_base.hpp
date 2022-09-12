@@ -18,34 +18,35 @@
 
 namespace id3v2 {
 
-enum class tag_t { idle = 0, v00, v30, v40, NrOfTypes_t };
-using frame_t = std::vector<std::pair<tag_t, std::string_view>>;
+enum class tagVersion_t { idle = 0, v00, v30, v40, NrOfTypes_t };
+using frame_t = std::vector<std::pair<tagVersion_t, std::string_view>>;
 
-constexpr auto getIndex(tag_t val) {
+constexpr auto getIndex(tagVersion_t val) {
   switch (val) {
-  case tag_t::idle:
+  case tagVersion_t::idle:
     return -1;
     break;
 
-  case tag_t::v00:
+  case tagVersion_t::v00:
     return 0;
     break;
 
-  case tag_t::v30:
+  case tagVersion_t::v30:
     return 1;
     break;
 
-  case tag_t::v40:
+  case tagVersion_t::v40:
     return 2;
     break;
-  case tag_t::NrOfTypes_t:
+  case tagVersion_t::NrOfTypes_t:
     return 3;
     break;
   }
   return -1;
 }
 
-using frameArray_t = std::array<std::string, getIndex(tag_t::NrOfTypes_t)>;
+using frameArray_t =
+    std::array<std::string, getIndex(tagVersion_t::NrOfTypes_t)>;
 
 template <typename T> class frameID_s {
 public:
@@ -125,7 +126,13 @@ typedef struct AudioSettings_t audioProperties_t;
 namespace id3v2 {
 
 using namespace id3;
+constexpr int TagHeaderStartPosition = 0;
 constexpr int TagHeaderSize = 10;
+constexpr int FrameHeaderSize = 10;
+constexpr uint32_t frameSizePositionInFrameHeader = TagHeaderStartPosition + 4;
+constexpr uint32_t tagSizePositionInHeader = TagHeaderStartPosition + 6;
+constexpr uint32_t tagSizeLengthPositionInHeader = TagHeaderStartPosition + 4;
+constexpr uint32_t tagSizeMaxValuePerElement = 127;
 
 void CheckAudioPropertiesObject(
     const audioProperties_t *const audioPropertiesObj) {
@@ -139,40 +146,35 @@ void CheckAudioPropertiesObject(
 }
 
 template <typename T>
-buffer_t fillTagBufferWithPayload(T content, id3::buffer_t tagBuffer,
-                                  const frameScopeProperties &frameConfig) {
+void fillTagBufferWithPayload(T content, std::vector<uint8_t> &tagBuffer,
+                              const frameScopeProperties &frameConfig,
+                              uint32_t additionalSize = 0) {
 
-  ID3_PRECONDITION_MSG(frameConfig.getFramePayloadLength() >= content.size(),
-                       "Existing Frame Payload size < content size");
+  const auto framePayloadStartPosition = frameConfig.frameContentStartPosition;
 
-  const auto PositionFramePayloadStart = frameConfig.frameContentStartPosition;
+  ID3_PRECONDITION_MSG(
+      tagBuffer.size() >= content.size() + framePayloadStartPosition,
+      "Existing Frame Payload index + content size > buffer size");
 
-  id3::log()->info(" PositionTagStart: {}", PositionFramePayloadStart);
+  id3::log()->info(" PositionTagStart: {}", framePayloadStartPosition);
 
   const auto payload_start_index =
-      std::begin(*tagBuffer) + PositionFramePayloadStart;
+      std::begin(tagBuffer) + framePayloadStartPosition;
 
-  std::transform(payload_start_index, payload_start_index + content.size(),
-                 content.begin(), payload_start_index, [](char a, char b) {
-                   (void)a;
-                   return b;
-                 });
+  const auto payload_end_index =
+      std::begin(tagBuffer) + framePayloadStartPosition + content.size();
 
-  std::transform(payload_start_index + content.size(),
-                 payload_start_index + frameConfig.getFramePayloadLength(),
-                 content.begin(), payload_start_index + content.size(),
-                 [](char a, char b) {
-                   (void)a;
-                   (void)b;
-                   return 0x00;
-                 });
+  std::transform(content.begin(), content.end(), payload_start_index,
+                 [](char a) { return a; });
 
-  return tagBuffer;
+  std::transform(payload_end_index, payload_end_index + additionalSize,
+                 payload_end_index, // location to write
+                 [](char a) { return 0x00; });
 }
 
 template <typename T>
-std::optional<T> GetFrameSize(buffer_t buff, const iD3Variant &TagVersion,
-                              uint32_t framePos) {
+std::optional<T> GetFrameSize(const std::vector<uint8_t> &buff,
+                              const iD3Variant &TagVersion, uint32_t framePos) {
   return std::visit(
       overloaded{
           [&](id3v2::v30 arg) { return arg.GetFrameSize(buff, framePos); },
@@ -189,8 +191,8 @@ uint32_t GetFrameHeaderSize(const iD3Variant &TagVersion) {
       TagVersion);
 }
 
-std::optional<buffer_t> UpdateFrameSize(buffer_t buffer, uint32_t extraSize,
-                                        uint32_t frameIDPosition) {
+auto UpdateFrameSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
+                     uint32_t frameIDPosition) {
 
   const uint32_t frameSizePositionInArea = frameIDPosition + 4;
   constexpr uint32_t frameSizeLengthInArea = 4;
@@ -202,8 +204,8 @@ std::optional<buffer_t> UpdateFrameSize(buffer_t buffer, uint32_t extraSize,
 }
 
 template <typename... Args>
-std::optional<buffer_t> updateFrameSizeIndex(const iD3Variant &TagVersion,
-                                             Args... args) {
+std::optional<std::vector<uint8_t>>
+updateFrameSizeIndex(const iD3Variant &TagVersion, Args... args) {
   return std::visit(
       overloaded{[&](id3v2::v30 arg) {
                    (void)arg;
@@ -217,23 +219,24 @@ std::optional<buffer_t> updateFrameSizeIndex(const iD3Variant &TagVersion,
       TagVersion);
 }
 
-const auto CreateTagBufferFromFile(const std::string &FileName, uint32_t num) {
+void CreateTagBufferFromFile(const std::string &FileName, uint32_t num,
+                             buffer_t &buffer) {
   std::ifstream fil(FileName);
-  auto buffer = std::make_shared<std::vector<unsigned char>>(num, '0');
+  constexpr auto tagBeginPosition = 0;
 
-  fil.read(reinterpret_cast<char *>(buffer->data()), num);
+  buffer.reset(new std::vector<uint8_t>(num));
 
-  return buffer;
+  fil.read(reinterpret_cast<char *>(&buffer->at(tagBeginPosition)), num);
 }
 
 template <typename T>
-std::optional<std::string> GetHexFromBuffer(id3::buffer_t buffer, T index,
-                                            T num_of_bytes_in_hex) {
+std::optional<std::string> GetHexFromBuffer(const std::vector<uint8_t> &buffer,
+                                            T index, T num_of_bytes_in_hex) {
   constexpr bool is_integrale_asset =
       std::is_integral<T>::value || std::is_unsigned<T>::value;
   static_assert(is_integrale_asset, "Parameter should be integer");
 
-  ID3_PRECONDITION(buffer->size() > num_of_bytes_in_hex);
+  ID3_PRECONDITION(buffer.size() > num_of_bytes_in_hex);
 
   std::stringstream stream_obj;
 
@@ -260,17 +263,15 @@ template <typename T> std::string u8_to_u16_string(T val) {
 
 template <typename T> constexpr T RetrieveSize(T n) { return n; }
 
-std::optional<buffer_t> updateTagSize(buffer_t buffer, uint32_t extraSize) {
-  constexpr uint32_t tagSizePositionInHeader = 6;
-  constexpr uint32_t tagSizeLengthInHeader = 4;
-  constexpr uint32_t tagSizeMaxValuePerElement = 127;
+auto updateTagSize(const std::vector<uint8_t> &buffer, uint32_t extraSize) {
 
   return updateAreaSize<uint32_t>(buffer, extraSize, tagSizePositionInHeader,
-                                  tagSizeLengthInHeader,
+                                  tagSizeLengthPositionInHeader,
                                   tagSizeMaxValuePerElement);
 }
 
-std::optional<uint32_t> GetTagSize(buffer_t buffer) {
+std::optional<uint32_t>
+GetTagSizeWithoutHeader(const std::vector<uint8_t> &buffer) {
 
   const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
   constexpr uint32_t TagIndex = 6;
@@ -301,27 +302,19 @@ std::optional<uint32_t> GetTagSize(buffer_t buffer) {
 #endif
 }
 
-const auto GetTotalTagSize(buffer_t buffer) {
-  return GetTagSize(buffer) |
+const auto GetTotalTagSize(const std::vector<uint8_t> &buffer) {
+  return GetTagSizeWithoutHeader(buffer) |
          [=](const uint32_t Tagsize) { return Tagsize + TagHeaderSize; };
 }
 
-const auto GetTagSizeExclusiveHeader(buffer_t buffer) {
-  return GetTagSize(buffer) |
-         [](const int tag_size) { return (tag_size - TagHeaderSize); };
+buffer_t &FillTagHeader(const std::string &FileName, buffer_t &buffer) {
+  std::ifstream fil(FileName);
+  fil.read(reinterpret_cast<char *>(&buffer->at(0)), TagHeaderSize);
+  return buffer;
 }
 
-std::optional<buffer_t> GetTagHeader(const std::string &FileName) {
-  auto val = CreateTagBufferFromFile(FileName, TagHeaderSize);
-
-  return val;
-}
-
-std::string GetTagArea(buffer_t buffer) {
-
-  const auto totalSize = GetTotalTagSize(buffer);
-
-  return ExtractString(buffer, 0, totalSize);
+std::string GetStringFromBuffer(const std::vector<uint8_t> &buffer) {
+  return ExtractString(buffer, 0, buffer.size());
 }
 
 template <typename T>
@@ -357,14 +350,7 @@ template <typename id3Type> void GetTagNames(void) {
   return id3Type::tag_names;
 };
 
-std::string GetID3FileIdentifier(buffer_t buffer) {
-  constexpr auto FileIdentifierStart = 0;
-  constexpr auto FileIdentifierLength = 3;
-
-  return ExtractString(buffer, FileIdentifierStart, FileIdentifierLength);
-}
-
-std::optional<std::string> GetID3Version(id3::buffer_t buffer) {
+std::optional<std::string> GetID3Version(const std::vector<uint8_t> &buffer) {
   constexpr auto kID3IndexStart = 4;
   constexpr auto kID3VersionBytesLength = 2;
 

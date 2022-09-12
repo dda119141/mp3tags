@@ -21,59 +21,49 @@
 
 namespace id3v2 {
 
-std::optional<buffer_t> checkForID3(buffer_t buffer) {
-  const auto ID3_Identifier = GetID3FileIdentifier(buffer);
-
-  if (ID3_Identifier != std::string("ID3")) {
-    id3::log()->info(" ID3 tag not present");
-    return {};
-  } else {
-    return buffer;
-  }
-}
-
 void getframeScopePropertiesFromEncodeByte(
-    frameScopeProperties &mframeScopeProperties, buffer_t tagBuffer) {
+    frameScopeProperties &mframeScopeProperties,
+    const std::vector<uint8_t> &tagBuffer) {
 
   const auto &frameContentOffset =
       mframeScopeProperties.frameContentStartPosition;
 
-  switch (tagBuffer->at(frameContentOffset)) {
+  switch (tagBuffer.at(frameContentOffset)) {
   case 0x0: {
 
     mframeScopeProperties.frameContentStartPosition += 1;
-    mframeScopeProperties.frameLength -= 1;
+    mframeScopeProperties.framePayloadLength -= 1;
     break;
   }
   case 0x1: {
-    const uint16_t encodeOder = (tagBuffer->at(frameContentOffset + 1) << 8 |
-                                 tagBuffer->at(frameContentOffset + 2));
+    const uint16_t encodeOder = (tagBuffer.at(frameContentOffset + 1) << 8 |
+                                 tagBuffer.at(frameContentOffset + 2));
     if (encodeOder == 0xfeff) {
       mframeScopeProperties.doSwap = 1;
     }
 
     mframeScopeProperties.frameContentStartPosition += 3;
-    mframeScopeProperties.frameLength -= 3;
+    mframeScopeProperties.framePayloadLength -= 3;
     mframeScopeProperties.encodeFlag = 1;
     break;
   }
   case 0x2: { /* UTF-16BE [UTF-16] encoded Unicode [UNICODE] without
                  BOM */
     mframeScopeProperties.frameContentStartPosition += 1;
-    mframeScopeProperties.frameLength -= 1;
+    mframeScopeProperties.framePayloadLength -= 1;
     mframeScopeProperties.encodeFlag = 2;
     break;
   }
   case 0x3: { /* UTF-8 [UTF-8] encoded Unicode [UNICODE]. Terminated
                  with $00 */
     mframeScopeProperties.frameContentStartPosition += 3;
-    mframeScopeProperties.frameLength -= 3;
+    mframeScopeProperties.framePayloadLength -= 3;
     mframeScopeProperties.encodeFlag = 3;
     break;
   }
   default: {
     mframeScopeProperties.frameContentStartPosition += 1;
-    mframeScopeProperties.frameLength -= 1;
+    mframeScopeProperties.framePayloadLength -= 1;
     break;
   }
   }
@@ -89,11 +79,11 @@ const auto formatFramePayload(std::string_view content,
     payloadType varEncode;
 
     if (frameProperties.encodeFlag == 0x01) {
-      varEncode = std::u16string();
+      varEncode = std::u16string{};
     } else if (frameProperties.encodeFlag == 0x02) { // unicode without BOM
-      varEncode = std::string_view("");
+      varEncode = std::string_view{""};
     } else if (frameProperties.encodeFlag == 0x03) { // UTF8 unicode
-      varEncode = std::u32string();
+      varEncode = std::u32string{};
     }
 
     return varEncode;
@@ -104,35 +94,31 @@ const auto formatFramePayload(std::string_view content,
 
           [&](std::string_view arg) {
             (void)arg;
-            return std::string(content);
+            return std::string{content};
           },
-
           [&](std::u16string arg) {
             (void)arg;
 
             if (frameProperties.doSwap == 0x01) {
-              std::string_view val =
+              auto val =
                   tagBase::getW16StringFromLatin<std::vector<uint8_t>>(content);
               const auto ret = tagBase::swapW16String(val);
               return ret;
             } else {
-              const auto ret =
-                  tagBase::getW16StringFromLatin<std::vector<uint8_t>>(content);
-              return ret;
+              return tagBase::getW16StringFromLatin<std::vector<uint8_t>>(
+                  content);
             }
           },
-
           [&](std::u32string arg) {
             (void)arg;
-            const auto ret = std::string(content) + '\0';
+            const auto ret = std::string{content} + '\0';
             return ret;
           },
-
       },
       encodeValue);
 }
 
-const auto getFramePosition(std::string_view frameID,
+const auto GetFramePosition(std::string_view frameID,
                             std::string_view tagAreaIn) {
 
   const auto searchFramePosition =
@@ -148,28 +134,36 @@ class writer;
 class TagReader {
 public:
   explicit TagReader(id3::audioProperties_t &&Config)
-      : audioProperties(std::move(Config)) {
+      : mAudioProperties(std::move(Config)),
+        fileProperties(mAudioProperties.fileScopePropertiesObj),
+        mTagHeaderBuffer(new std::vector<uint8_t>(id3v2::TagHeaderSize)) {
 
-    fileScopeProperties &fileProperties =
-        this->audioProperties.fileScopePropertiesObj;
+    FillTagHeader(fileProperties.get_filename(), mTagHeaderBuffer);
 
-    tagBuffer =
-        GetTagHeader(fileProperties.get_filename()) | GetTagSize |
-        [&](uint32_t tags_size) {
-          return CreateTagBufferFromFile(fileProperties.get_filename(),
-                                         tags_size + id3v2::TagHeaderSize);
-        };
+    if (auto tag_payload_size = GetTagSizeWithoutHeader(*mTagHeaderBuffer);
+        !tag_payload_size.has_value()) {
+      ID3V2_THROW("Tag length = 0\n");
+    } else {
+      const auto tag_size = tag_payload_size.value() + id3v2::TagHeaderSize;
 
-    if (fileProperties.get_frame_id().length() == 0)
-      ID3V2_THROW("No frame ID parameter");
+      CreateTagBufferFromFile(fileProperties.get_filename(), tag_size,
+                              mTagBuffer);
+    }
 
-    this->audioProperties.frameScopePropertiesObj.emplace();
+    if (fileProperties.get_frame_id().length() == 0) {
+      ID3V2_THROW("No frame ID parameter\n");
+    } else {
+      mAudioProperties.frameScopePropertiesObj.emplace();
+    }
 
     m_status = retrieveFrameProperties(fileProperties);
     if (m_status.rstatus != rstatus_t::noError) {
       ID3V2_THROW(get_message_from_status(m_status.rstatus));
     }
   }
+
+  auto &getHeaderBuffer() const { return mTagHeaderBuffer; }
+  auto &getTagBuffer() const { return mTagBuffer; }
 
   const auto getFramePayload() const {
 
@@ -178,9 +172,9 @@ public:
 
     } else {
       const frameScopeProperties &frameProperties =
-          audioProperties.frameScopePropertiesObj.value();
+          mAudioProperties.frameScopePropertiesObj.value();
       auto framePayload =
-          ExtractString(tagBuffer, frameProperties.frameContentStartPosition,
+          ExtractString(*mTagBuffer, frameProperties.frameContentStartPosition,
                         frameProperties.getFramePayloadLength());
 
       id3::stripLeft(framePayload);
@@ -195,66 +189,63 @@ public:
   }
 
 private:
-  audioProperties_t audioProperties;
-  buffer_t tagBuffer = {};
+  audioProperties_t mAudioProperties;
+  fileScopeProperties &fileProperties;
+  buffer_t mTagHeaderBuffer{};
+  buffer_t mTagBuffer{};
   execution_status_t m_status;
   friend class id3v2::writer;
 
   execution_status_t
   retrieveFrameProperties(const fileScopeProperties &params) {
     frameScopeProperties &frameProperties =
-        audioProperties.frameScopePropertiesObj.value();
+        mAudioProperties.frameScopePropertiesObj.value();
 
-    const auto tagArea = GetTagArea(tagBuffer);
+    const auto tagArea = GetStringFromBuffer(*mTagBuffer);
     if (tagArea.size() == 0) {
       return get_status_no_tag_exists(tag_type_t::id3v2);
     }
 
-    auto id3Status = getFramePosition(params.get_frame_id(), tagArea);
+    const auto id3Status = GetFramePosition(params.get_frame_id(), tagArea);
     if (id3Status.rstatus != rstatus_t::noError) {
       return id3Status;
     }
 
     frameProperties.frameIDStartPosition = id3Status.frameIDPosition;
 
-    frameProperties.frameLength =
-        GetFrameSize<uint32_t>(tagBuffer, params.get_tag_version(),
+    /* get total frame length (including frame header length) */
+    frameProperties.framePayloadLength =
+        GetFrameSize<uint32_t>(*mTagBuffer, params.get_tag_version(),
                                frameProperties.frameIDStartPosition)
             .value();
+    frameProperties.frameLength =
+        frameProperties.framePayloadLength + id3v2::FrameHeaderSize;
 
     frameProperties.frameContentStartPosition =
-        frameProperties.frameIDStartPosition +
-        GetFrameHeaderSize(params.get_tag_version());
+        frameProperties.frameIDStartPosition + id3v2::FrameHeaderSize;
 
     if (params.get_frame_id().find_first_of("T") ==
         0) // if frameID starts with T
     {
-      getframeScopePropertiesFromEncodeByte(frameProperties, tagBuffer);
+      getframeScopePropertiesFromEncodeByte(frameProperties, *mTagBuffer);
     }
-
-    audioProperties.TagArea = tagArea;
-    audioProperties.TagBuffer = tagBuffer;
 
     return id3Status;
   }
-};
+}; // namespace id3v2
 
 class writer {
 public:
   explicit writer(const TagReader &tagReaderIn)
-      : audioPropertiesObj(&tagReaderIn.audioProperties) {
+      : mTagReaderIn(tagReaderIn),
+        audioPropertiesObj(&tagReaderIn.mAudioProperties) {
 
     CheckAudioPropertiesObject(audioPropertiesObj);
 
     const auto &params = audioPropertiesObj->fileScopePropertiesObj;
-
     if (params.get_frame_content_to_write().size() == 0) {
       ID3V2_THROW("frame payload to write size = 0");
     }
-  }
-
-  auto execute() const {
-    const auto &params = audioPropertiesObj->fileScopePropertiesObj;
 
     const frameScopeProperties &frameProperties =
         audioPropertiesObj->frameScopePropertiesObj.value();
@@ -265,32 +256,28 @@ public:
     if (frameProperties.getFramePayloadLength() <
         framePayloadToWrite.size()) // resize whole header
     {
-      std::cerr << "frames size does not fit\n";
+      const uint32_t extraLength =
+          framePayloadToWrite.size() - frameProperties.getFramePayloadLength();
 
-      const uint32_t extraLength = (framePayloadToWrite.size() -
-                                    frameProperties.getFramePayloadLength());
-
-      static const id3v2::FileExtended fileExtended{
-          audioPropertiesObj, extraLength, framePayloadToWrite};
-
-      return fileExtended.get_status();
+      const id3v2::FileExtended fileExtended{*mTagReaderIn.getTagBuffer(),
+                                             audioPropertiesObj, extraLength,
+                                             framePayloadToWrite};
+      mStatus = fileExtended.get_status();
 
     } else {
-      return id3::WriteFile(params.get_filename(), framePayloadToWrite,
-                            frameProperties);
+      mStatus = id3::WriteFile(params.get_filename(), framePayloadToWrite,
+                               frameProperties);
     }
   }
 
+  const auto getStatus() const { return mStatus; }
+
 private:
-  writer() = default;
+  writer() = delete;
+  id3::execution_status_t mStatus{};
+  const TagReader &mTagReaderIn;
   const audioProperties_t *const audioPropertiesObj;
 };
-
-template <typename id3Type> const auto is_tag(std::string name) {
-  return (std::any_of(id3v2::GetTagNames<id3Type>().cbegin(),
-                      id3v2::GetTagNames<id3Type>().cend(),
-                      [&](std::string obj) { return name == obj; }));
-}
 }; // end namespace id3v2
 
 #endif //_ID3V2_COMMON

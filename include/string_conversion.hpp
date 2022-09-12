@@ -58,8 +58,7 @@ std::string getW16StringFromLatin(std::string_view val) {
 #endif
 }
 
-std::string swapW16String(std::string_view val) {
-  std::string val_str = std::string(val);
+const std::string &swapW16String(std::string &val_str) {
 
   if (std::distance(val_str.begin(), val_str.end()) % 2 != 0)
     val_str += '\0';

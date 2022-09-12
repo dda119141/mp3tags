@@ -14,9 +14,9 @@ struct tagOptions {
   bool artist;
   bool trackPosition;
   bool example;
-
+  bool year;
   bool isEmpty() {
-    return !(album | genre | title | artist | trackPosition | example);
+    return !(album | genre | title | artist | trackPosition | year | example);
   }
 } tagOption = {};
 
@@ -62,6 +62,10 @@ bool readTagsInFile(const std::string &mediafile,
   if (tags.trackPosition) {
     cout << "Get track position of file: " << EndFilename << " : ";
     cout << GetTrackPosition(filename) << "\n";
+  }
+  if (tags.year) {
+    cout << "Get file release year: " << EndFilename << " : ";
+    cout << GetYear(filename) << "\n";
   }
   if (tags.example) {
     preCheckId3(filename);
@@ -118,6 +122,7 @@ int main(int argc, const char **argv) {
           "Get the artist frame content.") |
       lyra::opt(tagOption.album)["--album"]["-b"](
           "Get the album frame content.") |
+      lyra::opt(tagOption.year)["--year"]["-y"]("Get the album release year.") |
       lyra::opt(tagOption.trackPosition)["--trackposition"]["-p"](
           "Get the track position.") |
       lyra::opt(tagOption.example)["--example"]["-e"]("Example logic");

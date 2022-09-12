@@ -81,14 +81,15 @@ public:
 
   constexpr unsigned int FrameHeaderSize(void) { return 6; }
 
-  std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index) {
+  std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t> &buffer,
+                                       uint32_t index) {
     const auto start = FrameIDSize() + index;
 
-    if (buffer->size() >= start) {
-      auto val = buffer->at(start + 0) * std::pow(2, 16);
+    if (buffer.size() >= start) {
+      auto val = buffer.at(start + 0) * std::pow(2, 16);
 
-      val += buffer->at(start + 1) * std::pow(2, 8);
-      val += buffer->at(start + 2) * std::pow(2, 0);
+      val += buffer.at(start + 1) * std::pow(2, 8);
+      val += buffer.at(start + 2) * std::pow(2, 0);
 
       return val;
 
@@ -96,12 +97,11 @@ public:
       ID3_LOG_ERROR("failed..: {} ..", start);
     }
 
-    return {};
+    return std::nullopt;
   }
 
-  std::optional<id3::buffer_t> UpdateFrameSize(id3::buffer_t buffer,
-                                               uint32_t extraSize,
-                                               uint32_t tagLocation) {
+  auto UpdateFrameSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
+                       uint32_t tagLocation) {
 
     const uint32_t frameSizePositionInArea = 3 + tagLocation;
     constexpr uint32_t frameSizeLengthInArea = 3;

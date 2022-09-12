@@ -23,25 +23,23 @@ private:
   uint32_t mTagBegin = 0;
   uint32_t mTagPayloadPosition = 0;
   uint32_t mTagPayloadLength = 0;
-  id3::buffer_t mBuffer{};
   execution_status_t mStatus{};
 
   execution_status_t init(const std::string &fileName) {
     std::ifstream filRead(mFileName, std::ios::binary | std::ios::ate);
 
+    /* move the cursor to tag begin */
     const unsigned int dataSize = filRead.tellg();
     mTagBegin = dataSize - ::id3v1::TagSize;
     filRead.seekg(mTagBegin);
 
-    id3::buffer_t tagHeaderBuffer =
-        std::make_shared<std::vector<uint8_t>>(::id3v1::TagHeaderLength, '0');
-    filRead.read(reinterpret_cast<char *>(tagHeaderBuffer->data()),
-                 ::id3v1::TagHeaderLength);
+    /* extract the tag identifier */
+    std::string identifier{'-'};
+    identifier.resize(TagHeaderLength);
+    filRead.read(identifier.data(), TagHeaderLength);
 
-    const auto stringExtracted =
-        id3::ExtractString(tagHeaderBuffer, 0, ::id3v1::TagHeaderLength);
-    const auto ret = (stringExtracted == std::string("TAG"));
-    if (!ret) {
+    /* check tag identifier */
+    if (bool ret = (identifier == std::string("TAG")); !ret) {
       return get_status_error(tag_type_t::id3v1, rstatus_t::noTag);
     }
 
@@ -53,58 +51,59 @@ private:
     mTagPayloadLength = ::id3v1::TagSize - ::id3v1::TagHeaderLength;
 
     filRead.seekg(mTagPayloadPosition);
-    id3::buffer_t buffer1 =
-        std::make_shared<std::vector<unsigned char>>(mTagPayloadLength, '0');
-    filRead.read(reinterpret_cast<char *>(buffer1->data()), mTagPayloadLength);
-    mBuffer = buffer1;
+    tagStringBuffer.resize(mTagPayloadLength);
+    filRead.read(tagStringBuffer.data(), mTagPayloadLength);
 
     return get_status_error(tag_type_t::id3v1, rstatus_t::noError);
   }
 
 public:
+  std::string tagStringBuffer{};
   explicit tagReadWriter(const std::string &fileName)
-      : mFileName(fileName), mBuffer({}) {
+      : mFileName(fileName), tagStringBuffer({}) {
     mStatus = init(fileName);
   }
 
   uint32_t GetTagPayloadPosition() const { return mTagPayloadPosition; }
 
-  frameBuffer_t GetBuffer() const { return frameBuffer_t{mStatus, mBuffer}; }
+  frameContent_v GetBuffer() const {
+    return frameContent_v{mStatus, tagStringBuffer};
+  }
 };
 
 class frameObj_t {
 
-  id3::buffer_t tagBuffer{};
+  std::string_view mTagView{};
   uint32_t mFrameStartPos = 0;
   uint32_t mFrameEndPos = 0;
 
 public:
-  explicit frameObj_t(id3::buffer_t buf, uint32_t frameStartPosIn,
+  explicit frameObj_t(std::string_view tagView, uint32_t frameStartPosIn,
                       uint32_t frameEndPosIn)
-      : tagBuffer(buf), mFrameStartPos(frameStartPosIn),
+      : mTagView(tagView), mFrameStartPos(frameStartPosIn),
         mFrameEndPos(frameEndPosIn) {
 
-    if (mFrameStartPos > mFrameEndPos)
+    if (mFrameStartPos >= mFrameEndPos)
       throw id3::id3_error("id3v1: start pos > end pos");
 
-    frameContent = id3::ExtractString(tagBuffer, mFrameStartPos,
-                                      (mFrameEndPos - mFrameStartPos));
+    frameContent =
+        mTagView.substr(mFrameStartPos, (mFrameEndPos - mFrameStartPos));
 
-    id3::stripLeft(frameContent.value());
+    id3::stripLeft(frameContent);
   }
 
-  std::optional<std::string> frameContent{};
+  std::string frameContent{};
 };
 
-auto getFramePayload = [](const std::string &filename, uint32_t start,
-                          uint32_t end) {
+const auto getFramePayload = [](const std::string &filename, uint32_t start,
+                                uint32_t end) {
   const tagReadWriter tagRW{filename};
   const auto bufObj = tagRW.GetBuffer();
 
   if (noStatusErrorFrom(bufObj.parseStatus)) {
-    const frameObj_t frameObj{bufObj.tagBuffer, start, end};
+    const frameObj_t frameObj{bufObj.payload, start, end};
 
-    return frameContent_t{bufObj.parseStatus, frameObj.frameContent.value()};
+    return frameContent_t{bufObj.parseStatus, frameObj.frameContent};
   } else {
     return frameContent_t{bufObj.parseStatus, {}};
   }
@@ -136,8 +135,7 @@ const auto SetFramePayload(const std::string &filename,
   ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content),
                tagRW.GetTagPayloadPosition());
 
-  const auto ret =
-      WriteFile(filename, std::string(content), frameScopeProperties);
+  const auto ret = WriteFile(filename, content, frameScopeProperties);
 
   return ret;
 }
