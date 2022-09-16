@@ -6,226 +6,237 @@
 #define _TAG_READER
 
 #include <ape.hpp>
+#include <id3_precheck.hpp>
 #include <id3v1.hpp>
 #include <id3v2_common.hpp>
 #include <id3v2_v00.hpp>
 #include <id3v2_v30.hpp>
 #include <id3v2_v40.hpp>
 
-const std::string
-GetId3v2Tag(const std::string &fileName,
-            const std::vector<std::pair<std::string, std::string_view>> &tags) {
+const auto GetId3v2Tag(const std::string &fileName,
+                       const id3v2::frameArray_t &frameIDs) {
 
-  const auto ret =
-      id3v2::GetTagHeader(fileName)
+  const auto params = [&fileName, &frameIDs]() {
+    const auto id3Version = preCheckId3(fileName).id3Version;
 
-      | id3v2::checkForID3
+    switch (id3Version) {
+    case id3v2::tagVersion_t::v30: {
+      return audioProperties_t{id3v2::fileScopeProperties{
+          fileName,
+          id3v2::v30(),                                   // Tag version
+          frameIDs.at(getIndex(id3v2::tagVersion_t::v30)) // Frame ID
+      }};
+    } break;
+    case id3v2::tagVersion_t::v40: {
+      return audioProperties_t{id3v2::fileScopeProperties{
+          fileName,
+          id3v2::v40(),                                   // Tag version
+          frameIDs.at(getIndex(id3v2::tagVersion_t::v40)) // Frame ID
+      }};
+    } break;
+    case id3v2::tagVersion_t::v00: {
+      return audioProperties_t{id3v2::fileScopeProperties{
+          fileName,
+          id3v2::v00(),                                   // Tag version
+          frameIDs.at(getIndex(id3v2::tagVersion_t::v00)) // Frame ID
+      }};
+    } break;
+    default: {
+      return audioProperties_t{};
+    } break;
+    }
+  };
+  try {
+    const auto obj = std::make_unique<id3v2::TagReader>(std::move(params()));
+    const auto found = obj->getFramePayload();
 
-      | [](id3::buffer_t buffer) { return id3v2::GetID3Version(buffer); }
+    return found;
+  } catch (const id3::audio_tag_error &e) {
+    std::cout << e.what();
 
-      | [&](const std::string &id3Version) {
-          for (auto &tag : tags) {
-            if (id3Version == tag.first) // tag.first is the id3 Version
-            {
-              const auto params = [&]() {
-                if (id3Version == "0x0300") {
-                  const auto paramLoc = id3v2::basicParameters{
-                      fileName, id3v2::v30() // Tag version
-                      ,
-                      tag.second // Frame ID
-                  };
+  } catch (const std::runtime_error &e) {
+    std::cout << e.what();
+  }
 
-                  return paramLoc;
-
-                } else if (id3Version == "0x0400") {
-                  const auto paramLoc = id3v2::basicParameters{
-                      fileName, id3v2::v40() // Tag version
-                      ,
-                      tag.second // Frame ID
-                  };
-
-                  return paramLoc;
-
-                } else if (id3Version == "0x0000") {
-                  const auto paramLoc = id3v2::basicParameters{
-                      fileName, id3v2::v00() // Tag version
-                      ,
-                      tag.second // Frame ID
-                  };
-
-                  return paramLoc;
-
-                } else {
-                  const id3v2::basicParameters paramLoc{std::string("")};
-                  return paramLoc;
-                }
-              };
-              try {
-                id3v2::TagReadWriter obj(params());
-
-                const auto found = obj.getFramePayload();
-                return id3::stripLeft(found);
-
-              } catch (const id3::audio_tag_error &e) {
-                std::cout << e.what();
-              } catch (const std::runtime_error &e) {
-                std::cout << e.what();
-              }
-            }
-          }
-
-          return std::string("");
-        };
-
-  return ret;
+  return frameContent_t{};
 }
 
 template <typename Function1, typename Function2>
-const std::string
-GetTag(const std::string &filename,
-       const std::vector<std::pair<std::string, std::string_view>> &id3v2Tags,
-       Function1 fuc1, Function2 fuc2) {
+const auto GetTag(const std::string &filename,
+                  const id3v2::frameArray_t &id3v2Tags, Function1 fuc1,
+                  Function2 fuc2) {
   const auto retApe = fuc1(filename);
-  if (retApe.has_value()) {
-    return retApe.value();
+  if (retApe.parseStatus.rstatus == rstatus_t::noError) {
+    return retApe;
   }
 
   const auto retId3v1 = fuc2(filename);
-  if (retId3v1.has_value()) {
-    return retId3v1.value();
+  if (retId3v1.parseStatus.rstatus == rstatus_t::noError) {
+    return retId3v1;
   }
 
   return GetId3v2Tag(filename, id3v2Tags);
 }
 
-const std::string GetAlbum(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TALB"},
-      {"0x0300", "TALB"},
-      {"0x0000", "TAL"},
-  };
+const auto GetAlbum(const std::string &filename) {
+  static const id3v2::frame_t frames{{id3v2::tagVersion_t::v40, "TALB"},
+                                     {id3v2::tagVersion_t::v30, "TALB"},
+                                     {id3v2::tagVersion_t::v00, "TAL"}};
 
-  return GetTag(filename, id3v2Tags, ape::GetAlbum, id3v1::GetAlbum);
+  const id3v2::frameID_s<id3v2::frame_t> Id3v2Tags{frames};
+
+  const auto ret =
+      GetTag(filename, Id3v2Tags.mFrames, ape::GetAlbum, id3v1::GetAlbum);
+
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetLeadArtist(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TPE1"},
-      {"0x0300", "TPE1"},
-      {"0x0000", "TP1"},
+const auto GetLeadArtist(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TPE1"},
+      {id3v2::tagVersion_t::v30, "TPE1"},
+      {id3v2::tagVersion_t::v00, "TP1"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> Id3v2Tags{frames};
 
-  return GetTag(filename, id3v2Tags, ape::GetLeadArtist, id3v1::GetLeadArtist);
+  const auto ret = GetTag(filename, Id3v2Tags.mFrames, ape::GetLeadArtist,
+                          id3v1::GetLeadArtist);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetComposer(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TCOM"},
-      {"0x0300", "TCOM"},
-      {"0x0000", "TCM"},
+const auto GetComposer(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TCOM"},
+      {id3v2::tagVersion_t::v30, "TCOM"},
+      {id3v2::tagVersion_t::v00, "TCM"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret = GetId3v2Tag(filename, id3v2Tags.mFrames);
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetDate(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0300", "TDAT"},
-      {"0x0400", "TDRC"},
-      {"0x0000", "TDA"},
+const auto GetDate(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v30, "TDAT"},
+      {id3v2::tagVersion_t::v40, "TDRC"},
+      {id3v2::tagVersion_t::v00, "TDA"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret = GetId3v2Tag(filename, id3v2Tags.mFrames);
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
 // Also known as Genre
-const std::string GetContentType(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TCON"},
-      {"0x0300", "TCON"},
-      {"0x0000", "TCO"},
+const auto GetContentType(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TCON"},
+      {id3v2::tagVersion_t::v30, "TCON"},
+      {id3v2::tagVersion_t::v00, "TCO"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret =
+      GetTag(filename, id3v2Tags.mFrames, ape::GetGenre, id3v1::GetGenre);
 
-  return GetTag(filename, id3v2Tags, ape::GetGenre, id3v1::GetGenre);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetComment(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "COMM"},
-      {"0x0300", "COMM"},
-      {"0x0000", "COM"},
+const auto GetComment(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "COMM"},
+      {id3v2::tagVersion_t::v30, "COMM"},
+      {id3v2::tagVersion_t::v00, "COM"},
   };
 
-  return GetTag(filename, id3v2Tags, ape::GetComment, id3v1::GetComment);
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret =
+      GetTag(filename, id3v2Tags.mFrames, ape::GetComment, id3v1::GetComment);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetTextWriter(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TEXT"},
-      {"0x0300", "TEXT"},
-      {"0x0000", "TXT"},
+const auto GetTextWriter(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TEXT"},
+      {id3v2::tagVersion_t::v30, "TEXT"},
+      {id3v2::tagVersion_t::v00, "TXT"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret = GetId3v2Tag(filename, id3v2Tags.mFrames);
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetYear(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TDRC"},
-      {"0x0300", "TYER"},
-      {"0x0000", "TYE"},
+const auto GetYear(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TDRC"},
+      {id3v2::tagVersion_t::v30, "TYER"},
+      {id3v2::tagVersion_t::v00, "TYE"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret =
+      GetTag(filename, id3v2Tags.mFrames, ape::GetYear, id3v1::GetYear);
 
-  return GetTag(filename, id3v2Tags, ape::GetYear, id3v1::GetYear);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetFileType(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0300", "TFLT"},
-      {"0x0000", "TFT"},
+const auto GetFileType(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v30, "TFLT"},
+      {id3v2::tagVersion_t::v00, "TFT"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret = GetId3v2Tag(filename, id3v2Tags.mFrames);
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetTitle(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TIT2"},
-      {"0x0300", "TIT2"},
-      {"0x0000", "TT2"},
+const auto GetTitle(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TIT2"},
+      {id3v2::tagVersion_t::v30, "TIT2"},
+      {id3v2::tagVersion_t::v00, "TT2"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret =
+      GetTag(filename, id3v2Tags.mFrames, ape::GetTitle, id3v1::GetTitle);
 
-  return GetTag(filename, id3v2Tags, ape::GetTitle, id3v1::GetTitle);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetContentGroupDescription(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TIT1"},
-      {"0x0300", "TIT1"},
-      {"0x0000", "TT1"},
+const auto GetContentGroupDescription(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TIT1"},
+      {id3v2::tagVersion_t::v30, "TIT1"},
+      {id3v2::tagVersion_t::v00, "TT1"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret = GetId3v2Tag(filename, id3v2Tags.mFrames);
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetTrackPosition(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TRCK"},
-      {"0x0300", "TRCK"},
-      {"0x0000", "TRK"},
+const auto GetTrackPosition(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TRCK"},
+      {id3v2::tagVersion_t::v30, "TRCK"},
+      {id3v2::tagVersion_t::v00, "TRK"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret = GetId3v2Tag(filename, id3v2Tags.mFrames);
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
 
-const std::string GetBandOrchestra(const std::string &filename) {
-  const std::vector<std::pair<std::string, std::string_view>> id3v2Tags{
-      {"0x0400", "TPE2"},
-      {"0x0300", "TPE2"},
-      {"0x0000", "TP2"},
+const auto GetBandOrchestra(const std::string &filename) {
+  static const id3v2::frame_t frames{
+      {id3v2::tagVersion_t::v40, "TPE2"},
+      {id3v2::tagVersion_t::v30, "TPE2"},
+      {id3v2::tagVersion_t::v00, "TP2"},
   };
+  const id3v2::frameID_s<id3v2::frame_t> id3v2Tags{frames};
+  const auto ret = GetId3v2Tag(filename, id3v2Tags.mFrames);
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  return ret.payload.value_or(std::string(""));
 }
-
 #endif //_TAG_READER

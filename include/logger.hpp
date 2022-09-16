@@ -16,11 +16,11 @@ public:
     logger = spdlog::rotating_logger_mt("logger", logName, max_size, 0);
     logger->set_pattern("[%H:%M:%S %z] [%^%L%$] %s:%!:%# %v");
 
-    logger->set_level(spdlog::level::trace);
+    // logger->set_level(spdlog::level::trace);
     // logger->set_level(spdlog::level::info);
     // logger->set_level(spdlog::level::debug);
     // logger->set_level(spdlog::level::warn);
-    // logger->set_level(spdlog::level::err);
+    logger->set_level(spdlog::level::err);
     // logger->set_level(spdlog::level::critical);
   }
 

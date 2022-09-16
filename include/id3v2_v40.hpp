@@ -66,10 +66,11 @@ public:
 
   constexpr unsigned int FrameHeaderSize(void) { return 10; }
 
-  std::optional<uint32_t> GetFrameSize(id3::buffer_t buffer, uint32_t index) {
+  std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t> &buffer,
+                                       uint32_t index) {
     const auto start = FrameIDSize() + index;
 
-    if (buffer->size() >= start) {
+    if (buffer.size() >= start) {
       using paire = std::pair<uint32_t, uint32_t>;
 
       const std::vector<uint32_t> pow_val = {24, 16, 8, 0};
@@ -77,8 +78,8 @@ public:
       std::vector<paire> result(pow_val.size());
 
       std::transform(
-          std::begin(*buffer) + start,
-          std::begin(*buffer) + start + pow_val.size(), pow_val.begin(),
+          std::begin(buffer) + start,
+          std::begin(buffer) + start + pow_val.size(), pow_val.begin(),
           result.begin(),
           [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
 
@@ -90,11 +91,10 @@ public:
       return val;
 
     } else {
-      ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer->size(),
-                    start);
+      ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
     }
 
-    return {};
+    return std::optional<uint32_t>{};
   }
 
 }; // v40
