@@ -219,8 +219,8 @@ updateFrameSizeIndex(const iD3Variant &TagVersion, Args... args) {
       TagVersion);
 }
 
-void CreateTagBufferFromFile(const std::string &FileName, uint32_t num,
-                             buffer_t &buffer) {
+void GetTagBufferFromFile(const std::string &FileName, uint32_t num,
+                          buffer_t &buffer) {
   std::ifstream fil(FileName);
   constexpr auto tagBeginPosition = 0;
 
@@ -270,44 +270,22 @@ auto updateTagSize(const std::vector<uint8_t> &buffer, uint32_t extraSize) {
                                   tagSizeMaxValuePerElement);
 }
 
-std::optional<uint32_t>
-GetTagSizeWithoutHeader(const std::vector<uint8_t> &buffer) {
+const uint32_t GetTagSizeWithoutHeader(const std::vector<uint8_t> &buffer) {
 
   const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
   constexpr uint32_t TagIndex = 6;
 
   const auto val = id3::GetTagSize(buffer, pow_val, TagIndex);
 
-  ID3_PRECONDITION(val > TagHeaderSize);
-
   return val;
-
-#if 0
-        if(buffer.size() >= GetTagHeaderSize<uint32_t>())
-        {
-            auto val = buffer[6] * std::pow(2, 21);
-
-            val += buffer[7] * std::pow(2, 14);
-            val += buffer[8] * std::pow(2, 7);
-            val += buffer[9] * std::pow(2, 0);
-
-            if(val > GetTagHeaderSize<uint32_t>()){
-                return val;
-            }
-        } else
-        {
-        }
-
-        return {};
-#endif
 }
 
 const auto GetTotalTagSize(const std::vector<uint8_t> &buffer) {
-  return GetTagSizeWithoutHeader(buffer) |
-         [=](const uint32_t Tagsize) { return Tagsize + TagHeaderSize; };
+  const auto val = GetTagSizeWithoutHeader(buffer);
+  return val + TagHeaderSize;
 }
 
-buffer_t &FillTagHeader(const std::string &FileName, buffer_t &buffer) {
+buffer_t &GetTagHeader(const std::string &FileName, buffer_t &buffer) {
   std::ifstream fil(FileName);
   fil.read(reinterpret_cast<char *>(&buffer->at(0)), TagHeaderSize);
   return buffer;

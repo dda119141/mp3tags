@@ -138,16 +138,15 @@ public:
         fileProperties(mAudioProperties.fileScopePropertiesObj),
         mTagHeaderBuffer(new std::vector<uint8_t>(id3v2::TagHeaderSize)) {
 
-    FillTagHeader(fileProperties.get_filename(), mTagHeaderBuffer);
+    GetTagHeader(fileProperties.get_filename(), mTagHeaderBuffer);
 
     if (auto tag_payload_size = GetTagSizeWithoutHeader(*mTagHeaderBuffer);
-        !tag_payload_size.has_value()) {
+        !tag_payload_size) {
       ID3V2_THROW("Tag length = 0\n");
     } else {
-      const auto tag_size = tag_payload_size.value() + id3v2::TagHeaderSize;
+      const auto tag_size = tag_payload_size + id3v2::TagHeaderSize;
 
-      CreateTagBufferFromFile(fileProperties.get_filename(), tag_size,
-                              mTagBuffer);
+      GetTagBufferFromFile(fileProperties.get_filename(), tag_size, mTagBuffer);
     }
 
     if (fileProperties.get_frame_id().length() == 0) {

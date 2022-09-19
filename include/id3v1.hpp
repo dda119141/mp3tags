@@ -113,7 +113,7 @@ const auto SetFramePayload(const std::string &filename,
                            std::string_view content,
                            uint32_t relativeFramePayloadStart,
                            uint32_t relativeFramePayloadEnd) {
-  if (relativeFramePayloadEnd > relativeFramePayloadStart)
+  if (relativeFramePayloadEnd < relativeFramePayloadStart)
     return get_status_error(tag_type_t::id3v1,
                             rstatus_t::PayloadStartAfterPayloadEnd);
 
@@ -131,9 +131,6 @@ const auto SetFramePayload(const std::string &filename,
       tagRW.GetTagPayloadPosition() + relativeFramePayloadStart;
   frameScopeProperties.frameLength =
       relativeFramePayloadEnd - relativeFramePayloadStart;
-
-  ID3_LOG_INFO("ID3V1: Write content: {} at {}", std::string(content),
-               tagRW.GetTagPayloadPosition());
 
   const auto ret = WriteFile(filename, content, frameScopeProperties);
 

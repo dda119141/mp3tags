@@ -122,6 +122,9 @@ const auto get_message_from_status(const rstatus_t &status) {
   case rstatus_t::tagVersionError:
     return std::string{"Error: Wrong Tag Version"};
     break;
+  case rstatus_t::noTagLengthError:
+    return std::string("Tag length = 0");
+    break;
   default:
     break;
   }
@@ -185,9 +188,23 @@ typedef struct frameScopeProperties_t {
   uint32_t framePayloadLength = {};
   uint16_t encodeFlag = {};
 
-  uint32_t getFramePayloadLength() const { return framePayloadLength; }
+  uint32_t getFramePayloadLength() const {
+    if (framePayloadLength)
+      return framePayloadLength;
+    else if (frameLength)
+      return frameLength;
+    else
+      return framePayloadLength;
+  }
 
-  uint32_t getFrameLength() const { return frameLength; }
+  uint32_t getFrameLength() const {
+    if (frameLength)
+      return frameLength;
+    else if (framePayloadLength)
+      return framePayloadLength;
+    else
+      return frameLength;
+  }
 
   void with_additional_payload_size(uint32_t additionalPayload) {
     frameLength += additionalPayload;
