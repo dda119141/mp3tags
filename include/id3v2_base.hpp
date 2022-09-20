@@ -137,11 +137,11 @@ constexpr uint32_t tagSizeMaxValuePerElement = 127;
 void CheckAudioPropertiesObject(
     const audioProperties_t *const audioPropertiesObj) {
   if (audioPropertiesObj == nullptr) {
-    ID3V2_THROW("frame properties object does not exists");
+    ID3V2_THROW("frame properties object does not exists\n");
   }
 
   if (!audioPropertiesObj->frameScopePropertiesObj.has_value()) {
-    ID3V2_THROW("frame properties not yet parsed from audio file");
+    ID3V2_THROW("frame properties not yet parsed from audio file\n");
   }
 }
 

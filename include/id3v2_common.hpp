@@ -135,29 +135,34 @@ class TagReader {
 public:
   explicit TagReader(id3::audioProperties_t &&Config)
       : mAudioProperties(std::move(Config)),
-        fileProperties(mAudioProperties.fileScopePropertiesObj),
+        mFileProperties(mAudioProperties.fileScopePropertiesObj),
         mTagHeaderBuffer(new std::vector<uint8_t>(id3v2::TagHeaderSize)) {
 
-    GetTagHeader(fileProperties.get_filename(), mTagHeaderBuffer);
-
-    if (auto tag_payload_size = GetTagSizeWithoutHeader(*mTagHeaderBuffer);
-        !tag_payload_size) {
-      ID3V2_THROW("Tag length = 0\n");
+    if (mAudioProperties.fileScopePropertiesObj.get_filename() ==
+        std::string{}) {
+      m_status = get_status_error(tag_type_t::id3v2, rstatus_t::noTag);
     } else {
-      const auto tag_size = tag_payload_size + id3v2::TagHeaderSize;
+      GetTagHeader(mFileProperties.get_filename(), mTagHeaderBuffer);
 
-      GetTagBufferFromFile(fileProperties.get_filename(), tag_size, mTagBuffer);
+      if (auto tag_payload_size = GetTagSizeWithoutHeader(*mTagHeaderBuffer);
+          !tag_payload_size) {
+        m_status =
+            get_status_error(tag_type_t::id3v2, rstatus_t::noTagLengthError);
+      } else {
+        const auto tag_size = tag_payload_size + id3v2::TagHeaderSize;
+
+        GetTagBufferFromFile(mFileProperties.get_filename(), tag_size,
+                             mTagBuffer);
+      }
     }
+    if (m_status.rstatus == rstatus_t::idle) {
+      if (mFileProperties.get_frame_id().length() == 0) {
+        ID3V2_THROW("No frame ID parameter\n");
+      } else {
+        mAudioProperties.frameScopePropertiesObj.emplace();
+      }
 
-    if (fileProperties.get_frame_id().length() == 0) {
-      ID3V2_THROW("No frame ID parameter\n");
-    } else {
-      mAudioProperties.frameScopePropertiesObj.emplace();
-    }
-
-    m_status = retrieveFrameProperties(fileProperties);
-    if (m_status.rstatus != rstatus_t::noError) {
-      ID3V2_THROW(get_message_from_status(m_status.rstatus));
+      m_status = retrieveFrameProperties(mFileProperties);
     }
   }
 
@@ -189,10 +194,10 @@ public:
 
 private:
   audioProperties_t mAudioProperties;
-  fileScopeProperties &fileProperties;
+  fileScopeProperties &mFileProperties;
   buffer_t mTagHeaderBuffer{};
   buffer_t mTagBuffer{};
-  execution_status_t m_status;
+  execution_status_t m_status{};
   friend class id3v2::writer;
 
   execution_status_t
@@ -239,11 +244,15 @@ public:
       : mTagReaderIn(tagReaderIn),
         audioPropertiesObj(&tagReaderIn.mAudioProperties) {
 
+    if (!noStatusErrorFrom(mTagReaderIn.m_status)) {
+      ID3V2_THROW(
+          get_message_from_status(mTagReaderIn.m_status.rstatus).c_str());
+    }
     CheckAudioPropertiesObject(audioPropertiesObj);
 
     const auto &params = audioPropertiesObj->fileScopePropertiesObj;
     if (params.get_frame_content_to_write().size() == 0) {
-      ID3V2_THROW("frame payload to write size = 0");
+      ID3V2_THROW("frame payload to write size = 0\n");
     }
 
     const frameScopeProperties &frameProperties =

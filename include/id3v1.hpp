@@ -103,7 +103,13 @@ const auto getFramePayload = [](const std::string &filename, uint32_t start,
   if (noStatusErrorFrom(bufObj.parseStatus)) {
     const frameObj_t frameObj{bufObj.payload, start, end};
 
-    return frameContent_t{bufObj.parseStatus, frameObj.frameContent};
+    if (frameObj.frameContent.size() == 0) {
+      const execution_status_t status = get_status_error(
+          tag_type_t::id3v1, rstatus_t::ErrorNoPrintableContent);
+      return frameContent_t{status, {}};
+    } else {
+      return frameContent_t{bufObj.parseStatus, frameObj.frameContent};
+    }
   } else {
     return frameContent_t{bufObj.parseStatus, {}};
   }

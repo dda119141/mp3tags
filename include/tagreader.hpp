@@ -75,7 +75,20 @@ const auto GetTag(const std::string &filename,
     return retId3v1;
   }
 
-  return GetId3v2Tag(filename, id3v2Tags);
+  const auto retId3v2 = GetId3v2Tag(filename, id3v2Tags);
+  if (retId3v2.parseStatus.rstatus == rstatus_t::noError) {
+    return retId3v2;
+  }
+
+  std::cout << "\n"
+            << filename
+            << " ape: " << get_message_from_status(retApe.parseStatus.rstatus);
+  std::cout << filename << " id3v1: "
+            << get_message_from_status(retId3v1.parseStatus.rstatus);
+  std::cout << filename << " id3v2: "
+            << get_message_from_status(retId3v2.parseStatus.rstatus);
+
+  return frameContent_t{};
 }
 
 const auto GetAlbum(const std::string &filename) {
