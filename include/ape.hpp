@@ -24,23 +24,17 @@ typedef struct _frameConfig {
   std::optional<std::string> frameContent;
 } frameProperties_t;
 
-std::optional<std::vector<uint8_t>>
-UpdateFrameSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
-                uint32_t frameIDPosition) {
+const auto UpdateFrameSize(const std::vector<uint8_t> &buffer,
+                           uint32_t extraSize, uint32_t frameIDPosition) {
   const uint32_t frameSizePositionInArea = frameIDPosition;
   constexpr uint32_t frameSizeLengthInArea = 4;
   constexpr uint32_t frameSizeMaxValuePerElement = 255;
 
-  id3::log()->info(" Frame Index: {}", frameIDPosition);
-  id3::log()->info(
-      "Tag Frame Bytes before update : {}",
-      spdlog::to_hex(std::begin(buffer) + frameSizePositionInArea,
-                     std::begin(buffer) + frameSizePositionInArea + 4));
   const auto ret = id3::updateAreaSize<uint32_t>(
       buffer, extraSize, frameSizePositionInArea, frameSizeLengthInArea,
       frameSizeMaxValuePerElement, false);
 
-  return ret;
+  return ret.value();
 }
 
 class apeTagProperties {
@@ -284,13 +278,13 @@ public:
 
     assert(frameConfig.getFramePayloadLength() <= TagBuffer->size());
 
-    id3::replaceElementsInBuff(frameSizeBuff.value(), *TagBuffer,
+    id3::replaceElementsInBuff(frameSizeBuff, *TagBuffer,
                                frameSizePositionInFrameHeader);
 
-    id3::replaceElementsInBuff(tagSizeBuff.value(), *TagBuffer,
+    id3::replaceElementsInBuff(tagSizeBuff, *TagBuffer,
                                tagsSizePositionInHeader);
 
-    id3::replaceElementsInBuff(tagSizeBuff.value(), *TagBuffer,
+    id3::replaceElementsInBuff(tagSizeBuff, *TagBuffer,
                                tagsSizePositionInFooter);
 
     auto it = TagBuffer->begin() + frameContentStart +
