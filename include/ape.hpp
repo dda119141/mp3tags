@@ -13,13 +13,9 @@ namespace ape {
 
 static const std::string modifiedEnding(".ape.mod");
 
-constexpr uint32_t GetTagFooterSize(void) { return static_cast<uint32_t>(32); }
-
-constexpr uint32_t GetTagHeaderSize(void) { return static_cast<uint32_t>(32); }
-
-constexpr uint32_t OffsetFromFrameStartToFrameID(void) {
-  return static_cast<uint32_t>(8);
-}
+constexpr auto GetTagFooterSize = 32;
+constexpr auto GetTagHeaderSize = 32;
+constexpr auto OffsetFromFrameStartToFrameID = 8;
 
 typedef struct _frameConfig {
   uint32_t frameStartPosition;
@@ -84,9 +80,9 @@ private:
 
     if (id3v1TagSizeIfPresent)
       footerPreambleOffsetFromEndOfFile =
-          id3v1::TagSize + ape::GetTagFooterSize();
+          id3v1::TagSize + ape::GetTagFooterSize;
     else
-      footerPreambleOffsetFromEndOfFile = ape::GetTagFooterSize();
+      footerPreambleOffsetFromEndOfFile = ape::GetTagFooterSize;
 
     mfileSize = filRead.tellg();
     mTagFooterBegin = mfileSize - footerPreambleOffsetFromEndOfFile;
@@ -110,13 +106,13 @@ private:
 
     mTagStartPosition = mTagFooterBegin - mTagSize;
 
-    mTagPayloadPosition = mTagFooterBegin + GetTagFooterSize() - mTagSize;
+    mTagPayloadPosition = mTagFooterBegin + GetTagFooterSize - mTagSize;
 
     filRead.seekg(mTagStartPosition);
     mTagBuffer = std::make_unique<std::vector<unsigned char>>(
-        mTagSize + GetTagFooterSize(), '0');
+        mTagSize + GetTagFooterSize, '0');
     filRead.read(reinterpret_cast<char *>(mTagBuffer->data()),
-                 mTagSize + GetTagFooterSize());
+                 mTagSize + GetTagFooterSize);
 
     return get_status_error(tag_type_t::ape, rstatus_t::noError);
   }
@@ -140,7 +136,7 @@ class tagReader {
 
 public:
   explicit tagReader(const std::string &FileName, std::string_view FrameID)
-      : mFilename{FileName}, frameID{FrameID} {
+      : mFilename{FileName}, mFrameID{FrameID} {
 
     bool bContinue = true;
 
@@ -180,7 +176,7 @@ public:
     }
     frameScopeProperties frameScopeProperties;
     frameScopeProperties.frameIDStartPosition =
-        mFrameProperties->frameStartPosition + OffsetFromFrameStartToFrameID();
+        mFrameProperties->frameStartPosition + OffsetFromFrameStartToFrameID;
 
     frameScopeProperties.frameContentStartPosition =
         mFrameProperties->frameContentPosition;
@@ -217,7 +213,7 @@ public:
   /* function not thread safe */
   expected::Result<bool> ReWriteFile(const id3::buffer_t &buff) const {
     const uint32_t endOfFooter =
-        mTagProperties->getTagFooterBegin() + GetTagFooterSize();
+        mTagProperties->getTagFooterBegin() + GetTagFooterSize;
 
     std::ifstream filRead(mFilename, std::ios::binary | std::ios::ate);
 
@@ -273,7 +269,7 @@ public:
     const uint32_t tagsSizePositionInFooter =
         mTagProperties->getTagFooterBegin() - relativeBufferPosition + 12;
     const uint32_t frameSizePositionInFrameHeader =
-        frameConfig.frameIDStartPosition - OffsetFromFrameStartToFrameID() -
+        frameConfig.frameIDStartPosition - OffsetFromFrameStartToFrameID -
         relativeBufferPosition;
     const uint32_t frameContentStart =
         frameConfig.frameContentStartPosition - relativeBufferPosition;
@@ -313,7 +309,7 @@ public:
 
 private:
   const std::string &mFilename;
-  std::string_view frameID;
+  std::string_view mFrameID;
   id3::execution_status_t m_status{};
   std::optional<apeTagProperties> mTagProperties{};
   std::unique_ptr<frameProperties_t> mFrameProperties{};
@@ -323,24 +319,25 @@ private:
 
     const auto tagArea = id3::ExtractString(*tagbuffer, 0, tagbuffer->size());
 
-    constexpr uint32_t frameKeyTerminatorLength = 1;
+    /* Frame ID lookup and validation check */
     const auto searchFramePosition =
         id3::searchFrame<std::string_view>{tagArea};
-    auto frameIDstatus = searchFramePosition.execute(frameID);
+    const auto frameIDstatus = searchFramePosition.execute(mFrameID);
     if (frameIDstatus.rstatus != rstatus_t::noError) {
       return get_execution_status(tag_type_t::ape, frameIDstatus);
     }
-    const uint32_t frameContentPosition = frameIDstatus.frameIDPosition +
-                                          frameID.size() +
-                                          frameKeyTerminatorLength;
-
-    if (frameIDstatus.frameIDPosition < OffsetFromFrameStartToFrameID()) {
+    if (frameIDstatus.frameIDPosition < OffsetFromFrameStartToFrameID) {
       return get_status_error(tag_type_t::ape,
                               rstatus_t::frameIDBadPositionError);
     }
 
+    constexpr uint32_t frameKeyTerminatorLength = 1;
+    const uint32_t frameContentPosition = frameIDstatus.frameIDPosition +
+                                          mFrameID.size() +
+                                          frameKeyTerminatorLength;
+
     const uint32_t frameStartPosition =
-        frameIDstatus.frameIDPosition - OffsetFromFrameStartToFrameID();
+        frameIDstatus.frameIDPosition - OffsetFromFrameStartToFrameID;
     const uint32_t frameLength =
         id3::GetTagSizeDefault(*tagbuffer, 4, frameStartPosition);
 

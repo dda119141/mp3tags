@@ -63,7 +63,8 @@ enum class rstatus_t {
   no_framePayloadLength,
   frameLengthBiggerThanTagLength,
   ContentLengthBiggerThanFrameArea, // Content to write does not fit in
-  PayloadStartAfterPayloadEnd
+  PayloadStartAfterPayloadEnd,
+  ErrorNoPrintableContent
 };
 
 typedef struct execution_status {
@@ -98,31 +99,42 @@ typedef struct frameBuffer_s {
 const auto get_message_from_status(const rstatus_t &status) {
   switch (status) {
   case rstatus_t::noError:
-    return std::string{"No Error"};
+    return std::string{"No Error\n"};
     break;
   case rstatus_t::noFrameIDError:
-    return std::string{"Frame ID could not be retrieved"};
+    return std::string{"Error: Frame ID could not be retrieved\n"};
     break;
   case rstatus_t::frameIDBadPositionError:
-    return std::string{"Bad Frame ID Position"};
+    return std::string{"Error: Bad Frame ID Position\n"};
     break;
   case rstatus_t::frameLengthBiggerThanTagLength:
-    return std::string{"Frame length > Tag length"};
+    return std::string{"Error: Frame length > Tag length\n"};
     break;
   case rstatus_t::PayloadStartAfterPayloadEnd:
-    return std::string{"Payload Start Position > Payload End Position"};
+    return std::string{
+        "Error: Payload Start Position > Payload End Position\n"};
     break;
   case rstatus_t::ContentLengthBiggerThanFrameArea:
     return std::string{
-        "Content Length to write > Existing Frame Payload Length"};
+        "Error: Content Length to write > Existing Frame Payload Length\n"};
     break;
   case rstatus_t::fileOpeningError:
-    return std::string{"Error: Could not open file"};
+    return std::string{"Error: Could not open file\n"};
     break;
   case rstatus_t::tagVersionError:
-    return std::string{"Error: Wrong Tag Version"};
+    return std::string{"Error: Wrong Tag Version\n"};
+    break;
+  case rstatus_t::noTagLengthError:
+    return std::string{"Error: Tag length = 0\n"};
+    break;
+  case rstatus_t::noTag:
+    return std::string{"Tag does not exist\n"};
+    break;
+  case rstatus_t::ErrorNoPrintableContent:
+    return std::string{"Frame content not an a printable character\n"};
     break;
   default:
+    return std::string{"General Error\n"};
     break;
   }
   return std::string("");
@@ -175,8 +187,23 @@ constexpr bool get_execution_status_b(execution_status_t valIn) {
   return (valIn.rstatus == rstatus_t::noError);
 }
 
+enum class frameRights_t {
+  FrameShouldBePreserved = 0,
+  FrameShouldBeDiscarded,
+  FrameIsReadOnly
+};
+
+enum class frameAttributes_t {
+  FrameIsNotCompressed = 0,
+  FrameIsCompressed = 1,
+  FrameIsEncrypted = 2,
+  FrameContainsGroupInformation = 4
+};
+
 /* Frame settings */
 typedef struct frameScopeProperties_t {
+  frameRights_t frameRights : 3;
+  frameAttributes_t frameAttributes : 3;
   uint32_t frameIDStartPosition = {};
   tag_type_t tagType;
   uint8_t doSwap = {};
@@ -185,9 +212,23 @@ typedef struct frameScopeProperties_t {
   uint32_t framePayloadLength = {};
   uint16_t encodeFlag = {};
 
-  uint32_t getFramePayloadLength() const { return framePayloadLength; }
+  uint32_t getFramePayloadLength() const {
+    if (framePayloadLength)
+      return framePayloadLength;
+    else if (frameLength)
+      return frameLength;
+    else
+      return framePayloadLength;
+  }
 
-  uint32_t getFrameLength() const { return frameLength; }
+  uint32_t getFrameLength() const {
+    if (frameLength)
+      return frameLength;
+    else if (framePayloadLength)
+      return framePayloadLength;
+    else
+      return frameLength;
+  }
 
   void with_additional_payload_size(uint32_t additionalPayload) {
     frameLength += additionalPayload;

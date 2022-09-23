@@ -137,11 +137,11 @@ constexpr uint32_t tagSizeMaxValuePerElement = 127;
 void CheckAudioPropertiesObject(
     const audioProperties_t *const audioPropertiesObj) {
   if (audioPropertiesObj == nullptr) {
-    ID3V2_THROW("frame properties object does not exists");
+    ID3V2_THROW("frame properties object does not exists\n");
   }
 
   if (!audioPropertiesObj->frameScopePropertiesObj.has_value()) {
-    ID3V2_THROW("frame properties not yet parsed from audio file");
+    ID3V2_THROW("frame properties not yet parsed from audio file\n");
   }
 }
 
@@ -219,8 +219,8 @@ updateFrameSizeIndex(const iD3Variant &TagVersion, Args... args) {
       TagVersion);
 }
 
-void CreateTagBufferFromFile(const std::string &FileName, uint32_t num,
-                             buffer_t &buffer) {
+void GetTagBufferFromFile(const std::string &FileName, uint32_t num,
+                          buffer_t &buffer) {
   std::ifstream fil(FileName);
   constexpr auto tagBeginPosition = 0;
 
@@ -239,19 +239,16 @@ std::optional<std::string> GetHexFromBuffer(const std::vector<uint8_t> &buffer,
   ID3_PRECONDITION(buffer.size() > num_of_bytes_in_hex);
 
   std::stringstream stream_obj;
-
   stream_obj << "0x" << std::setfill('0') << std::setw(num_of_bytes_in_hex * 2);
 
   const uint32_t version =
       id3::GetValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
-
   if (version != 0) {
     stream_obj << std::hex << version;
-
     return stream_obj.str();
 
   } else {
-    return {};
+    return std::nullopt;
   }
 }
 
@@ -270,44 +267,22 @@ auto updateTagSize(const std::vector<uint8_t> &buffer, uint32_t extraSize) {
                                   tagSizeMaxValuePerElement);
 }
 
-std::optional<uint32_t>
-GetTagSizeWithoutHeader(const std::vector<uint8_t> &buffer) {
+const uint32_t GetTagSizeWithoutHeader(const std::vector<uint8_t> &buffer) {
 
   const std::vector<uint32_t> pow_val = {21, 14, 7, 0};
   constexpr uint32_t TagIndex = 6;
 
   const auto val = id3::GetTagSize(buffer, pow_val, TagIndex);
 
-  ID3_PRECONDITION(val > TagHeaderSize);
-
   return val;
-
-#if 0
-        if(buffer.size() >= GetTagHeaderSize<uint32_t>())
-        {
-            auto val = buffer[6] * std::pow(2, 21);
-
-            val += buffer[7] * std::pow(2, 14);
-            val += buffer[8] * std::pow(2, 7);
-            val += buffer[9] * std::pow(2, 0);
-
-            if(val > GetTagHeaderSize<uint32_t>()){
-                return val;
-            }
-        } else
-        {
-        }
-
-        return {};
-#endif
 }
 
 const auto GetTotalTagSize(const std::vector<uint8_t> &buffer) {
-  return GetTagSizeWithoutHeader(buffer) |
-         [=](const uint32_t Tagsize) { return Tagsize + TagHeaderSize; };
+  const auto val = GetTagSizeWithoutHeader(buffer);
+  return val + TagHeaderSize;
 }
 
-buffer_t &FillTagHeader(const std::string &FileName, buffer_t &buffer) {
+buffer_t &GetTagHeader(const std::string &FileName, buffer_t &buffer) {
   std::ifstream fil(FileName);
   fil.read(reinterpret_cast<char *>(&buffer->at(0)), TagHeaderSize);
   return buffer;
@@ -317,33 +292,70 @@ std::string GetStringFromBuffer(const std::vector<uint8_t> &buffer) {
   return ExtractString(buffer, 0, buffer.size());
 }
 
-template <typename T>
-std::optional<std::vector<uint8_t>>
-processFrameHeaderFlags(buffer_t buffer, uint32_t frameHeaderFlagsPosition,
-                        std::string_view tag) {
-  constexpr uint32_t frameHeaderFlagsLength = 2;
-
-  const auto it = buffer->begin() + frameHeaderFlagsPosition;
-
-  std::vector<uint8_t> temp_vec(frameHeaderFlagsLength);
-
-  std::copy(it, it + 2, temp_vec.begin());
-
-  std::bitset<8> frameStatusFlag(temp_vec[0]);
-  std::bitset<8> frameDescriptionFlag(temp_vec[1]);
+const auto
+RetrieveFrameModificationRights(const std::vector<uint8_t> &HeaderBuffer) {
+  if (HeaderBuffer.size() < FrameHeaderSize) {
+    ID3V2_THROW("frame properties object does not exists\n");
+  }
+  constexpr uint32_t frameHeaderFlagsPosition = 8;
+  const auto it = HeaderBuffer.begin() + frameHeaderFlagsPosition;
+  const std::bitset<8> frameStatusFlag{*it};
+  const std::bitset<8> frameDescriptionFlag{*(it + 1)};
 
   if (frameStatusFlag[1]) {
-    ID3_LOG_WARN("frame {} should be discarded", std::string(tag));
+    return frameRights_t::FrameShouldBeDiscarded;
   }
   if (frameStatusFlag[2]) {
-    ID3_LOG_WARN("frame {} should be discarded", std::string(tag));
+    return frameRights_t::FrameShouldBeDiscarded;
   }
   if (frameStatusFlag[3]) {
-    ID3_LOG_WARN("frame {} is read-only and is not meant to be changed",
-                 std::string(tag));
+    return frameRights_t::FrameIsReadOnly;
   }
+  return frameRights_t{};
+}
 
-  return temp_vec;
+constexpr auto FrameIsReadOnly(frameRights_t ValIn) {
+  return (ValIn == frameRights_t::FrameIsReadOnly);
+}
+
+const auto RetrieveFrameAttributed(const std::vector<uint8_t> &HeaderBuffer) {
+  if (HeaderBuffer.size() < FrameHeaderSize) {
+    ID3V2_THROW("frame properties object does not exists\n");
+  }
+  constexpr uint32_t frameHeaderAttributesPosition = 9;
+  const auto it = HeaderBuffer.begin() + frameHeaderAttributesPosition;
+  const std::bitset<8> frameAttributeFlag{*it};
+
+  uint8_t frameAttributes = 0;
+
+  if (frameAttributeFlag[1]) {
+    frameAttributes =
+        static_cast<uint8_t>(frameAttributes_t::FrameIsCompressed);
+  }
+  if (frameAttributeFlag[2]) {
+    frameAttributes +=
+        static_cast<uint8_t>(frameAttributes_t::FrameIsEncrypted);
+  }
+  if (frameAttributeFlag[3]) {
+    frameAttributes +=
+        static_cast<uint8_t>(frameAttributes_t::FrameContainsGroupInformation);
+  }
+  return frameAttributes;
+}
+
+const auto FrameIsCompressed(uint8_t attribute) {
+  const auto val = static_cast<std::bitset<8>>(attribute);
+  return (val[1] == 1);
+}
+
+const auto FrameIsEncrypted(uint8_t attribute) {
+  const auto val = static_cast<std::bitset<8>>(attribute);
+  return (val[2] == 1);
+}
+
+const auto FrameContainsGroupInformation(uint8_t attribute) {
+  const auto val = static_cast<std::bitset<8>>(attribute);
+  return (val[3] == 1);
 }
 
 template <typename id3Type> void GetTagNames(void) {
