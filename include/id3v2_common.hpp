@@ -173,22 +173,21 @@ public:
 
     if (m_status.rstatus != rstatus_t::noError) {
       return frameContent_t{m_status, {}};
+    }
 
+    const frameScopeProperties &frameProperties =
+        mAudioProperties.frameScopePropertiesObj.value();
+    auto framePayload =
+        ExtractString(*mTagBuffer, frameProperties.frameContentStartPosition,
+                      frameProperties.getFramePayloadLength());
+
+    id3::stripLeft(framePayload);
+
+    if (frameProperties.doSwap == 0x01) {
+      const auto tempPayload = tagBase::swapW16String(framePayload);
+      return frameContent_t{this->m_status, tempPayload};
     } else {
-      const frameScopeProperties &frameProperties =
-          mAudioProperties.frameScopePropertiesObj.value();
-      auto framePayload =
-          ExtractString(*mTagBuffer, frameProperties.frameContentStartPosition,
-                        frameProperties.getFramePayloadLength());
-
-      id3::stripLeft(framePayload);
-
-      if (frameProperties.doSwap == 0x01) {
-        const auto tempPayload = tagBase::swapW16String(framePayload);
-        return frameContent_t{this->m_status, tempPayload};
-      } else {
-        return frameContent_t{this->m_status, framePayload};
-      }
+      return frameContent_t{this->m_status, framePayload};
     }
   }
 
@@ -247,6 +246,14 @@ public:
     if (!noStatusErrorFrom(mTagReaderIn.m_status)) {
       ID3V2_THROW(
           get_message_from_status(mTagReaderIn.m_status.rstatus).c_str());
+    }
+    if (FrameIsReadOnly(
+            RetrieveFrameModificationRights(*mTagReaderIn.mTagBuffer))) {
+      const auto val =
+          std::string(
+              audioPropertiesObj->fileScopePropertiesObj.get_frame_id()) +
+          std::string(": Read-Only Frame\n");
+      ID3V2_THROW(val.c_str())
     }
     CheckAudioPropertiesObject(audioPropertiesObj);
 

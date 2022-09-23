@@ -187,8 +187,23 @@ constexpr bool get_execution_status_b(execution_status_t valIn) {
   return (valIn.rstatus == rstatus_t::noError);
 }
 
+enum class frameRights_t {
+  FrameShouldBePreserved = 0,
+  FrameShouldBeDiscarded,
+  FrameIsReadOnly
+};
+
+enum class frameAttributes_t {
+  FrameIsNotCompressed = 0,
+  FrameIsCompressed = 1,
+  FrameIsEncrypted = 2,
+  FrameContainsGroupInformation = 4
+};
+
 /* Frame settings */
 typedef struct frameScopeProperties_t {
+  frameRights_t frameRights : 3;
+  frameAttributes_t frameAttributes : 3;
   uint32_t frameIDStartPosition = {};
   tag_type_t tagType;
   uint8_t doSwap = {};
