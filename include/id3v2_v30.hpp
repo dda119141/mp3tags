@@ -52,7 +52,7 @@ public:
 
   constexpr unsigned int FrameHeaderSize(void) { return 10; }
 
-  std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t> &buffer,
+  std::optional<uint32_t> GetFrameSize(const std::vector<char> &buffer,
                                        uint32_t index) {
     const auto start = FrameIDSize() + index;
 

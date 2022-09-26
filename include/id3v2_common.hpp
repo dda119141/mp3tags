@@ -23,7 +23,7 @@ namespace id3v2 {
 
 void getframeScopePropertiesFromEncodeByte(
     frameScopeProperties &mframeScopeProperties,
-    const std::vector<uint8_t> &tagBuffer) {
+    const std::vector<char> &tagBuffer) {
 
   const auto &frameContentOffset =
       mframeScopeProperties.frameContentStartPosition;
@@ -101,12 +101,11 @@ const auto formatFramePayload(std::string_view content,
 
             if (frameProperties.doSwap == 0x01) {
               auto val =
-                  tagBase::getW16StringFromLatin<std::vector<uint8_t>>(content);
+                  tagBase::getW16StringFromLatin<std::vector<char>>(content);
               const auto ret = tagBase::swapW16String(val);
               return ret;
             } else {
-              return tagBase::getW16StringFromLatin<std::vector<uint8_t>>(
-                  content);
+              return tagBase::getW16StringFromLatin<std::vector<char>>(content);
             }
           },
           [&](std::u32string arg) {
@@ -136,7 +135,7 @@ public:
   explicit TagReader(id3::audioProperties_t &&Config)
       : mAudioProperties(std::move(Config)),
         mFileProperties(mAudioProperties.fileScopePropertiesObj),
-        mTagHeaderBuffer(new std::vector<uint8_t>(id3v2::TagHeaderSize)) {
+        mTagHeaderBuffer(new std::vector<char>(id3v2::TagHeaderSize)) {
 
     if (mAudioProperties.fileScopePropertiesObj.get_filename() ==
         std::string{}) {
@@ -205,7 +204,7 @@ private:
     frameScopeProperties &frameProperties =
         mAudioProperties.frameScopePropertiesObj.value();
 
-    const auto tagArea = GetStringFromBuffer(*mTagBuffer);
+    std::string_view tagArea{mTagBuffer->data(), mTagBuffer->size()};
     if (tagArea.size() == 0) {
       return get_status_no_tag_exists(tag_type_t::id3v2);
     }

@@ -81,7 +81,7 @@ public:
 
   constexpr unsigned int FrameHeaderSize(void) { return 6; }
 
-  std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t> &buffer,
+  std::optional<uint32_t> GetFrameSize(const std::vector<char> &buffer,
                                        uint32_t index) {
     const auto start = FrameIDSize() + index;
 
@@ -100,7 +100,7 @@ public:
     return std::nullopt;
   }
 
-  auto UpdateFrameSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
+  auto UpdateFrameSize(const std::vector<char> &buffer, uint32_t extraSize,
                        uint32_t tagLocation) {
 
     const uint32_t frameSizePositionInArea = 3 + tagLocation;

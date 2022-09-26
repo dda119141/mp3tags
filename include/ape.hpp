@@ -24,8 +24,8 @@ typedef struct _frameConfig {
   std::optional<std::string> frameContent;
 } frameProperties_t;
 
-const auto UpdateFrameSize(const std::vector<uint8_t> &buffer,
-                           uint32_t extraSize, uint32_t frameIDPosition) {
+const auto UpdateFrameSize(const std::vector<char> &buffer, uint32_t extraSize,
+                           uint32_t frameIDPosition) {
   const uint32_t frameSizePositionInArea = frameIDPosition;
   constexpr uint32_t frameSizeLengthInArea = 4;
   constexpr uint32_t frameSizeMaxValuePerElement = 255;
@@ -103,8 +103,8 @@ private:
     mTagPayloadPosition = mTagFooterBegin + GetTagFooterSize - mTagSize;
 
     filRead.seekg(mTagStartPosition);
-    mTagBuffer = std::make_unique<std::vector<unsigned char>>(
-        mTagSize + GetTagFooterSize, '0');
+    mTagBuffer =
+        std::make_unique<std::vector<char>>(mTagSize + GetTagFooterSize, '0');
     filRead.read(reinterpret_cast<char *>(mTagBuffer->data()),
                  mTagSize + GetTagFooterSize);
 
@@ -216,13 +216,13 @@ public:
     const uint32_t endLength = fileSize - endOfFooter;
 
     /* read in bytes from footer end until audio file end */
-    std::vector<uint8_t> bufFooter;
+    std::vector<char> bufFooter;
     bufFooter.reserve((endLength));
     filRead.seekg(endOfFooter);
     filRead.read(reinterpret_cast<char *>(&bufFooter[0]), endLength);
 
     /* read in bytes from audio file start end until ape area start */
-    std::vector<uint8_t> bufHeader;
+    std::vector<char> bufHeader;
     bufHeader.reserve((mTagProperties->getTagStartPosition()));
     filRead.seekg(0);
     filRead.read(reinterpret_cast<char *>(&bufHeader[0]),
@@ -298,7 +298,7 @@ public:
                      return b;
                    });
 
-    return std::make_unique<std::vector<uint8_t>>((*TagBuffer));
+    return std::make_unique<std::vector<char>>((*TagBuffer));
   }
 
 private:

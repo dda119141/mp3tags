@@ -36,7 +36,7 @@ namespace filesystem = std::filesystem;
 #endif
 
 static const std::string modifiedEnding(".mod");
-using buffer_t = std::unique_ptr<std::vector<uint8_t>>;
+using buffer_t = std::unique_ptr<std::vector<char>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
 enum class severity_t { idle = 0, high, middle, low };
@@ -333,8 +333,8 @@ std::optional<bool> renameFile(const std::string &fileToRename,
 }
 
 template <typename T>
-uint32_t GetValFromBuffer(std::vector<uint8_t> buffer, T index,
-                          T num_of_bytes_in_hex) {
+uint32_t GetValFromBuffer(std::vector<char> buffer, T index,
+                          std::size_t num_of_bytes_in_hex) {
 
   constexpr bool is_integrale_asset =
       std::is_integral<T>::value || std::is_unsigned<T>::value;
@@ -361,7 +361,7 @@ uint32_t GetValFromBuffer(std::vector<uint8_t> buffer, T index,
   return version;
 }
 
-inline std::string ExtractString(const std::vector<uint8_t> &buffer,
+inline std::string ExtractString(const std::vector<char> &buffer,
                                  uint32_t start, uint32_t length) {
   ID3_PRECONDITION((start + length) <= static_cast<uint32_t>(buffer.size()));
 
@@ -410,7 +410,7 @@ uint32_t GetTagSizeDefaultO(const std::vector<unsigned char> &buffer,
   return val;
 }
 
-uint32_t GetTagSizeDefault(const std::vector<uint8_t> &buffer, uint32_t length,
+uint32_t GetTagSizeDefault(const std::vector<char> &buffer, uint32_t length,
                            uint32_t startPosition = 0, bool BigEndian = false) {
 
   ID3_PRECONDITION((startPosition + length) <=
@@ -443,8 +443,8 @@ uint32_t GetTagSizeDefault(const std::vector<uint8_t> &buffer, uint32_t length,
   return val;
 }
 
-inline bool replaceElementsInBuff(const std::vector<uint8_t> &buffIn,
-                                  std::vector<uint8_t> &buffOut,
+inline bool replaceElementsInBuff(const std::vector<char> &buffIn,
+                                  std::vector<char> &buffOut,
                                   uint32_t position) {
   const auto iter = std::begin(buffIn);
 
@@ -460,7 +460,7 @@ An ID3 tag is a data container within an MP3 audio file stored
  in a prescribed format. This data commonly contains the Artist name,
  Song title, Year and Genre of the current audio file
 */
-uint32_t GetTagSize(const std::vector<uint8_t> &buffer,
+uint32_t GetTagSize(const std::vector<char> &buffer,
                     const std::vector<unsigned int> &power_values,
                     uint32_t index) {
 
@@ -482,10 +482,9 @@ uint32_t GetTagSize(const std::vector<uint8_t> &buffer,
 }
 
 template <typename T>
-std::optional<std::vector<uint8_t>>
-updateAreaSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
-               T tagIndex, T numberOfElements, T _maxValue,
-               bool littleEndian = true) {
+std::optional<std::vector<char>>
+updateAreaSize(const std::vector<char> &buffer, uint32_t extraSize, T tagIndex,
+               T numberOfElements, T _maxValue, bool littleEndian = true) {
   const uint32_t TagIndex = tagIndex;
   const uint32_t NumberOfElements = numberOfElements;
   const uint32_t maxValue = _maxValue;
@@ -493,7 +492,7 @@ updateAreaSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
   auto ExtraSize = extraSize;
   auto extr = ExtraSize % maxValue;
 
-  std::vector<uint8_t> temp_vec = {};
+  std::vector<char> temp_vec = {};
   temp_vec.resize(NumberOfElements);
   std::copy(itIn, itIn + NumberOfElements, temp_vec.begin());
   auto it = temp_vec.begin();

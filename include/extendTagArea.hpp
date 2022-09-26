@@ -11,7 +11,7 @@
 namespace id3v2 {
 
 void ExtendTagBuffer(const AudioSettings_t *const audioProperties,
-                     std::vector<uint8_t> &tagBuffer, uint32_t additionalSize) {
+                     std::vector<char> &tagBuffer, uint32_t additionalSize) {
 
   const auto &frameProperties =
       audioProperties->frameScopePropertiesObj.value();
@@ -21,7 +21,7 @@ void ExtendTagBuffer(const AudioSettings_t *const audioProperties,
   const auto tagSizeBuffer = updateTagSize(tagBuffer, additionalSize);
 
   const auto frameSizeBuff =
-      updateFrameSizeIndex<std::vector<uint8_t>, uint32_t, uint32_t>(
+      updateFrameSizeIndex<std::vector<char>, uint32_t, uint32_t>(
           audioProperties->fileScopePropertiesObj.get_tag_version(), tagBuffer,
           additionalSize, frameProperties.frameIDStartPosition);
 
@@ -41,7 +41,7 @@ void ExtendTagBuffer(const AudioSettings_t *const audioProperties,
 
 class FileExtended {
 public:
-  explicit FileExtended(std::vector<uint8_t> &tagBufIn,
+  explicit FileExtended(std::vector<char> &tagBufIn,
                         const audioProperties_t *const audioProperties,
                         uint32_t additionalSize, const std::string &content)
       : mTagBuffer(tagBufIn), audioPropertiesObj(audioProperties) {
@@ -75,11 +75,11 @@ public:
   auto get_status() const { return status; }
 
 private:
-  std::vector<uint8_t> mTagBuffer;
+  std::vector<char> mTagBuffer;
   const audioProperties_t *const audioPropertiesObj;
   execution_status_t status{};
 
-  bool ReWriteFile(const std::vector<uint8_t> &tagBuffer, uint32_t extraSize) {
+  bool ReWriteFile(const std::vector<char> &tagBuffer, uint32_t extraSize) {
     const auto &fileParameter = audioPropertiesObj->fileScopePropertiesObj;
 
     std::ifstream filRead(fileParameter.get_filename(),
@@ -101,7 +101,7 @@ private:
     const auto audioSizeWithoutId3v2Tag = fileSize - initialTagSize;
     filRead.seekg(id3v2::TagHeaderStartPosition + initialTagSize);
     auto bufRead =
-        std::make_unique<std::vector<uint8_t>>(audioSizeWithoutId3v2Tag);
+        std::make_unique<std::vector<char>>(audioSizeWithoutId3v2Tag);
     filRead.read(reinterpret_cast<char *>(&bufRead->at(0)),
                  audioSizeWithoutId3v2Tag);
 
