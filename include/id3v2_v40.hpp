@@ -7,68 +7,46 @@
 
 #include <id3.hpp>
 
-namespace id3v2 {
+namespace id3v2
+{
 
-class v40 {
+constexpr unsigned int v40FrameIDSize = 4;
+
+class v40
+{
 public:
-#if 0
-        const std::vector<std::string> tag_names{
-            "TALB" //     [#TALB Album/Movie/Show title]
-                ,"TBPM" //     [#TBPM BPM (beats per minute)]
-                ,"TCOM" //     [#TCOM Composer]
-                ,"TCON" //     [#TCON Content type]
-                ,"TCOP" //     [#TCOP Copyright message]
-                ,"TDRC" //     [#TDRC release time]
-                ,"TDLY" //     [#TDLY Playlist delay]
-                ,"TENC" //     [#TENC Encoded by]
-                ,"TEXT" //     [#TEXT Lyricist/Text writer]
-                ,"TFLT" //     [#TFLT File type]
-                ,"TIT1" //     [#TIT1 Content group description]
-                ,"TIT2" //     [#TIT2 Title/songname/content description]
-                ,"TIT3" //     [#TIT3 Subtitle/Description refinement]	
-                ,"TLAN" //    [#TLAN Language(s)]
-                ,"TLEN"//      [#TLEN Length]
-                ,"TMED"//      [#TMED Media type]
-                ,"TOAL"//      [#TOAL Original album/movie/show title]
-                ,"TOFN"//      [#TOFN Original filename]
-                ,"TOLY"//      [#TOLY Original lyricist(s)/text writer(s)]
-                ,"TOPE"//      [#TOPE Original artist(s)/performer(s)]
-                ,"TDOR"//      [#TDOR Original release time]
-                ,"TOWN"//      [#TOWN File owner/licensee]
-                ,"TPE1"//      [#TPE1 Lead performer(s)/Soloist(s)]
-                ,"TPE2"//      [#TPE2 Band/orchestra/accompaniment]
-                ,"TPE3"//      [#TPE3 Conductor/performer refinement]
-                ,"TPE4"//      [#TPE4 Interpreted, remixed, or otherwise modified by]
-                ,"TPOS"//      [#TPOS Part of a set]
-                ,"TPUB"//      [#TPUB Publisher]
-                ,"TRCK"//      [#TRCK Track number/Position in set]
-                ,"TRSN"//      [#TRSN Internet radio station name]
-                ,"TRSO"//      [#TRSO Internet radio station owner]
-                ,"TSRC"//      [#TSRC ISRC (international standard recording code)]
-                ,"TSSE"//      [#TSEE Software/Hardware and settings used for encoding]
-                ,"ASPI"//      [#Audio Seek Point]
-                ,"EQU2"//        Equalisation (2) [F:4.12]
-                ,"RVA2"//       Relative volume adjustment (2) [F:4.11]
-                ,"SEEK"//        Seek frame [F:4.29]
-                ,"WCOM"//      Commercial information
-                ,"WCOP"// Copyright/Legal information
-                ,"WOAF"// Official audio file webpage
-                ,"WOAR"// Official artist/performer webpage
-                ,"WOAS"// Official audio source webpage
-                ,"WORS"// Official Internet radio station homepage
-                ,"WPAY"// Payment
-                ,"WPUB"// Publishers official webpage
-                ,"WXXX"// User defined URL link frame
-
-        };
-#endif
-  constexpr unsigned int FrameIDSize(void) { return 4; }
+  const auto get_frame(const meta_entry &entry) const
+  {
+    switch (entry) {
+    case meta_entry::album:
+    case meta_entry::artist:
+    case meta_entry::composer:
+    case meta_entry::title:
+    case meta_entry::date:
+    case meta_entry::genre:
+    case meta_entry::textwriter:
+    case meta_entry::audioencryption:
+    case meta_entry::language:
+    case meta_entry::time:
+    case meta_entry::year:
+    case meta_entry::originalfilename:
+    case meta_entry::filetype:
+    case meta_entry::bandOrchestra:
+      return id3::v30_v40::get_frame(entry);
+      break;
+    default:
+      return std::string_view();
+      break;
+    }
+    return std::string_view();
+  }
 
   constexpr unsigned int FrameHeaderSize(void) { return 10; }
 
   std::optional<uint32_t> GetFrameSize(const std::vector<char> &buffer,
-                                       uint32_t index) {
-    const auto start = FrameIDSize() + index;
+                                       uint32_t index)
+  {
+    const auto start = v40FrameIDSize + index;
 
     if (buffer.size() >= start) {
       using paire = std::pair<uint32_t, uint32_t>;
@@ -89,7 +67,6 @@ public:
           });
 
       return val;
-
     } else {
       ID3_LOG_ERROR("failed..: size: {} and start: {}..", buffer.size(), start);
     }

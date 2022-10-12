@@ -6,9 +6,9 @@
 #include <iostream>
 #include <lyra/lyra.hpp>
 
-
 bool changeTagsInFile(const std::string &mediafile,
-                      const std::pair<std::string, std::string> &tags) {
+                      const std::pair<std::string, std::string> &tags)
+{
   namespace fs = id3::filesystem;
   using std::cout;
   using std::endl;
@@ -54,7 +54,8 @@ bool changeTagsInFile(const std::string &mediafile,
 }
 
 bool changeTagsInDirectory(const std::string &directory,
-                           const std::pair<std::string, std::string> &tags) {
+                           const std::pair<std::string, std::string> &tags)
+{
   namespace fs = id3::filesystem;
   using std::cout;
   using std::endl;
@@ -87,7 +88,8 @@ bool changeTagsInDirectory(const std::string &directory,
   return true;
 }
 
-int main(int argc, const char **argv) {
+int main(int argc, const char **argv)
+{
 
   // Where we read in the argument value:
   bool show_help = false;

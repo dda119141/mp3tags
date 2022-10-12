@@ -17,7 +17,8 @@
 
 auto id3v2_SetFrameContent(const std::string &filename,
                            const id3v2::frameArray_t &frameIDs,
-                           std::string_view content) {
+                           std::string_view content)
+{
 
   const auto params = [&filename, &frameIDs, content]() {
     const auto id3Version = preCheckId3(filename).id3Version;
@@ -60,7 +61,6 @@ auto id3v2_SetFrameContent(const std::string &filename,
     return Writer.getStatus();
   } catch (const id3::audio_tag_error &e) {
     std::cout << e.what();
-
   } catch (const std::runtime_error &e) {
     std::cerr << "Runtime Error: " << e.what() << std::endl;
   }
@@ -72,7 +72,8 @@ auto id3v2_SetFrameContent(const std::string &filename,
 template <typename Function1>
 auto SetFramePayload(const std::string &filename,
                      const id3v2::frameArray_t &id3v2Tags,
-                     std::string_view content, Function1 fuc1) {
+                     std::string_view content, Function1 fuc1)
+{
 
   const auto retId3v1 = fuc1(filename, content);
   auto ret = id3::get_execution_status_b(retId3v1);
@@ -83,7 +84,8 @@ auto SetFramePayload(const std::string &filename,
   return ret;
 }
 
-bool SetAlbum(const std::string &filename, std::string_view content) {
+bool SetAlbum(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{{id3v2::tagVersion_t::v40, "TALB"},
                                      {id3v2::tagVersion_t::v30, "TALB"},
                                      {id3v2::tagVersion_t::v00, "TAL"}};
@@ -97,7 +99,8 @@ bool SetAlbum(const std::string &filename, std::string_view content) {
   return (ret | retId3);
 }
 
-bool SetLeadArtist(const std::string &filename, std::string_view content) {
+bool SetLeadArtist(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v40, "TPE1"},
       {id3v2::tagVersion_t::v30, "TPE1"},
@@ -113,7 +116,8 @@ bool SetLeadArtist(const std::string &filename, std::string_view content) {
   return (ret | retId3);
 }
 
-bool SetGenre(const std::string &filename, std::string_view content) {
+bool SetGenre(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v40, "TCON"},
       {id3v2::tagVersion_t::v30, "TCON"},
@@ -129,7 +133,8 @@ bool SetGenre(const std::string &filename, std::string_view content) {
   return (ret | retId3);
 }
 
-bool SetBandOrchestra(const std::string &filename, std::string_view content) {
+bool SetBandOrchestra(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v40, "TPE2"},
       {id3v2::tagVersion_t::v30, "TPE2"},
@@ -141,7 +146,8 @@ bool SetBandOrchestra(const std::string &filename, std::string_view content) {
   return id3::get_execution_status_b(ret);
 }
 
-bool SetComposer(const std::string &filename, std::string_view content) {
+bool SetComposer(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v40, "TCOM"},
       {id3v2::tagVersion_t::v30, "TCOM"},
@@ -153,7 +159,8 @@ bool SetComposer(const std::string &filename, std::string_view content) {
   return id3::get_execution_status_b(ret);
 }
 
-bool SetDate(const std::string &filename, std::string_view content) {
+bool SetDate(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v30, "TDAT"},
       {id3v2::tagVersion_t::v40, "TDRC"},
@@ -165,7 +172,8 @@ bool SetDate(const std::string &filename, std::string_view content) {
   return id3::get_execution_status_b(ret);
 }
 
-bool SetTextWriter(const std::string &filename, std::string_view content) {
+bool SetTextWriter(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v40, "TEXT"},
       {id3v2::tagVersion_t::v30, "TEXT"},
@@ -177,7 +185,8 @@ bool SetTextWriter(const std::string &filename, std::string_view content) {
   return id3::get_execution_status_b(ret);
 }
 
-bool SetTitle(const std::string &filename, std::string_view content) {
+bool SetTitle(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v40, "TIT2"},
       {id3v2::tagVersion_t::v30, "TIT2"},
@@ -192,7 +201,8 @@ bool SetTitle(const std::string &filename, std::string_view content) {
   return (ret | retId3);
 }
 
-bool SetYear(const std::string &filename, std::string_view content) {
+bool SetYear(const std::string &filename, std::string_view content)
+{
   static const id3v2::frame_t frames{
       {id3v2::tagVersion_t::v40, "TDRC"},
       {id3v2::tagVersion_t::v30, "TYER"},

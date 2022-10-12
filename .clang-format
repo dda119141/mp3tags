@@ -1,1 +1,5 @@
 BasedOnStyle: LLVM
+BreakBeforeBraces: Linux
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
+AlwaysBreakTemplateDeclarations: Yes

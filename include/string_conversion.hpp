@@ -7,8 +7,10 @@
 
 #include <unicode.hpp>
 
-namespace tagBase {
-std::string utf8ToUtf16String(const std::string &utf8String) {
+namespace tagBase
+{
+std::string utf8ToUtf16String(const std::string &utf8String)
+{
   using utf16_t = Unicode::UTF16;
 
   const auto inputLength = utf8String.length();
@@ -35,7 +37,8 @@ std::string utf8ToUtf16String(const std::string &utf8String) {
 }
 
 template <typename type>
-std::string getW16StringFromLatin(std::string_view val) {
+std::string getW16StringFromLatin(std::string_view val)
+{
 #ifndef __OLD
 
   std::string val_str = std::string(val);
@@ -58,7 +61,8 @@ std::string getW16StringFromLatin(std::string_view val) {
 #endif
 }
 
-const std::string &swapW16String(std::string &val_str) {
+const std::string &swapW16String(std::string &val_str)
+{
 
   if (std::distance(val_str.begin(), val_str.end()) % 2 != 0)
     val_str += '\0';

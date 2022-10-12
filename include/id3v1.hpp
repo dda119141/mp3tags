@@ -12,7 +12,8 @@
 
 using namespace id3;
 
-namespace id3v1 {
+namespace id3v1
+{
 
 constexpr uint32_t TagSize = 128;
 constexpr uint32_t TagHeaderLength = 3;
@@ -25,7 +26,8 @@ private:
   uint32_t mTagPayloadLength = 0;
   execution_status_t mStatus{};
 
-  execution_status_t init(const std::string &fileName) {
+  execution_status_t init(const std::string &fileName)
+  {
     std::ifstream filRead(mFileName, std::ios::binary | std::ios::ate);
 
     /* move the cursor to tag begin */
@@ -60,18 +62,18 @@ private:
 public:
   std::string tagStringBuffer{};
   explicit tagReadWriter(const std::string &fileName)
-      : mFileName(fileName), tagStringBuffer({}) {
+      : mFileName(fileName), tagStringBuffer({})
+  {
     mStatus = init(fileName);
   }
 
   uint32_t GetTagPayloadPosition() const { return mTagPayloadPosition; }
 
-  frameContent_v GetBuffer() const {
-    return frameContent_v{mStatus, tagStringBuffer};
-  }
+  auto GetTagView() const { return ContentView_t{mStatus, tagStringBuffer}; }
 };
 
-class frameObj_t {
+class frameObj_t
+{
 
   std::string_view mTagView{};
   uint32_t mFrameStartPos = 0;
@@ -81,7 +83,8 @@ public:
   explicit frameObj_t(std::string_view tagView, uint32_t frameStartPosIn,
                       uint32_t frameEndPosIn)
       : mTagView(tagView), mFrameStartPos(frameStartPosIn),
-        mFrameEndPos(frameEndPosIn) {
+        mFrameEndPos(frameEndPosIn)
+  {
 
     if (mFrameStartPos >= mFrameEndPos)
       throw id3::id3_error("id3v1: start pos > end pos");
@@ -95,30 +98,11 @@ public:
   std::string frameContent{};
 };
 
-const auto getFramePayload = [](const std::string &filename, uint32_t start,
-                                uint32_t end) {
-  const tagReadWriter tagRW{filename};
-  const auto bufObj = tagRW.GetBuffer();
-
-  if (noStatusErrorFrom(bufObj.parseStatus)) {
-    const frameObj_t frameObj{bufObj.payload, start, end};
-
-    if (frameObj.frameContent.size() == 0) {
-      const execution_status_t status = get_status_error(
-          tag_type_t::id3v1, rstatus_t::ErrorNoPrintableContent);
-      return frameContent_t{status, {}};
-    } else {
-      return frameContent_t{bufObj.parseStatus, frameObj.frameContent};
-    }
-  } else {
-    return frameContent_t{bufObj.parseStatus, {}};
-  }
-};
-
 const auto SetFramePayload(const std::string &filename,
                            std::string_view content,
                            uint32_t relativeFramePayloadStart,
-                           uint32_t relativeFramePayloadEnd) {
+                           uint32_t relativeFramePayloadEnd)
+{
   if (relativeFramePayloadEnd < relativeFramePayloadStart)
     return get_status_error(tag_type_t::id3v1,
                             rstatus_t::PayloadStartAfterPayloadEnd);
@@ -143,59 +127,126 @@ const auto SetFramePayload(const std::string &filename,
   return ret;
 }
 
-const auto SetTitle(const std::string &filename, std::string_view content) {
+const auto SetTitle(const std::string &filename, std::string_view content)
+{
   return id3v1::SetFramePayload(filename, content, 0, 30);
 }
 
-const auto SetLeadArtist(const std::string &filename,
-                         std::string_view content) {
+const auto SetLeadArtist(const std::string &filename, std::string_view content)
+{
   return id3v1::SetFramePayload(filename, content, 30, 60);
 }
 
-const auto SetAlbum(const std::string &filename, std::string_view content) {
+const auto SetAlbum(const std::string &filename, std::string_view content)
+{
   return id3v1::SetFramePayload(filename, content, 60, 90);
 }
 
-const auto SetYear(const std::string &filename, std::string_view content) {
+const auto SetYear(const std::string &filename, std::string_view content)
+{
   return id3v1::SetFramePayload(filename, content, 90, 94);
 }
 
-const auto SetComment(const std::string &filename, std::string_view content) {
+const auto SetComment(const std::string &filename, std::string_view content)
+{
   return id3v1::SetFramePayload(filename, content, 94, 124);
 }
 
-const auto SetGenre(const std::string &filename, std::string_view content) {
+const auto SetGenre(const std::string &filename, std::string_view content)
+{
   return id3v1::SetFramePayload(filename, content, 124, 125);
 }
 
-const auto GetTitle(const std::string &filename) {
-  const auto frameObj = getFramePayload;
-  return frameObj(filename, 0, 30);
+class handle_t
+{
+  const tagReadWriter tagRW;
+  const ContentView_t TagContentView;
+
+  const auto FramePayload(uint32_t start, uint32_t end) const
+  {
+    if (noStatusErrorFrom(TagContentView.parseStatus)) {
+      const frameObj_t frameObj{TagContentView.payload, start, end};
+
+      if (frameObj.frameContent.size() == 0) {
+        const execution_status_t status = get_status_error(
+            tag_type_t::id3v1, rstatus_t::ErrorNoPrintableContent);
+        return frameContent_t{status, {}};
+      } else {
+        return frameContent_t{TagContentView.parseStatus,
+                              frameObj.frameContent};
+      }
+    } else {
+      return frameContent_t{TagContentView.parseStatus, {}};
+    }
+  };
+
+public:
+  handle_t(const std::string &filename)
+      : tagRW(filename), TagContentView(tagRW.GetTagView())
+  {
+  }
+
+  const auto getStatus() const { return TagContentView.parseStatus; }
+
+  const auto getFramePayload(meta_entry entry) const
+  {
+    switch (entry) {
+    case meta_entry::album:
+      return FramePayload(60, 90);
+      break;
+    case meta_entry::artist:
+      return FramePayload(30, 60);
+      break;
+    case meta_entry::comments:
+      return FramePayload(94, 124);
+      break;
+    case meta_entry::genre:
+      return FramePayload(124, 125);
+      break;
+    case meta_entry::title:
+      return FramePayload(0, 30);
+      break;
+    case meta_entry::year:
+      return FramePayload(90, 94);
+      break;
+    default:
+      return frameContent_t{TagContentView.parseStatus, {}};
+      break;
+    };
+    return frameContent_t{TagContentView.parseStatus, {}};
+  };
+};
+
+const auto getId3v1Payload = getPayload<id3v1::handle_t>;
+
+const auto GetTitle(const std::string &filename)
+{
+  return getId3v1Payload(filename)(meta_entry::title);
 }
 
-const auto GetLeadArtist(const std::string &filename) {
-  const auto frameObj = getFramePayload;
-  return frameObj(filename, 30, 60);
+const auto GetLeadArtist(const std::string &filename)
+{
+  return getId3v1Payload(filename)(meta_entry::artist);
 }
 
-const auto GetAlbum(const std::string &filename) {
-  const auto frameObj = getFramePayload;
-  return frameObj(filename, 60, 90);
+const auto GetAlbum(const std::string &filename)
+{
+  return getId3v1Payload(filename)(meta_entry::album);
 }
 
-const auto GetYear(const std::string &filename) {
-  const auto frameObj = getFramePayload;
-  return frameObj(filename, 90, 94);
+const auto GetYear(const std::string &filename)
+{
+  return getId3v1Payload(filename)(meta_entry::year);
 }
 
-const auto GetComment(const std::string &filename) {
-  const auto frameObj = getFramePayload;
-  return frameObj(filename, 94, 124);
+const auto GetComment(const std::string &filename)
+{
+  return getId3v1Payload(filename)(meta_entry::comments);
 }
 
-const auto GetGenre(const std::string &filename) {
-  const auto frameObj = getFramePayload;
-  return frameObj(filename, 124, 125);
+const auto GetGenre(const std::string &filename)
+{
+  return getId3v1Payload(filename)(meta_entry::genre);
 }
 
 }; // end namespace id3v1

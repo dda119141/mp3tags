@@ -2,7 +2,6 @@
 // Email: dda119141@gmail.com
 // Distributed under the MIT License (http://opensource.org/licenses/MIT)
 
-#include "id3_precheck.hpp"
 #include "tagreader.hpp"
 #include <iostream>
 #include <lyra/lyra.hpp>
@@ -15,13 +14,14 @@ struct tagOptions {
   bool trackPosition;
   bool example;
   bool year;
-  bool isEmpty() {
+  bool isEmpty()
+  {
     return !(album | genre | title | artist | trackPosition | year | example);
   }
 } tagOption = {};
 
-bool readTagsInFile(const std::string &mediafile,
-                    const struct tagOptions &tags) {
+bool readTagsInFile(const std::string &mediafile, const struct tagOptions &tags)
+{
   namespace fs = id3::filesystem;
   using std::cout;
   using std::endl;
@@ -68,13 +68,14 @@ bool readTagsInFile(const std::string &mediafile,
     cout << GetYear(filename) << "\n";
   }
   if (tags.example) {
-    preCheckId3(filename);
+    // preCheckId3(filename);
   }
 
   return true;
 }
 
-bool readTags(const std::string &directory, const struct tagOptions &tags) {
+bool readTags(const std::string &directory, const struct tagOptions &tags)
+{
   namespace fs = id3::filesystem;
 
   using std::cout;
@@ -102,7 +103,8 @@ bool readTags(const std::string &directory, const struct tagOptions &tags) {
   return true;
 }
 
-int main(int argc, const char **argv) {
+int main(int argc, const char **argv)
+{
   // Where we read in the argument value:
   bool show_help = false;
   std::string directory;
