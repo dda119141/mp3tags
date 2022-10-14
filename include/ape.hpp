@@ -163,7 +163,7 @@ public:
 
       const auto status = this->getFrameProperties(FrameID, frameProperties);
 
-      return frameContent_t{status, frameProperties.frameContent.value()};
+      return frameContent_t{status, frameProperties.frameContent};
     } else {
       return frameContent_t{m_status, {}};
     }

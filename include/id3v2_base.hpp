@@ -135,20 +135,7 @@ public:
 
   const iD3Variant &get_tag_version() const { return tagVersion; }
 
-  const auto get_tag_type()
-  {
-#if 0
-    return std::visit(
-        overloaded{
-            [](id3v2::v00 arg) { return iD3Variant{id3v2::v00()}; },
-            [](id3v2::v30 arg) { return iD3Variant{id3v2::v30()}; },
-            [](id3v2::v40 arg) { return iD3Variant{id3v2::v40()}; },
-        },
-        tagVersion);
-#else
-    return tagVersion;
-#endif
-  }
+  const auto get_tag_type() const { return tagVersion; }
 
   std::string_view get_frame_id() const { return frameID; }
 
@@ -284,14 +271,17 @@ updateFrameSizeIndex(const iD3Variant &TagVersion, Args... args)
       TagVersion);
 }
 
-void GetTagBufferFromFile(const std::string &FileName, uint32_t num,
+void GetTagBufferFromFile(const std::string &FileName, size_t num,
                           buffer_t &buffer)
 {
   std::ifstream fil(FileName);
   constexpr auto tagBeginPosition = 0;
 
-  buffer.reset(new std::vector<char>(num));
+  const bool buffer_to_reset = ((buffer && buffer->size() < num) || !buffer);
 
+  if (buffer_to_reset) {
+    buffer.reset(new std::vector<char>(num));
+  }
   fil.read(reinterpret_cast<char *>(&buffer->at(tagBeginPosition)), num);
 }
 
@@ -327,15 +317,8 @@ std::string u8_to_u16_string(T val)
       [](std::string arg1, char arg2) { return arg1 + '\0' + arg2; });
 }
 
-template <typename T>
-constexpr T RetrieveSize(T n)
-{
-  return n;
-}
-
 auto updateTagSize(const std::vector<char> &buffer, uint32_t extraSize)
 {
-
   return updateAreaSize<uint32_t>(buffer, extraSize, tagSizePositionInHeader,
                                   tagSizeLengthPositionInHeader,
                                   tagSizeMaxValuePerElement);
@@ -360,6 +343,12 @@ const auto GetTotalTagSize(const std::vector<char> &buffer)
 buffer_t &GetTagHeader(const std::string &FileName, buffer_t &buffer)
 {
   std::ifstream fil(FileName);
+  const bool buffer_to_reset =
+      ((buffer && buffer->size() < TagHeaderSize) || !buffer);
+
+  if (buffer_to_reset) {
+    buffer.reset(new std::vector<char>(TagHeaderSize));
+  }
   fil.read(reinterpret_cast<char *>(&buffer->at(0)), TagHeaderSize);
   return buffer;
 }
@@ -455,19 +444,6 @@ const auto FrameContainsGroupInformation(uint8_t attribute)
   return (val[3] == 1);
 }
 
-template <typename id3Type>
-void GetTagNames(void)
-{
-  return id3Type::tag_names;
-};
-
-std::optional<std::string> GetID3Version(const std::vector<char> &buffer)
-{
-  constexpr auto kID3IndexStart = 4;
-  constexpr auto kID3VersionBytesLength = 2;
-
-  return GetHexFromBuffer<char>(buffer, kID3IndexStart, kID3VersionBytesLength);
-}
 }; // end namespace id3v2
 
 #endif // ID3V2_BASE

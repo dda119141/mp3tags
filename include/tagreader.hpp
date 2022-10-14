@@ -8,6 +8,7 @@
 #include <ape.hpp>
 #include <id3v1.hpp>
 #include <id3v2_common.hpp>
+#include <printEntries.hpp>
 
 const auto GetAudioFrames(const std::string &filename)
 {
@@ -18,6 +19,8 @@ const auto GetAudioFrames(const std::string &filename)
     case 0: {
       const id3v2::ConstructTag v2Tag{filename};
       if (noStatusErrorFrom(v2Tag.getStatus())) {
+        print_meta_entries(v2Tag);
+        doCheck = 3;
       } else {
         doCheck = 1;
       }
@@ -26,14 +29,18 @@ const auto GetAudioFrames(const std::string &filename)
     case 1: {
       const auto v1Tag = id3v1::handle_t{filename};
       if (noStatusErrorFrom(v1Tag.getStatus())) {
+        print_meta_entries(v1Tag);
+        doCheck = 3;
       } else {
         doCheck = 2;
       }
       break;
     }
     case 2: {
-      const auto retApe = ape::handle_t{filename};
-      if (noStatusErrorFrom(retApe.getStatus())) {
+      const auto apeTag = ape::handle_t{filename};
+      if (noStatusErrorFrom(apeTag.getStatus())) {
+        print_meta_entries(apeTag);
+        doCheck = 3;
       } else {
         doCheck = 3;
       }
@@ -139,4 +146,9 @@ const auto GetBandOrchestra(const std::string &filename)
   const auto ret = GetAudioFrame(filename)(meta_entry::bandOrchestra);
   return ret.payload.value_or(std::string(""));
 }
+const auto GetAllMetaEntries(const std::string &filename)
+{
+  return GetAudioFrames(filename);
+}
+
 #endif //_TAG_READER

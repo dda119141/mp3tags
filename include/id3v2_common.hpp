@@ -22,11 +22,10 @@
 
 namespace id3v2
 {
-void getframeScopePropertiesFromEncodeByte(
+void getframePropertiesFromEncodeByte(
     frameScopeProperties &mframeScopeProperties,
     const std::vector<char> &tagBuffer)
 {
-
   const auto &frameContentOffset =
       mframeScopeProperties.frameContentStartPosition;
 
@@ -74,7 +73,6 @@ void getframeScopePropertiesFromEncodeByte(
 const auto formatFramePayload(std::string_view content,
                               const frameScopeProperties &frameProperties)
 {
-
   using payloadType =
       std::variant<std::string_view, std::u16string, std::u32string>;
 
@@ -122,7 +120,6 @@ const auto formatFramePayload(std::string_view content,
 const auto GetFramePosition(std::string_view frameID,
                             std::string_view tagAreaIn)
 {
-
   const auto searchFramePosition =
       id3::searchFrame<std::string_view>(tagAreaIn);
 
@@ -161,6 +158,7 @@ public:
     }
     if (m_status.rstatus == rstatus_t::idle) {
       mAudioProperties.frameScopePropertiesObj.emplace();
+      m_status.rstatus = rstatus_t::noError;
     }
   }
 
@@ -242,7 +240,7 @@ private:
 
     if (FrameID.find_first_of("T") == 0) // if frameID starts with T
     {
-      getframeScopePropertiesFromEncodeByte(frameProperties, *mTagBuffer);
+      getframePropertiesFromEncodeByte(frameProperties, *mTagBuffer);
     }
 
     return id3Status;
@@ -357,6 +355,7 @@ private:
   const TagReader &mTagReaderIn;
   const audioProperties_t *const audioPropertiesObj;
 };
+
 }; // end namespace id3v2
 
 #endif //_ID3V2_COMMON
