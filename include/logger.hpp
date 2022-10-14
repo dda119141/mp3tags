@@ -9,10 +9,13 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 
-namespace id3 {
-class Logger {
+namespace id3
+{
+class Logger
+{
 public:
-  Logger(const std::string &logName) : max_size(1024 * 100) {
+  Logger(const std::string &logName) : max_size(1024 * 100)
+  {
     logger = spdlog::rotating_logger_mt("logger", logName, max_size, 0);
     logger->set_pattern("[%H:%M:%S %z] [%^%L%$] %s:%!:%# %v");
 
@@ -24,7 +27,8 @@ public:
     // logger->set_level(spdlog::level::critical);
   }
 
-  auto GetLog(void) const {
+  auto GetLog(void) const
+  {
     logger->flush();
     return logger;
   }
@@ -34,12 +38,15 @@ private:
   uint32_t max_size;
 };
 
-template <typename... Args> auto log(Args... args) {
+template <typename... Args>
+auto log(Args... args)
+{
   static id3::Logger tLogger;
   return tLogger.GetLog()->info(args...);
 }
 
-auto log() {
+auto log()
+{
   static id3::Logger tLogger("id3.log");
   return tLogger.GetLog();
 }

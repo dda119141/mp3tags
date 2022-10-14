@@ -9,7 +9,8 @@
 #include "logger.hpp"
 #include "result.hpp"
 
-namespace ape {
+namespace ape
+{
 
 static const std::string modifiedEnding(".ape.mod");
 
@@ -24,26 +25,22 @@ typedef struct _frameConfig {
   std::optional<std::string> frameContent;
 } frameProperties_t;
 
-std::optional<std::vector<uint8_t>>
-UpdateFrameSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
-                uint32_t frameIDPosition) {
+const auto UpdateFrameSize(const std::vector<char> &buffer, uint32_t extraSize,
+                           uint32_t frameIDPosition)
+{
   const uint32_t frameSizePositionInArea = frameIDPosition;
   constexpr uint32_t frameSizeLengthInArea = 4;
   constexpr uint32_t frameSizeMaxValuePerElement = 255;
 
-  id3::log()->info(" Frame Index: {}", frameIDPosition);
-  id3::log()->info(
-      "Tag Frame Bytes before update : {}",
-      spdlog::to_hex(std::begin(buffer) + frameSizePositionInArea,
-                     std::begin(buffer) + frameSizePositionInArea + 4));
   const auto ret = id3::updateAreaSize<uint32_t>(
       buffer, extraSize, frameSizePositionInArea, frameSizeLengthInArea,
       frameSizeMaxValuePerElement, false);
 
-  return ret;
+  return ret.value();
 }
 
-class apeTagProperties {
+class apeTagProperties
+{
 private:
   const std::string &FileName;
   uint32_t mfileSize = 0;
@@ -55,7 +52,8 @@ private:
   id3::buffer_t mTagBuffer = {};
   execution_status_t m_status{};
 
-  uint32_t getTagSize(std::ifstream &fRead, uint32_t bufferLength) {
+  uint32_t getTagSize(std::ifstream &fRead, uint32_t bufferLength)
+  {
     std::vector<unsigned char> tagbufferLength(bufferLength);
     fRead.read(reinterpret_cast<char *>(tagbufferLength.data()), bufferLength);
 
@@ -63,7 +61,8 @@ private:
   }
 
   bool checkAPEtag(std::ifstream &fRead, uint32_t bufferLength,
-                   const std::string &tagToCheck) {
+                   const std::string &tagToCheck)
+  {
 
     std::string apeIdentifier{'-'};
     apeIdentifier.resize(bufferLength);
@@ -73,7 +72,8 @@ private:
   }
 
   const auto init(const std::string &fileName,
-                  const uint32_t &id3v1TagSizeIfPresent) {
+                  const uint32_t &id3v1TagSizeIfPresent)
+  {
     uint32_t footerPreambleOffsetFromEndOfFile = 0;
 
     std::ifstream filRead(FileName, std::ios::binary | std::ios::ate);
@@ -109,8 +109,8 @@ private:
     mTagPayloadPosition = mTagFooterBegin + GetTagFooterSize - mTagSize;
 
     filRead.seekg(mTagStartPosition);
-    mTagBuffer = std::make_unique<std::vector<unsigned char>>(
-        mTagSize + GetTagFooterSize, '0');
+    mTagBuffer =
+        std::make_unique<std::vector<char>>(mTagSize + GetTagFooterSize, '0');
     filRead.read(reinterpret_cast<char *>(mTagBuffer->data()),
                  mTagSize + GetTagFooterSize);
 
@@ -120,7 +120,8 @@ private:
 public:
   explicit apeTagProperties(const std::string &fileName,
                             uint32_t id3v1TagSizeIfPresent)
-      : FileName{fileName} {
+      : FileName{fileName}
+  {
     m_status = init(fileName, id3v1TagSizeIfPresent);
   }
 
@@ -128,15 +129,16 @@ public:
   uint32_t getTagStartPosition() const { return mTagStartPosition; }
   uint32_t getTagFooterBegin() const { return mTagFooterBegin; }
   uint32_t getFileLength() const { return mfileSize; }
-  auto &GetBuffer() const { return mTagBuffer; }
+  auto &GetTagView() const { return mTagBuffer; }
   const auto GetStatus() const { return m_status; }
 };
 
-class tagReader {
+class tagReader
+{
 
 public:
-  explicit tagReader(const std::string &FileName, std::string_view FrameID)
-      : mFilename{FileName}, mFrameID{FrameID} {
+  explicit tagReader(const std::string &FileName) : mFilename{FileName}
+  {
 
     bool bContinue = true;
 
@@ -152,42 +154,48 @@ public:
         bContinue = false;
       }
     }
-    if (bContinue) {
-      m_status = getFrameProperties();
-    }
   }
 
-  const auto getFramePayload(void) const {
+  const auto getFramePayload(std::string_view FrameID) const
+  {
     if (noStatusErrorFrom(this->m_status)) {
-      return frameContent_t{this->m_status,
-                            mFrameProperties->frameContent.value()};
+      frameProperties_t frameProperties;
+
+      const auto status = this->getFrameProperties(FrameID, frameProperties);
+
+      return frameContent_t{status, frameProperties.frameContent};
     } else {
       return frameContent_t{m_status, {}};
     }
   }
 
-  auto writeFramePayload(std::string_view framePayload, uint32_t length) const {
+  auto writeFramePayload(std::string_view framePayload,
+                         std::string_view frameID) const
+  {
     if (!noStatusErrorFrom(this->m_status)) {
       return get_status_error(tag_type_t::ape, m_status.rstatus);
     }
-    if (framePayload.size() > length) {
-      return get_status_error(tag_type_t::ape,
-                              rstatus_t::ContentLengthBiggerThanFrameArea);
+
+    frameProperties_t frameProperties;
+    if (const auto status = this->getFrameProperties(frameID, frameProperties);
+        !noStatusErrorFrom(status)) {
+      return get_status_error(tag_type_t::ape, status.rstatus);
     }
+
     frameScopeProperties frameScopeProperties;
     frameScopeProperties.frameIDStartPosition =
-        mFrameProperties->frameStartPosition + OffsetFromFrameStartToFrameID;
+        frameProperties.frameStartPosition + OffsetFromFrameStartToFrameID;
 
     frameScopeProperties.frameContentStartPosition =
-        mFrameProperties->frameContentPosition;
-    frameScopeProperties.frameLength = mFrameProperties->frameLength;
+        frameProperties.frameContentPosition;
+    frameScopeProperties.frameLength = frameProperties.frameLength;
 
-    if (mFrameProperties->frameLength >= framePayload.size()) {
+    if (frameProperties.frameLength >= framePayload.size()) {
 
       return WriteFile(mFilename, framePayload, frameScopeProperties);
     } else {
       const uint32_t additionalSize =
-          framePayload.size() - mFrameProperties->frameLength;
+          framePayload.size() - frameProperties.frameLength;
 
       /* extend tag buffer */
       const auto bufferExtended =
@@ -211,7 +219,8 @@ public:
   }
 
   /* function not thread safe */
-  expected::Result<bool> ReWriteFile(const id3::buffer_t &buff) const {
+  expected::Result<bool> ReWriteFile(const id3::buffer_t &buff) const
+  {
     const uint32_t endOfFooter =
         mTagProperties->getTagFooterBegin() + GetTagFooterSize;
 
@@ -222,13 +231,13 @@ public:
     const uint32_t endLength = fileSize - endOfFooter;
 
     /* read in bytes from footer end until audio file end */
-    std::vector<uint8_t> bufFooter;
+    std::vector<char> bufFooter;
     bufFooter.reserve((endLength));
     filRead.seekg(endOfFooter);
     filRead.read(reinterpret_cast<char *>(&bufFooter[0]), endLength);
 
     /* read in bytes from audio file start end until ape area start */
-    std::vector<uint8_t> bufHeader;
+    std::vector<char> bufHeader;
     bufHeader.reserve((mTagProperties->getTagStartPosition()));
     filRead.seekg(0);
     filRead.read(reinterpret_cast<char *>(&bufHeader[0]),
@@ -257,10 +266,60 @@ public:
     return expected::makeValue<bool>(true);
   }
 
+  const auto getStatus() const { return m_status; }
+
+private:
+  const std::string &mFilename;
+  id3::execution_status_t m_status{};
+  std::optional<apeTagProperties> mTagProperties{};
+
+  const id3::execution_status_t
+  getFrameProperties(std::string_view FrameID,
+                     frameProperties_t &frameProperties) const
+  {
+    auto &tagbuffer = mTagProperties->GetTagView();
+
+    std::string_view tagArea{tagbuffer->data(), tagbuffer->size()};
+
+    /* Frame ID lookup and validation check */
+    const auto searchFramePosition =
+        id3::searchFrame<std::string_view>{tagArea};
+    const auto frameIDstatus = searchFramePosition.execute(FrameID);
+    if (frameIDstatus.rstatus != rstatus_t::noError) {
+      return get_execution_status(tag_type_t::ape, frameIDstatus);
+    }
+    if (frameIDstatus.frameIDPosition < OffsetFromFrameStartToFrameID) {
+      return get_status_error(tag_type_t::ape,
+                              rstatus_t::frameIDBadPositionError);
+    }
+
+    constexpr uint32_t frameKeyTerminatorLength = 1;
+    const uint32_t frameContentPosition = frameIDstatus.frameIDPosition +
+                                          FrameID.size() +
+                                          frameKeyTerminatorLength;
+
+    const uint32_t frameStartPosition =
+        frameIDstatus.frameIDPosition - OffsetFromFrameStartToFrameID;
+    const uint32_t frameLength =
+        id3::GetTagSizeDefault(*tagbuffer, 4, frameStartPosition);
+
+    frameProperties.frameContentPosition =
+        frameContentPosition + mTagProperties->getTagStartPosition();
+    frameProperties.frameStartPosition =
+        frameStartPosition + mTagProperties->getTagStartPosition();
+    frameProperties.frameLength = frameLength;
+
+    auto ret =
+        id3::ExtractString(*tagbuffer, frameContentPosition, frameLength);
+    frameProperties.frameContent = id3::stripLeft(ret);
+
+    return frameIDstatus;
+  }
+
   std::optional<id3::buffer_t>
   extendTagBuffer(const id3::frameScopeProperties &frameConfig,
-                  std::string_view framePayload,
-                  uint32_t additionalSize) const {
+                  std::string_view framePayload, uint32_t additionalSize) const
+  {
 
     const uint32_t relativeBufferPosition =
         mTagProperties->getTagStartPosition();
@@ -274,7 +333,7 @@ public:
     const uint32_t frameContentStart =
         frameConfig.frameContentStartPosition - relativeBufferPosition;
 
-    auto &TagBuffer = mTagProperties->GetBuffer();
+    auto &TagBuffer = mTagProperties->GetTagView();
 
     const auto tagSizeBuff =
         UpdateFrameSize(*TagBuffer, additionalSize, tagsSizePositionInHeader);
@@ -284,13 +343,13 @@ public:
 
     assert(frameConfig.getFramePayloadLength() <= TagBuffer->size());
 
-    id3::replaceElementsInBuff(frameSizeBuff.value(), *TagBuffer,
+    id3::replaceElementsInBuff(frameSizeBuff, *TagBuffer,
                                frameSizePositionInFrameHeader);
 
-    id3::replaceElementsInBuff(tagSizeBuff.value(), *TagBuffer,
+    id3::replaceElementsInBuff(tagSizeBuff, *TagBuffer,
                                tagsSizePositionInHeader);
 
-    id3::replaceElementsInBuff(tagSizeBuff.value(), *TagBuffer,
+    id3::replaceElementsInBuff(tagSizeBuff, *TagBuffer,
                                tagsSizePositionInFooter);
 
     auto it = TagBuffer->begin() + frameContentStart +
@@ -304,132 +363,130 @@ public:
                      return b;
                    });
 
-    return std::make_unique<std::vector<uint8_t>>((*TagBuffer));
+    return std::make_unique<std::vector<char>>((*TagBuffer));
   }
 
-private:
-  const std::string &mFilename;
-  std::string_view mFrameID;
-  id3::execution_status_t m_status{};
-  std::optional<apeTagProperties> mTagProperties{};
-  std::unique_ptr<frameProperties_t> mFrameProperties{};
-
-  const id3::execution_status_t getFrameProperties() {
-    auto &tagbuffer = mTagProperties->GetBuffer();
-
-    const auto tagArea = id3::ExtractString(*tagbuffer, 0, tagbuffer->size());
-
-    /* Frame ID lookup and validation check */
-    const auto searchFramePosition =
-        id3::searchFrame<std::string_view>{tagArea};
-    const auto frameIDstatus = searchFramePosition.execute(mFrameID);
-    if (frameIDstatus.rstatus != rstatus_t::noError) {
-      return get_execution_status(tag_type_t::ape, frameIDstatus);
-    }
-    if (frameIDstatus.frameIDPosition < OffsetFromFrameStartToFrameID) {
-      return get_status_error(tag_type_t::ape,
-                              rstatus_t::frameIDBadPositionError);
-    }
-
-    constexpr uint32_t frameKeyTerminatorLength = 1;
-    const uint32_t frameContentPosition = frameIDstatus.frameIDPosition +
-                                          mFrameID.size() +
-                                          frameKeyTerminatorLength;
-
-    const uint32_t frameStartPosition =
-        frameIDstatus.frameIDPosition - OffsetFromFrameStartToFrameID;
-    const uint32_t frameLength =
-        id3::GetTagSizeDefault(*tagbuffer, 4, frameStartPosition);
-
-    mFrameProperties = std::make_unique<frameProperties_t>();
-    mFrameProperties->frameContentPosition =
-        frameContentPosition + mTagProperties->getTagStartPosition();
-    mFrameProperties->frameStartPosition =
-        frameStartPosition + mTagProperties->getTagStartPosition();
-    mFrameProperties->frameLength = frameLength;
-
-    auto ret =
-        id3::ExtractString(*tagbuffer, frameContentPosition, frameLength);
-    mFrameProperties->frameContent = id3::stripLeft(ret);
-
-    return frameIDstatus;
-  }
 }; // namespace ape
 
-const auto getFramePayload(const std::string &filename,
-                           std::string_view frameID) {
-  const tagReader TagR{filename, frameID};
+class handle_t
+{
+  const tagReader TagR;
 
-  return TagR.getFramePayload();
-}
+public:
+  handle_t(const std::string &filename) : TagR(filename) {}
+
+  const auto getStatus() const { return TagR.getStatus(); }
+
+  const auto getFramePayload(meta_entry entry) const
+  {
+    switch (entry) {
+    case meta_entry::album:
+      return TagR.getFramePayload("ALBUM");
+      break;
+    case meta_entry::artist:
+      return TagR.getFramePayload("ARTIST");
+      break;
+    case meta_entry::comments:
+      return TagR.getFramePayload("COMMENT");
+      break;
+    case meta_entry::genre:
+      return TagR.getFramePayload("GENRE");
+      break;
+    case meta_entry::title:
+      return TagR.getFramePayload("TITLE");
+      break;
+    case meta_entry::year:
+      return TagR.getFramePayload("YEAR");
+      break;
+    case meta_entry::composer:
+      return TagR.getFramePayload("COMPOSER");
+      break;
+    default:
+      return TagR.getFramePayload("");
+      break;
+    };
+    return TagR.getFramePayload("");
+  };
+};
 
 const auto setFramePayload(const std::string &filename,
                            std::string_view frameID,
-                           std::string_view framePayload) {
-  const tagReader TagR{filename, frameID};
+                           std::string_view framePayload)
+{
+  const tagReader TagR{filename};
 
-  return TagR.writeFramePayload(framePayload, framePayload.size());
+  return TagR.writeFramePayload(framePayload, frameID);
 } // namespace ape
 
-const auto GetTitle(const std::string &filename) {
-  std::string_view frameID("TITLE");
+const auto getApePayload = getPayload<ape::handle_t>;
 
-  return getFramePayload(filename, frameID);
+const auto GetTitle(const std::string &filename)
+{
+  return getApePayload(filename)(meta_entry::title);
 }
 
-const auto GetLeadArtist(const std::string &filename) {
-  std::string_view frameID("ARTIST");
-
-  return getFramePayload(filename, frameID);
+const auto GetLeadArtist(const std::string &filename)
+{
+  return getApePayload(filename)(meta_entry::artist);
 }
 
-const auto GetAlbum(const std::string &filename) {
-  std::string_view frameID("ALBUM");
-
-  return getFramePayload(filename, frameID);
+const auto GetAlbum(const std::string &filename)
+{
+  return getApePayload(filename)(meta_entry::album);
 }
 
-const auto GetYear(const std::string &filename) {
-  return getFramePayload(filename, std::string_view("YEAR"));
+const auto GetYear(const std::string &filename)
+{
+  return getApePayload(filename)(meta_entry::year);
 }
 
-const auto GetComment(const std::string &filename) {
-  return getFramePayload(filename, std::string_view("COMMENT"));
+const auto GetComment(const std::string &filename)
+{
+  return getApePayload(filename)(meta_entry::comments);
 }
 
-const auto GetGenre(const std::string &filename) {
-  return getFramePayload(filename, std::string_view("GENRE"));
+const auto GetGenre(const std::string &filename)
+{
+  return getApePayload(filename)(meta_entry::genre);
 }
 
-const auto GetComposer(const std::string &filename) {
-  return getFramePayload(filename, std::string_view("COMPOSER"));
+const auto GetComposer(const std::string &filename)
+{
+  return getApePayload(filename)(meta_entry::composer);
 }
 
-auto SetTitle(const std::string &filename, std::string_view content) {
+auto SetTitle(const std::string &filename, std::string_view content)
+{
   return ape::setFramePayload(filename, std::string_view("TITLE"), content);
 }
 
-auto SetAlbum(const std::string &filename, std::string_view content) {
+auto SetAlbum(const std::string &filename, std::string_view content)
+{
   return ape::setFramePayload(filename, std::string_view("ALBUM"), content);
 }
 
-auto SetLeadArtist(const std::string &filename, std::string_view content) {
+auto SetLeadArtist(const std::string &filename, std::string_view content)
+{
   return ape::setFramePayload(filename, std::string_view("ARTIST"), content);
 }
 
-auto SetYear(const std::string &filename, std::string_view content) {
+auto SetYear(const std::string &filename, std::string_view content)
+{
   return ape::setFramePayload(filename, std::string_view("YEAR"), content);
 }
 
-auto SetComment(const std::string &filename, std::string_view content) {
+auto SetComment(const std::string &filename, std::string_view content)
+{
   return ape::setFramePayload(filename, std::string_view("COMMENT"), content);
 }
 
-auto SetGenre(const std::string &filename, std::string_view content) {
+auto SetGenre(const std::string &filename, std::string_view content)
+{
   return ape::setFramePayload(filename, std::string_view("GENRE"), content);
 }
 
-auto SetComposer(const std::string &filename, std::string_view content) {
+auto SetComposer(const std::string &filename, std::string_view content)
+{
   return ape::setFramePayload(filename, std::string_view("COMPOSER"), content);
 }
 }; // end namespace ape

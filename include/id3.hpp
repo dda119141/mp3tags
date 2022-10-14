@@ -7,6 +7,7 @@
 
 #include "id3_exceptions.hpp"
 #include "logger.hpp"
+#include "metaEntry.hpp"
 #include "tagfilesystem.hpp"
 #include <algorithm>
 #include <bitset>
@@ -22,10 +23,15 @@
 #include <variant>
 #include <vector>
 
-template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+template <class... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
 
-namespace id3 {
+namespace id3
+{
 
 #if defined(HAS_FS_EXPERIMENTAL)
 namespace filesystem = std::experimental::filesystem;
@@ -35,8 +41,62 @@ namespace filesystem = std::filesystem;
 namespace filesystem = std::filesystem;
 #endif
 
+namespace v30_v40
+{
+const auto get_frame(const meta_entry &entry)
+{
+  switch (entry) {
+  case meta_entry::album:
+    return std::string_view{"TALB"};
+    break;
+  case meta_entry::artist:
+    return std::string_view{"TPE1"};
+    break;
+  case meta_entry::composer:
+    return std::string_view{"TCOM"};
+    break;
+  case meta_entry::title:
+    return std::string_view{"TIT2"};
+    break;
+  case meta_entry::date:
+    return std::string_view{"TDAT"};
+    break;
+  case meta_entry::genre:
+    return std::string_view{"TCON"};
+    break;
+  case meta_entry::textwriter:
+    return std::string_view{"TEXT"};
+    break;
+  case meta_entry::audioencryption:
+    return std::string_view{"AENC"};
+    break;
+  case meta_entry::language:
+    return std::string_view{"TLAN"};
+    break;
+  case meta_entry::time:
+    return std::string_view{"TIME"};
+    break;
+  case meta_entry::year:
+    return std::string_view{"TYER"};
+    break;
+  case meta_entry::originalfilename:
+    return std::string_view{"TOFN"};
+    break;
+  case meta_entry::filetype:
+    return std::string_view{"TFLT"};
+    break;
+  case meta_entry::bandOrchestra:
+    return std::string_view{"TPE2"};
+    break;
+  default:
+    return std::string_view{};
+    break;
+  }
+}
+}; // namespace v30_v40
+
 static const std::string modifiedEnding(".mod");
-using buffer_t = std::unique_ptr<std::vector<uint8_t>>;
+using buffer_t = std::unique_ptr<std::vector<char>>;
 using shared_string_t = std::shared_ptr<std::string>;
 
 enum class severity_t { idle = 0, high, middle, low };
@@ -84,10 +144,10 @@ typedef struct frameContent_s {
   std::optional<std::string> payload;
 } frameContent_t;
 
-typedef struct _frameContent_v {
+typedef struct _Content_view {
   execution_status_t parseStatus;
   std::string_view payload;
-} frameContent_v;
+} ContentView_t;
 
 typedef struct frameBuffer_s {
   execution_status_t parseStatus;
@@ -96,7 +156,8 @@ typedef struct frameBuffer_s {
   uint32_t end;
 } frameBuffer_t;
 
-const auto get_message_from_status(const rstatus_t &status) {
+const auto get_message_from_status(const rstatus_t &status)
+{
   switch (status) {
   case rstatus_t::noError:
     return std::string{"No Error\n"};
@@ -140,15 +201,25 @@ const auto get_message_from_status(const rstatus_t &status) {
   return std::string("");
 }
 
-constexpr auto noStatusErrorFrom(execution_status_t statusIn) {
+constexpr auto noStatusErrorFrom(execution_status_t statusIn)
+{
   if (statusIn.rstatus == rstatus_t::noError) {
     return true;
   } else {
     return false;
   }
 }
+constexpr auto statusIsIdleFrom(execution_status_t statusIn)
+{
+  if (statusIn.rstatus == rstatus_t::idle) {
+    return true;
+  } else {
+    return false;
+  }
+}
 
-constexpr auto get_status_error(tag_type_t frameTypeIn, rstatus_t statusIn) {
+constexpr auto get_status_error(tag_type_t frameTypeIn, rstatus_t statusIn)
+{
   execution_status_t val = {};
   val.frame_type_val = frameTypeIn;
   val.rstatus = statusIn;
@@ -156,34 +227,39 @@ constexpr auto get_status_error(tag_type_t frameTypeIn, rstatus_t statusIn) {
 }
 
 constexpr auto get_execution_status(tag_type_t frameTypeIn,
-                                    execution_status_t statusIn) {
+                                    execution_status_t statusIn)
+{
   execution_status_t val = statusIn;
   val.frame_type_val = frameTypeIn;
   return val;
 }
 
-constexpr execution_status_t get_status_no_tag_exists(tag_type_t tagTypeIn) {
+constexpr execution_status_t get_status_no_tag_exists(tag_type_t tagTypeIn)
+{
   execution_status_t val = {};
   val.frame_type_val = tagTypeIn;
   val.rstatus = rstatus_t::noTagLengthError;
   return val;
 }
 
-constexpr execution_status_t get_status_no_frame_ID(tag_type_t tagTypeIn) {
+constexpr execution_status_t get_status_no_frame_ID(tag_type_t tagTypeIn)
+{
   execution_status_t val = {};
   val.frame_type_val = tagTypeIn;
   val.rstatus = rstatus_t::noFrameIDError;
   return val;
 }
 
-constexpr execution_status_t get_status_frame_ID_pos(unsigned int pos) {
+constexpr execution_status_t get_status_frame_ID_pos(unsigned int pos)
+{
   execution_status_t val = {};
   val.rstatus = rstatus_t::noError;
   val.frameIDPosition = pos;
   return val;
 }
 
-constexpr bool get_execution_status_b(execution_status_t valIn) {
+constexpr bool get_execution_status_b(execution_status_t valIn)
+{
   return (valIn.rstatus == rstatus_t::noError);
 }
 
@@ -212,7 +288,8 @@ typedef struct frameScopeProperties_t {
   uint32_t framePayloadLength = {};
   uint16_t encodeFlag = {};
 
-  uint32_t getFramePayloadLength() const {
+  uint32_t getFramePayloadLength() const
+  {
     if (framePayloadLength)
       return framePayloadLength;
     else if (frameLength)
@@ -221,7 +298,8 @@ typedef struct frameScopeProperties_t {
       return framePayloadLength;
   }
 
-  uint32_t getFrameLength() const {
+  uint32_t getFrameLength() const
+  {
     if (frameLength)
       return frameLength;
     else if (framePayloadLength)
@@ -230,14 +308,16 @@ typedef struct frameScopeProperties_t {
       return frameLength;
   }
 
-  void with_additional_payload_size(uint32_t additionalPayload) {
+  void with_additional_payload_size(uint32_t additionalPayload)
+  {
     frameLength += additionalPayload;
     framePayloadLength += additionalPayload;
   }
 
 } frameScopeProperties;
 
-inline std::string &stripLeft(std::string &valIn) {
+inline std::string &stripLeft(std::string &valIn)
+{
   valIn.erase(
       remove_if(valIn.begin(), valIn.end(), [](char c) { return !isprint(c); }),
       valIn.end());
@@ -245,11 +325,16 @@ inline std::string &stripLeft(std::string &valIn) {
   return valIn;
 }
 
-template <typename T> constexpr T RetrieveSize(T n) { return n; }
+template <typename T>
+constexpr T RetrieveSize(T n)
+{
+  return n;
+}
 
 template <typename T, typename F>
 auto mbind(std::optional<T> &&_obj, F &&function)
-    -> decltype(function(_obj.value())) {
+    -> decltype(function(_obj.value()))
+{
   auto fuc = std::forward<F>(function);
   auto obj = std::forward<std::optional<T>>(_obj);
 
@@ -273,7 +358,8 @@ template <
                      std::optional<id3::frameScopeProperties>>::value)>,
     typename F>
 auto operator|(T &&_obj, F &&Function)
-    -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value())) {
+    -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value()))
+{
   auto fuc = std::forward<F>(Function);
   auto obj = std::forward<T>(_obj);
 
@@ -286,7 +372,8 @@ auto operator|(T &&_obj, F &&Function)
 
 execution_status_t WriteFile(const std::string &FileName,
                              std::string_view content,
-                             const frameScopeProperties &frameScopeProperties) {
+                             const frameScopeProperties &frameScopeProperties)
+{
   std::fstream filWrite(FileName,
                         std::ios::binary | std::ios::in | std::ios::out);
 
@@ -313,7 +400,8 @@ execution_status_t WriteFile(const std::string &FileName,
 }
 
 std::optional<bool> renameFile(const std::string &fileToRename,
-                               const std::string &renamedFile) {
+                               const std::string &renamedFile)
+{
 
   namespace fs = ::id3::filesystem;
 
@@ -333,8 +421,9 @@ std::optional<bool> renameFile(const std::string &fileToRename,
 }
 
 template <typename T>
-uint32_t GetValFromBuffer(std::vector<uint8_t> buffer, T index,
-                          T num_of_bytes_in_hex) {
+uint32_t GetValFromBuffer(std::vector<char> buffer, T index,
+                          std::size_t num_of_bytes_in_hex)
+{
 
   constexpr bool is_integrale_asset =
       std::is_integral<T>::value || std::is_unsigned<T>::value;
@@ -361,8 +450,9 @@ uint32_t GetValFromBuffer(std::vector<uint8_t> buffer, T index,
   return version;
 }
 
-inline std::string ExtractString(const std::vector<uint8_t> &buffer,
-                                 uint32_t start, uint32_t length) {
+inline std::string ExtractString(const std::vector<char> &buffer,
+                                 uint32_t start, uint32_t length)
+{
   ID3_PRECONDITION((start + length) <= static_cast<uint32_t>(buffer.size()));
 
   if (static_cast<uint32_t>(buffer.size()) >= (start + length)) {
@@ -378,7 +468,8 @@ inline std::string ExtractString(const std::vector<uint8_t> &buffer,
 
 uint32_t GetTagSizeDefaultO(const std::vector<unsigned char> &buffer,
                             uint32_t length, uint32_t startPosition = 0,
-                            bool BigEndian = false) {
+                            bool BigEndian = false)
+{
 
   ID3_PRECONDITION((startPosition + length) <=
                    static_cast<uint32_t>(buffer.size()));
@@ -410,8 +501,9 @@ uint32_t GetTagSizeDefaultO(const std::vector<unsigned char> &buffer,
   return val;
 }
 
-uint32_t GetTagSizeDefault(const std::vector<uint8_t> &buffer, uint32_t length,
-                           uint32_t startPosition = 0, bool BigEndian = false) {
+uint32_t GetTagSizeDefault(const std::vector<char> &buffer, uint32_t length,
+                           uint32_t startPosition = 0, bool BigEndian = false)
+{
 
   ID3_PRECONDITION((startPosition + length) <=
                    static_cast<uint32_t>(buffer.size()));
@@ -443,9 +535,9 @@ uint32_t GetTagSizeDefault(const std::vector<uint8_t> &buffer, uint32_t length,
   return val;
 }
 
-inline bool replaceElementsInBuff(const std::vector<uint8_t> &buffIn,
-                                  std::vector<uint8_t> &buffOut,
-                                  uint32_t position) {
+inline bool replaceElementsInBuff(const std::vector<char> &buffIn,
+                                  std::vector<char> &buffOut, uint32_t position)
+{
   const auto iter = std::begin(buffIn);
 
   std::transform(iter, iter + buffIn.size(), buffOut.begin() + position,
@@ -460,9 +552,10 @@ An ID3 tag is a data container within an MP3 audio file stored
  in a prescribed format. This data commonly contains the Artist name,
  Song title, Year and Genre of the current audio file
 */
-uint32_t GetTagSize(const std::vector<uint8_t> &buffer,
+uint32_t GetTagSize(const std::vector<char> &buffer,
                     const std::vector<unsigned int> &power_values,
-                    uint32_t index) {
+                    uint32_t index)
+{
 
   using pair_integers = std::pair<uint32_t, uint32_t>;
   std::vector<pair_integers> result(power_values.size());
@@ -482,10 +575,10 @@ uint32_t GetTagSize(const std::vector<uint8_t> &buffer,
 }
 
 template <typename T>
-std::optional<std::vector<uint8_t>>
-updateAreaSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
-               T tagIndex, T numberOfElements, T _maxValue,
-               bool littleEndian = true) {
+std::optional<std::vector<char>>
+updateAreaSize(const std::vector<char> &buffer, uint32_t extraSize, T tagIndex,
+               T numberOfElements, T _maxValue, bool littleEndian = true)
+{
   const uint32_t TagIndex = tagIndex;
   const uint32_t NumberOfElements = numberOfElements;
   const uint32_t maxValue = _maxValue;
@@ -493,7 +586,7 @@ updateAreaSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
   auto ExtraSize = extraSize;
   auto extr = ExtraSize % maxValue;
 
-  std::vector<uint8_t> temp_vec = {};
+  std::vector<char> temp_vec = {};
   temp_vec.resize(NumberOfElements);
   std::copy(itIn, itIn + NumberOfElements, temp_vec.begin());
   auto it = temp_vec.begin();
@@ -527,7 +620,9 @@ updateAreaSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
   return temp_vec;
 }
 
-template <typename Type> class searchFrame {
+template <typename Type>
+class searchFrame
+{
 private:
   const Type &mTagArea;
 
@@ -537,7 +632,8 @@ public:
   searchFrame(searchFrame const &) = delete;
   searchFrame &operator=(searchFrame const &) = delete;
 
-  execution_status_t execute(const Type &tag) const {
+  execution_status_t execute(const Type &tag) const
+  {
     auto _execute = [this](const Type &TagArea, const Type &_tag) {
       uint32_t loc = 0;
 
@@ -559,6 +655,6 @@ public:
   }
 };
 
-}; // end namespace id3
+}; // namespace id3
 
 #endif // ID3_BASE

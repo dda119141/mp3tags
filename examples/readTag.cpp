@@ -2,7 +2,6 @@
 // Email: dda119141@gmail.com
 // Distributed under the MIT License (http://opensource.org/licenses/MIT)
 
-#include "id3_precheck.hpp"
 #include "tagreader.hpp"
 #include <iostream>
 #include <lyra/lyra.hpp>
@@ -13,15 +12,17 @@ struct tagOptions {
   bool title;
   bool artist;
   bool trackPosition;
-  bool example;
+  bool allEntries;
   bool year;
-  bool isEmpty() {
-    return !(album | genre | title | artist | trackPosition | year | example);
+  bool isEmpty()
+  {
+    return !(album | genre | title | artist | trackPosition | year |
+             allEntries);
   }
 } tagOption = {};
 
-bool readTagsInFile(const std::string &mediafile,
-                    const struct tagOptions &tags) {
+bool readTagsInFile(const std::string &mediafile, const struct tagOptions &tags)
+{
   namespace fs = id3::filesystem;
   using std::cout;
   using std::endl;
@@ -67,14 +68,15 @@ bool readTagsInFile(const std::string &mediafile,
     cout << "Get file release year: " << EndFilename << " : ";
     cout << GetYear(filename) << "\n";
   }
-  if (tags.example) {
-    preCheckId3(filename);
+  if (tags.allEntries) {
+    GetAllMetaEntries(filename);
   }
 
   return true;
 }
 
-bool readTags(const std::string &directory, const struct tagOptions &tags) {
+bool readTags(const std::string &directory, const struct tagOptions &tags)
+{
   namespace fs = id3::filesystem;
 
   using std::cout;
@@ -102,7 +104,8 @@ bool readTags(const std::string &directory, const struct tagOptions &tags) {
   return true;
 }
 
-int main(int argc, const char **argv) {
+int main(int argc, const char **argv)
+{
   // Where we read in the argument value:
   bool show_help = false;
   std::string directory;
@@ -125,7 +128,8 @@ int main(int argc, const char **argv) {
       lyra::opt(tagOption.year)["--year"]["-y"]("Get the album release year.") |
       lyra::opt(tagOption.trackPosition)["--trackposition"]["-p"](
           "Get the track position.") |
-      lyra::opt(tagOption.example)["--example"]["-e"]("Example logic");
+      lyra::opt(tagOption.allEntries)["--all-entries"]["-e"](
+          "All meta entries");
 
   // Parse the program arguments:
   auto result = parser.parse({argc, argv});

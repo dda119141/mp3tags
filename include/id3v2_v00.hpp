@@ -6,10 +6,58 @@
 #define _ID3V2_000
 
 #include "id3.hpp"
-namespace id3v2 {
+namespace id3v2
+{
 
-class v00 {
+class v00
+{
 public:
+  const auto get_frame(const meta_entry &entry)
+  {
+    switch (entry) {
+    case meta_entry::album:
+      return std::string_view{"TAL"};
+      break;
+    case meta_entry::artist:
+      return std::string_view{"TP1"};
+      break;
+    case meta_entry::composer:
+      return std::string_view{"TCM"};
+      break;
+    case meta_entry::date:
+      return std::string_view{"TDA"};
+      break;
+    case meta_entry::genre:
+      return std::string_view{"TCO"};
+      break;
+    case meta_entry::textwriter:
+      return std::string_view{"TXT"};
+      break;
+    case meta_entry::audioencryption:
+      return std::string_view{"CRA"};
+      break;
+    case meta_entry::language:
+      return std::string_view{"TLA"};
+      break;
+    case meta_entry::time:
+      return std::string_view{"TIM"};
+      break;
+    case meta_entry::title:
+      return std::string_view{"TIT"};
+      break;
+    case meta_entry::filetype:
+      return std::string_view{"TFT"};
+      break;
+    case meta_entry::bandOrchestra:
+      return std::string_view{"TP2"};
+      break;
+    default:
+      return std::string_view{};
+      break;
+    }
+    return std::string_view{};
+  }
+
 #if 0
         std::vector<std::string> tag_names{
             "BUF" // Recommended buffer size
@@ -81,8 +129,9 @@ public:
 
   constexpr unsigned int FrameHeaderSize(void) { return 6; }
 
-  std::optional<uint32_t> GetFrameSize(const std::vector<uint8_t> &buffer,
-                                       uint32_t index) {
+  std::optional<uint32_t> GetFrameSize(const std::vector<char> &buffer,
+                                       uint32_t index)
+  {
     const auto start = FrameIDSize() + index;
 
     if (buffer.size() >= start) {
@@ -92,7 +141,6 @@ public:
       val += buffer.at(start + 2) * std::pow(2, 0);
 
       return val;
-
     } else {
       ID3_LOG_ERROR("failed..: {} ..", start);
     }
@@ -100,8 +148,9 @@ public:
     return std::nullopt;
   }
 
-  auto UpdateFrameSize(const std::vector<uint8_t> &buffer, uint32_t extraSize,
-                       uint32_t tagLocation) {
+  auto UpdateFrameSize(const std::vector<char> &buffer, uint32_t extraSize,
+                       uint32_t tagLocation)
+  {
 
     const uint32_t frameSizePositionInArea = 3 + tagLocation;
     constexpr uint32_t frameSizeLengthInArea = 3;

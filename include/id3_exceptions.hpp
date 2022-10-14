@@ -29,20 +29,26 @@
 #define ID3_THROW(exception, msg) throw exception(msg)
 #endif
 
-namespace id3 {
+namespace id3
+{
 
-class audio_tag_error : public std::runtime_error {
+class audio_tag_error : public std::runtime_error
+{
 public:
   explicit audio_tag_error(const std::string &msg)
-      : std::runtime_error(msg.c_str()) {}
+      : std::runtime_error(msg.c_str())
+  {
+  }
 };
 
-class id3_error : public audio_tag_error {
+class id3_error : public audio_tag_error
+{
 public:
   explicit id3_error(const std::string &msg) : audio_tag_error(msg.c_str()) {}
 };
 
-class ape_error : public audio_tag_error {
+class ape_error : public audio_tag_error
+{
 public:
   explicit ape_error(const std::string &msg) : audio_tag_error(msg.c_str()) {}
 };

@@ -61,7 +61,8 @@
 #define false 0
 #define true 1
 
-namespace Unicode {
+namespace Unicode
+{
 
 typedef unsigned long UTF32; /* at least 32 bits */
 typedef wchar_t UTF16; /* We assume that wchar_t is sufficient for UTF-16. */
@@ -96,7 +97,8 @@ ConversionResult ConvertUTF16toUTF8(const UTF16 **sourceStart,
                                     const UTF16 *sourceEnd,
                                     unsigned char **targetStart,
                                     unsigned char *targetEnd,
-                                    ConversionFlags flags) {
+                                    ConversionFlags flags)
+{
   ConversionResult result = conversionOK;
   const UTF16 *source = *sourceStart;
   unsigned char *target = *targetStart;
@@ -195,7 +197,8 @@ ConversionResult ConvertUTF16toUTF8(const UTF16 **sourceStart,
  * definition of UTF-8 goes up to 4-byte sequences.
  */
 
-static Boolean isLegalUTF8(const unsigned char *source, int length) {
+static Boolean isLegalUTF8(const unsigned char *source, int length)
+{
   unsigned char a;
   const unsigned char *srcptr = source + length;
   switch (length) {
@@ -249,7 +252,8 @@ static Boolean isLegalUTF8(const unsigned char *source, int length) {
  * This is not used here; it's just exported.
  */
 Boolean isLegalUTF8Sequence(const unsigned char *source,
-                            const unsigned char *sourceEnd) {
+                            const unsigned char *sourceEnd)
+{
   /*
    * Index into the table below with the first byte of a UTF-8 sequence to
    * get the number of trailing bytes that are supposed to follow it.
@@ -279,7 +283,8 @@ Boolean isLegalUTF8Sequence(const unsigned char *source,
 ConversionResult ConvertUTF8toUTF16(const unsigned char **sourceStart,
                                     const unsigned char *sourceEnd,
                                     UTF16 **targetStart, UTF16 *targetEnd,
-                                    ConversionFlags flags) {
+                                    ConversionFlags flags)
+{
 
   ConversionResult result = conversionOK;
   const unsigned char *source = *sourceStart;
