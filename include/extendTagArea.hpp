@@ -10,7 +10,7 @@
 
 namespace id3v2
 {
-bool ReWriteFile(const fileScopeProperties &fileProperties,
+bool reWriteFile(const fileScopeProperties &fileProperties,
                  const std::vector<char> &tagBuffer, uint32_t extraSize)
 {
   std::ifstream filRead(fileProperties.get_filename(),
@@ -48,7 +48,7 @@ bool ReWriteFile(const fileScopeProperties &fileProperties,
   return true;
 }
 
-void ExtendTagBuffer(const fileScopeProperties &fileProperties,
+void extendTagBuffer(const fileScopeProperties &fileProperties,
                      const frameScopeProperties &frameProperties,
                      std::vector<char> &tagBuffer, uint32_t additionalSize)
 {
@@ -95,13 +95,13 @@ public:
       ID3V2_THROW("error : tagBuffer length < TagHeaderSize");
     }
 
-    ExtendTagBuffer(fileProperties, frameProperties, mTagBuffer,
+    extendTagBuffer(fileProperties, frameProperties, mTagBuffer,
                     additionalSize);
 
     fillTagBufferWithPayload<std::string_view>(content, mTagBuffer,
                                                frameProperties);
 
-    if (ReWriteFile(fileProperties, mTagBuffer, additionalSize)) {
+    if (reWriteFile(fileProperties, mTagBuffer, additionalSize)) {
       id3::renameFile(fileProperties.get_filename() + modifiedEnding,
                       fileProperties.get_filename());
     }
@@ -110,7 +110,7 @@ public:
   auto get_status() const { return status; }
 
 private:
-  std::vector<char> mTagBuffer;
+  std::vector<char> &mTagBuffer;
   execution_status_t status{};
 };
 } // namespace id3v2

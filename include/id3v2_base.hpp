@@ -300,7 +300,7 @@ std::optional<std::string> GetHexFromBuffer(const std::vector<char> &buffer,
   stream_obj << "0x" << std::setfill('0') << std::setw(num_of_bytes_in_hex * 2);
 
   const uint32_t version =
-      id3::GetValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
+      id3::getValFromBuffer<T>(buffer, index, num_of_bytes_in_hex);
   if (version != 0) {
     stream_obj << std::hex << version;
     return stream_obj.str();
@@ -355,7 +355,7 @@ buffer_t &GetTagHeader(const std::string &FileName, buffer_t &buffer)
 
 std::string GetStringFromBuffer(const std::vector<char> &buffer)
 {
-  return ExtractString(buffer, 0, buffer.size());
+  return extractString(buffer, 0, buffer.size());
 }
 
 const auto

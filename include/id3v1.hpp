@@ -122,7 +122,7 @@ const auto SetFramePayload(const std::string &filename,
   frameScopeProperties.frameLength =
       relativeFramePayloadEnd - relativeFramePayloadStart;
 
-  const auto ret = WriteFile(filename, content, frameScopeProperties);
+  const auto ret = writeFile(filename, content, frameScopeProperties);
 
   return ret;
 }

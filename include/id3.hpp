@@ -283,10 +283,10 @@ typedef struct frameScopeProperties_t {
   uint32_t frameIDStartPosition = {};
   tag_type_t tagType;
   uint8_t doSwap = {};
+  uint8_t encodeFlag = {};
   uint32_t frameContentStartPosition = {};
   uint32_t frameLength = {};
   uint32_t framePayloadLength = {};
-  uint16_t encodeFlag = {};
 
   uint32_t getFramePayloadLength() const
   {
@@ -345,18 +345,26 @@ auto mbind(std::optional<T> &&_obj, F &&function)
   }
 }
 
-template <
-    typename T,
-    typename = std::enable_if_t<(
-        std::is_same<std::decay_t<T>, std::optional<std::string>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<shared_string_t>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<uint32_t>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<std::string_view>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<buffer_t>>::value ||
-        std::is_same<std::decay_t<T>, std::optional<bool>>::value ||
-        std::is_same<std::decay_t<T>,
-                     std::optional<id3::frameScopeProperties>>::value)>,
-    typename F>
+template <typename T>
+struct is_composible_t {
+  static constexpr bool value{
+      std::is_same<T, uint32_t>::value || std::is_same<T, bool>::value ||
+      std::is_same<T, shared_string_t>::value ||
+      std::is_same<T, std::string_view>::value ||
+      std::is_same<T, buffer_t>::value ||
+      std::is_same<std::decay_t<T>, std::string>::value ||
+      std::is_same<std::decay_t<T>, id3::frameScopeProperties>::value};
+};
+
+template <typename T, typename = void>
+constexpr bool is_optional_t{};
+
+template <typename T>
+constexpr bool is_optional_t<std::optional<T>,
+                             std::void_t<decltype(is_composible_t<T>::value)>> =
+    true;
+
+template <typename T, typename = std::enable_if_t<is_optional_t<T>>, typename F>
 auto operator|(T &&_obj, F &&Function)
     -> decltype(std::forward<F>(Function)(std::forward<T>(_obj).value()))
 {
@@ -370,7 +378,7 @@ auto operator|(T &&_obj, F &&Function)
   }
 }
 
-execution_status_t WriteFile(const std::string &FileName,
+execution_status_t writeFile(const std::string &FileName,
                              std::string_view content,
                              const frameScopeProperties &frameScopeProperties)
 {
@@ -402,7 +410,6 @@ execution_status_t WriteFile(const std::string &FileName,
 std::optional<bool> renameFile(const std::string &fileToRename,
                                const std::string &renamedFile)
 {
-
   namespace fs = ::id3::filesystem;
 
   const fs::path FileToRenamePath = fs::path(fs::absolute(fileToRename));
@@ -421,11 +428,10 @@ std::optional<bool> renameFile(const std::string &fileToRename,
 }
 
 template <typename T>
-uint32_t GetValFromBuffer(std::vector<char> buffer, T index,
+uint32_t getValFromBuffer(std::vector<char> buffer, T index,
                           std::size_t num_of_bytes_in_hex)
 {
-
-  constexpr bool is_integrale_asset =
+  static constexpr bool is_integrale_asset =
       std::is_integral<T>::value || std::is_unsigned<T>::value;
   static_assert(is_integrale_asset, "Parameter should be integer");
 
@@ -450,7 +456,7 @@ uint32_t GetValFromBuffer(std::vector<char> buffer, T index,
   return version;
 }
 
-inline std::string ExtractString(const std::vector<char> &buffer,
+inline std::string extractString(const std::vector<char> &buffer,
                                  uint32_t start, uint32_t length)
 {
   ID3_PRECONDITION((start + length) <= static_cast<uint32_t>(buffer.size()));
@@ -466,45 +472,9 @@ inline std::string ExtractString(const std::vector<char> &buffer,
   }
 }
 
-uint32_t GetTagSizeDefaultO(const std::vector<unsigned char> &buffer,
-                            uint32_t length, uint32_t startPosition = 0,
-                            bool BigEndian = false)
-{
-
-  ID3_PRECONDITION((startPosition + length) <=
-                   static_cast<uint32_t>(buffer.size()));
-
-  using pair_integers = std::pair<uint32_t, uint32_t>;
-  std::vector<uint32_t> power_values(length);
-  uint32_t n = 0;
-
-  std::generate(power_values.begin(), power_values.end(), [&n] {
-    n += 8;
-    return n - 8;
-  });
-  if (BigEndian) {
-    std::reverse(power_values.begin(),
-                 power_values.begin() + power_values.size());
-  }
-
-  std::vector<pair_integers> result(power_values.size());
-
-  const auto it = std::begin(buffer) + startPosition;
-  std::transform(it, it + length, power_values.begin(), result.begin(),
-                 [](uint32_t a, uint32_t b) { return std::make_pair(a, b); });
-
-  const uint32_t val = std::accumulate(
-      result.begin(), result.end(), 0, [](int a, pair_integers b) {
-        return (a + (b.first * std::pow(2, b.second)));
-      });
-
-  return val;
-}
-
 uint32_t GetTagSizeDefault(const std::vector<char> &buffer, uint32_t length,
                            uint32_t startPosition = 0, bool BigEndian = false)
 {
-
   ID3_PRECONDITION((startPosition + length) <=
                    static_cast<uint32_t>(buffer.size()));
 
@@ -556,7 +526,6 @@ uint32_t GetTagSize(const std::vector<char> &buffer,
                     const std::vector<unsigned int> &power_values,
                     uint32_t index)
 {
-
   using pair_integers = std::pair<uint32_t, uint32_t>;
   std::vector<pair_integers> result(power_values.size());
 

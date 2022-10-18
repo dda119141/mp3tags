@@ -187,7 +187,7 @@ public:
 
     const auto &frameProperties = framePropertiesOpt.value();
     auto framePayload =
-        ExtractString(*mTagBuffer, frameProperties.frameContentStartPosition,
+        extractString(*mTagBuffer, frameProperties.frameContentStartPosition,
                       frameProperties.getFramePayloadLength());
 
     id3::stripLeft(framePayload);
@@ -216,9 +216,6 @@ private:
       return get_status_no_tag_exists(tag_type_t::id3v2);
     }
     std::string_view tagArea{mTagBuffer->data(), mTagBuffer->size()};
-
-    //    frameScopeProperties &frameProperties =
-    //        mAudioProperties.frameScopePropertiesObj.value();
 
     const auto id3Status = GetFramePosition(FrameID, tagArea);
     if (id3Status.rstatus != rstatus_t::noError) {
@@ -342,7 +339,7 @@ public:
                                              extraLength, framePayloadToWrite};
       mStatus = fileExtended.get_status();
     } else {
-      mStatus = id3::WriteFile(params.get_filename(), framePayloadToWrite,
+      mStatus = id3::writeFile(params.get_filename(), framePayloadToWrite,
                                frameProperties);
     }
   }

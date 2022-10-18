@@ -54,10 +54,10 @@ private:
 
   uint32_t getTagSize(std::ifstream &fRead, uint32_t bufferLength)
   {
-    std::vector<unsigned char> tagbufferLength(bufferLength);
-    fRead.read(reinterpret_cast<char *>(tagbufferLength.data()), bufferLength);
+    std::vector<char> tagbufferLength(bufferLength);
+    fRead.read(tagbufferLength.data(), bufferLength);
 
-    return id3::GetTagSizeDefaultO(tagbufferLength, bufferLength);
+    return id3::GetTagSizeDefault(tagbufferLength, bufferLength);
   }
 
   bool checkAPEtag(std::ifstream &fRead, uint32_t bufferLength,
@@ -192,7 +192,7 @@ public:
 
     if (frameProperties.frameLength >= framePayload.size()) {
 
-      return WriteFile(mFilename, framePayload, frameScopeProperties);
+      return writeFile(mFilename, framePayload, frameScopeProperties);
     } else {
       const uint32_t additionalSize =
           framePayload.size() - frameProperties.frameLength;
@@ -204,7 +204,7 @@ public:
         return id3::get_status_error(id3::tag_type_t::ape,
                                      id3::rstatus_t::noExtendedTagError);
 
-      const auto writeBackAction = this->ReWriteFile(bufferExtended.value());
+      const auto writeBackAction = this->reWriteFile(bufferExtended.value());
       auto ret = writeBackAction | [&](bool fileWritten) {
         (void)fileWritten;
         return id3::renameFile(mFilename + ape::modifiedEnding, mFilename);
@@ -219,7 +219,7 @@ public:
   }
 
   /* function not thread safe */
-  expected::Result<bool> ReWriteFile(const id3::buffer_t &buff) const
+  expected::Result<bool> reWriteFile(const id3::buffer_t &buff) const
   {
     const uint32_t endOfFooter =
         mTagProperties->getTagFooterBegin() + GetTagFooterSize;
@@ -310,7 +310,7 @@ private:
     frameProperties.frameLength = frameLength;
 
     auto ret =
-        id3::ExtractString(*tagbuffer, frameContentPosition, frameLength);
+        id3::extractString(*tagbuffer, frameContentPosition, frameLength);
     frameProperties.frameContent = id3::stripLeft(ret);
 
     return frameIDstatus;
