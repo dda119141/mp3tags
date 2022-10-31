@@ -57,9 +57,10 @@ const auto GetAudioFrames(const std::string &filename)
 const auto GetAudioFrame(const std::string &filename)
 {
   return [&filename](const meta_entry &entry) {
-    const auto retApe = ape::getApePayload(filename)(entry);
-    if (retApe.parseStatus.rstatus == rstatus_t::noError) {
-      return retApe;
+    const id3v2::ConstructTag Id3v2Tag{filename};
+    const auto retId3v2 = Id3v2Tag.getFrame(entry);
+    if (retId3v2.parseStatus.rstatus == rstatus_t::noError) {
+      return retId3v2;
     }
 
     const auto retId3v1 = id3v1::getId3v1Payload(filename)(entry);
@@ -67,10 +68,9 @@ const auto GetAudioFrame(const std::string &filename)
       return retId3v1;
     }
 
-    const id3v2::ConstructTag Id3v2Tag{filename};
-    const auto retId3v2 = Id3v2Tag.getFrame(entry);
-    if (retId3v2.parseStatus.rstatus == rstatus_t::noError) {
-      return retId3v2;
+    const auto retApe = ape::getApePayload(filename)(entry);
+    if (retApe.parseStatus.rstatus == rstatus_t::noError) {
+      return retApe;
     }
 
     std::cout << "\n"

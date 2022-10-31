@@ -169,16 +169,16 @@ public:
     }
   }
 
-  auto writeFramePayload(std::string_view framePayload,
-                         std::string_view frameID) const
+  const auto writeFramePayload(std::string_view framePayload,
+                               std::string_view frameID) const
   {
-    if (!noStatusErrorFrom(this->m_status)) {
+    if (statusErrorFrom(this->m_status)) {
       return get_status_error(tag_type_t::ape, m_status.rstatus);
     }
 
     frameProperties_t frameProperties;
     if (const auto status = this->getFrameProperties(frameID, frameProperties);
-        !noStatusErrorFrom(status)) {
+        statusErrorFrom(status)) {
       return get_status_error(tag_type_t::ape, status.rstatus);
     }
 
@@ -406,7 +406,39 @@ public:
       break;
     };
     return TagR.getFramePayload("");
-  };
+  }
+
+  const auto writeFramePayload(const meta_entry &entry,
+                               std::string_view content)
+  {
+    switch (entry) {
+    case meta_entry::album:
+      return TagR.writeFramePayload(content, "ALBUM");
+      break;
+    case meta_entry::artist:
+      return TagR.writeFramePayload(content, "ARTIST");
+      break;
+    case meta_entry::comments:
+      return TagR.writeFramePayload(content, "COMMENT");
+      break;
+    case meta_entry::genre:
+      return TagR.writeFramePayload(content, "GENRE");
+      break;
+    case meta_entry::title:
+      return TagR.writeFramePayload(content, "TITLE");
+      break;
+    case meta_entry::year:
+      return TagR.writeFramePayload(content, "YEAR");
+      break;
+    case meta_entry::composer:
+      return TagR.writeFramePayload(content, "COMPOSER");
+      break;
+    default:
+      return TagR.writeFramePayload(content, "");
+      break;
+    };
+    return TagR.writeFramePayload(content, "");
+  }
 };
 
 const auto setFramePayload(const std::string &filename,
@@ -455,40 +487,6 @@ const auto GetComposer(const std::string &filename)
   return getApePayload(filename)(meta_entry::composer);
 }
 
-auto SetTitle(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("TITLE"), content);
-}
-
-auto SetAlbum(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("ALBUM"), content);
-}
-
-auto SetLeadArtist(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("ARTIST"), content);
-}
-
-auto SetYear(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("YEAR"), content);
-}
-
-auto SetComment(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("COMMENT"), content);
-}
-
-auto SetGenre(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("GENRE"), content);
-}
-
-auto SetComposer(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("COMPOSER"), content);
-}
 }; // end namespace ape
 
 #endif // APE_BASE

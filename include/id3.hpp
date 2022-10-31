@@ -209,6 +209,11 @@ constexpr auto noStatusErrorFrom(execution_status_t statusIn)
     return false;
   }
 }
+constexpr auto statusErrorFrom(execution_status_t statusIn)
+{
+  return !noStatusErrorFrom(statusIn);
+}
+
 constexpr auto statusIsIdleFrom(execution_status_t statusIn)
 {
   if (statusIn.rstatus == rstatus_t::idle) {
