@@ -90,7 +90,6 @@ bool changeTagsInDirectory(const std::string &directory,
 
 int main(int argc, const char **argv)
 {
-
   // Where we read in the argument value:
   bool show_help = false;
   std::string directory;

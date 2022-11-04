@@ -12,7 +12,40 @@
 
 class AudioTag
 {
+  execution_status_t writeSingleFrame(const meta_entry &entry,
+                                      std::string_view content)
+  {
+    execution_status_t result;
+
+    if (v2Tag.has_value()) {
+      auto retVal = v2Tag.value().writeFrame(entry, content);
+      if (statusErrorFrom(retVal)) {
+        std::cout << get_message_from_status(retVal.rstatus);
+        result = retVal;
+      }
+    }
+    if (v1Tag.has_value()) {
+      const auto retVal = v1Tag.value().writeFramePayload(entry, content);
+      if (statusErrorFrom(retVal)) {
+        std::cout << get_message_from_status(retVal.rstatus);
+        result = retVal;
+      }
+    }
+    if (apeTag.has_value()) {
+      const auto retVal = apeTag.value().writeFramePayload(entry, content);
+      if (statusErrorFrom(retVal)) {
+        std::cout << get_message_from_status(retVal.rstatus);
+        result = retVal;
+      }
+    }
+
+    return result;
+  }
+
 public:
+  AudioTag(const AudioTag &obj) = default;
+  AudioTag &operator=(const AudioTag &obj) = default;
+
   explicit AudioTag(const std::string &filename)
   {
     int doCheck = 0;
@@ -25,7 +58,7 @@ public:
           v2Tag.reset();
           doCheck = 1;
         } else {
-          doCheck = 3;
+          doCheck = 128;
         }
       }
       case 1: {
@@ -35,7 +68,7 @@ public:
           v1Tag.reset();
           doCheck = 2;
         } else {
-          doCheck = 3;
+          doCheck = 128;
         }
         break;
       }
@@ -46,7 +79,7 @@ public:
           apeTag.reset();
           doCheck = 3;
         } else {
-          doCheck = 3;
+          doCheck = 128;
         }
         break;
       }
@@ -58,38 +91,54 @@ public:
 
   bool writeFrame(const meta_entry &entry, std::string_view content)
   {
-    std::atomic_bool ret;
+    return noStatusErrorFrom(writeSingleFrame(entry, content));
+  }
 
-    if (v2Tag.has_value()) {
-      auto retVal = v2Tag.value().writeFrame(entry, content);
-      if (statusErrorFrom(retVal)) {
-        std::cout << get_message_from_status(retVal.rstatus);
-        ret = false;
-      }
-    }
-    if (v1Tag.has_value()) {
-      const auto retVal = v1Tag.value().writeFramePayload(entry, content);
-      if (statusErrorFrom(retVal)) {
-        std::cout << get_message_from_status(retVal.rstatus);
-        ret = false;
-      }
-    }
-    if (apeTag.has_value()) {
-      const auto retVal = apeTag.value().writeFramePayload(entry, content);
-      if (statusErrorFrom(retVal)) {
-        std::cout << get_message_from_status(retVal.rstatus);
-        ret = false;
-      }
+  AudioTag &writeEntry(const meta_entry &entry, std::string_view content) &&
+  {
+    results.push_back(std::make_pair(entry, writeSingleFrame(entry, content)));
+
+    return *this;
+  }
+
+  AudioTag &writeEntry(const meta_entry &entry, std::string_view content) &
+  {
+    results.push_back(std::make_pair(entry, writeSingleFrame(entry, content)));
+
+    return *this;
+  }
+
+  bool getLastResult() const
+  {
+    const auto res = (*results.end()).second;
+    return noStatusErrorFrom(res);
+  }
+
+  void printResults() const
+  {
+    for (auto elt : results) {
+      std::cout << get_frame_name(elt.first) << ": "
+                << get_message_from_status(elt.second.rstatus);
     }
 
-    return ret;
+    return;
   }
 
 private:
+  friend class AudioTagBuilder;
   std::optional<id3v2::ConstructTag> v2Tag{};
   std::optional<id3v1::handle_t> v1Tag{};
   std::optional<ape::handle_t> apeTag{};
+  std::vector<std::pair<meta_entry, execution_status_t>> results;
 };
+
+void SetMany(const std::string &filename)
+{
+  return AudioTag{filename}
+      .writeEntry(meta_entry::album, "Rap")
+      .writeEntry(meta_entry::artist, "PetiPays")
+      .printResults();
+}
 
 bool SetAlbum(const std::string &filename, std::string_view content)
 {
@@ -99,8 +148,7 @@ bool SetAlbum(const std::string &filename, std::string_view content)
 
 bool SetLeadArtist(const std::string &filename, std::string_view content)
 {
-  AudioTag tag{filename};
-  return tag.writeFrame(meta_entry::artist, content);
+  return AudioTag{filename}.writeFrame(meta_entry::artist, content);
 }
 
 bool SetGenre(const std::string &filename, std::string_view content)

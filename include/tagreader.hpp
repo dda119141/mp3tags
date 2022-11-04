@@ -13,7 +13,7 @@
 const auto GetAudioFrames(const std::string &filename)
 {
   int doCheck = 0;
-
+  std::cout << "*  File: " << filename << std::endl;
   do {
     switch (doCheck) {
     case 0: {
