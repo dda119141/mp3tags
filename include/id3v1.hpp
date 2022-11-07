@@ -158,6 +158,10 @@ public:
   }
 
   const auto getStatus() const { return TagContentView.parseStatus; }
+  const auto isOk() const
+  {
+    return noStatusErrorFrom(TagContentView.parseStatus);
+  }
 
   const auto getFramePayload(meta_entry entry) const
   {

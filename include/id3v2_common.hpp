@@ -267,6 +267,8 @@ public:
       return mTagReaderIn.m_status;
 
     frameScopeProperties frameProperties;
+    frameProperties.tagType = tag_type_t::id3v2;
+
     auto frameID = mTagReaderIn.getFrameID(entry);
 
     const auto status =
@@ -354,6 +356,8 @@ public:
   }
 
   const auto getStatus() const { return TagObj->getStatus(); }
+
+  const auto isOk() const { return noStatusErrorFrom(TagObj->getStatus()); }
 
   const auto writeFrame(const meta_entry &entry, std::string_view content)
   {

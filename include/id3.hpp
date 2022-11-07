@@ -149,6 +149,11 @@ typedef struct _Content_view {
   std::string_view payload;
 } ContentView_t;
 
+typedef struct _audio_content_view {
+  meta_entry metaEntry;
+  frameContent_t frameStatus;
+} audio_contentView_t;
+
 typedef struct frameBuffer_s {
   execution_status_t parseStatus;
   buffer_t tagBuffer;
@@ -156,9 +161,29 @@ typedef struct frameBuffer_s {
   uint32_t end;
 } frameBuffer_t;
 
+const auto get_message_from_tag_type(const tag_type_t &status)
+{
+  switch (status) {
+  case tag_type_t::ape:
+    return std::string_view{"Ape: "};
+    break;
+  case tag_type_t::id3v1:
+    return std::string_view{"Id3v1: "};
+    break;
+  case tag_type_t::id3v2:
+    return std::string_view{"Id3v2: "};
+    break;
+  default:
+    return std::string_view{};
+  }
+}
+
 const auto get_message_from_status(const rstatus_t &status)
 {
   switch (status) {
+  case rstatus_t::idle:
+    return std::string{"Idle\n"};
+    break;
   case rstatus_t::noError:
     return std::string{"No Error\n"};
     break;
@@ -193,6 +218,12 @@ const auto get_message_from_status(const rstatus_t &status)
     break;
   case rstatus_t::ErrorNoPrintableContent:
     return std::string{"Frame content not an a printable character\n"};
+    break;
+  case rstatus_t::no_framePayloadLength:
+    return std::string{"No frame payload length\n"};
+    break;
+  case rstatus_t::tagSizeBiggerThanTagHeaderLength:
+    return std::string{"tag Size bigger than tag header length\n"};
     break;
   default:
     return std::string{"General Error\n"};
@@ -409,7 +440,7 @@ execution_status_t writeFile(const std::string &FileName,
     filWrite << '\0';
   }
 
-  return execution_status_t{};
+  return get_status_error(frameScopeProperties.tagType, rstatus_t::noError);
 }
 
 std::optional<bool> renameFile(const std::string &fileToRename,

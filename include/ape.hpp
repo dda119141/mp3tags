@@ -139,7 +139,6 @@ class tagReader
 public:
   explicit tagReader(const std::string &FileName) : mFilename{FileName}
   {
-
     bool bContinue = true;
 
     mTagProperties.emplace(mFilename, true);
@@ -189,6 +188,7 @@ public:
     frameScopeProperties.frameContentStartPosition =
         frameProperties.frameContentPosition;
     frameScopeProperties.frameLength = frameProperties.frameLength;
+    frameScopeProperties.tagType = tag_type_t::ape;
 
     if (frameProperties.frameLength >= framePayload.size()) {
 
@@ -376,6 +376,7 @@ public:
   handle_t(const std::string &filename) : TagR(filename) {}
 
   const auto getStatus() const { return TagR.getStatus(); }
+  const auto isOk() const { return noStatusErrorFrom(TagR.getStatus()); }
 
   const auto getFramePayload(meta_entry entry) const
   {
