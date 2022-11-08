@@ -67,6 +67,8 @@ public:
     mStatus = init(fileName);
   }
 
+  const auto GetFilename() const { return mFileName; }
+
   uint32_t GetTagPayloadPosition() const { return mTagPayloadPosition; }
 
   auto GetTagView() const { return ContentView_t{mStatus, tagStringBuffer}; }
@@ -85,7 +87,6 @@ public:
       : mTagView(tagView), mFrameStartPos(frameStartPosIn),
         mFrameEndPos(frameEndPosIn)
   {
-
     if (mFrameStartPos >= mFrameEndPos)
       throw id3::id3_error("id3v1: start pos > end pos");
 
@@ -98,69 +99,39 @@ public:
   std::string frameContent{};
 };
 
-const auto SetFramePayload(const std::string &filename,
-                           std::string_view content,
-                           uint32_t relativeFramePayloadStart,
-                           uint32_t relativeFramePayloadEnd)
-{
-  if (relativeFramePayloadEnd < relativeFramePayloadStart)
-    return get_status_error(tag_type_t::id3v1,
-                            rstatus_t::PayloadStartAfterPayloadEnd);
-
-  if (content.size() > (relativeFramePayloadEnd - relativeFramePayloadStart)) {
-    return get_status_error(tag_type_t::id3v1,
-                            rstatus_t::ContentLengthBiggerThanFrameArea);
-  }
-  const tagReadWriter tagRW{filename};
-
-  frameScopeProperties frameScopeProperties = {};
-  frameScopeProperties.tagType = tag_type_t::id3v1;
-  frameScopeProperties.frameIDStartPosition =
-      tagRW.GetTagPayloadPosition() + relativeFramePayloadStart;
-  frameScopeProperties.frameContentStartPosition =
-      tagRW.GetTagPayloadPosition() + relativeFramePayloadStart;
-  frameScopeProperties.frameLength =
-      relativeFramePayloadEnd - relativeFramePayloadStart;
-
-  const auto ret = WriteFile(filename, content, frameScopeProperties);
-
-  return ret;
-}
-
-const auto SetTitle(const std::string &filename, std::string_view content)
-{
-  return id3v1::SetFramePayload(filename, content, 0, 30);
-}
-
-const auto SetLeadArtist(const std::string &filename, std::string_view content)
-{
-  return id3v1::SetFramePayload(filename, content, 30, 60);
-}
-
-const auto SetAlbum(const std::string &filename, std::string_view content)
-{
-  return id3v1::SetFramePayload(filename, content, 60, 90);
-}
-
-const auto SetYear(const std::string &filename, std::string_view content)
-{
-  return id3v1::SetFramePayload(filename, content, 90, 94);
-}
-
-const auto SetComment(const std::string &filename, std::string_view content)
-{
-  return id3v1::SetFramePayload(filename, content, 94, 124);
-}
-
-const auto SetGenre(const std::string &filename, std::string_view content)
-{
-  return id3v1::SetFramePayload(filename, content, 124, 125);
-}
-
 class handle_t
 {
   const tagReadWriter tagRW;
   const ContentView_t TagContentView;
+
+  const auto writeFramePayload(std::string_view content, uint32_t start,
+                               uint32_t end) const
+  {
+    if (end - start <= 0)
+      static_assert(true, "Parameter should be integer");
+
+    if (content.size() > (end - start)) {
+      return get_status_error(tag_type_t::id3v1,
+                              rstatus_t::ContentLengthBiggerThanFrameArea);
+    }
+
+    if (noStatusErrorFrom(TagContentView.parseStatus)) {
+      frameScopeProperties frameScopeProperties = {};
+      frameScopeProperties.tagType = tag_type_t::id3v1;
+      frameScopeProperties.frameIDStartPosition =
+          tagRW.GetTagPayloadPosition() + start;
+      frameScopeProperties.frameContentStartPosition =
+          tagRW.GetTagPayloadPosition() + start;
+      frameScopeProperties.frameLength = end - start;
+
+      const auto ret =
+          writeFile(tagRW.GetFilename(), content, frameScopeProperties);
+
+      return ret;
+    } else {
+      return TagContentView.parseStatus;
+    }
+  }
 
   const auto FramePayload(uint32_t start, uint32_t end) const
   {
@@ -178,7 +149,7 @@ class handle_t
     } else {
       return frameContent_t{TagContentView.parseStatus, {}};
     }
-  };
+  }
 
 public:
   handle_t(const std::string &filename)
@@ -187,6 +158,10 @@ public:
   }
 
   const auto getStatus() const { return TagContentView.parseStatus; }
+  const auto isOk() const
+  {
+    return noStatusErrorFrom(TagContentView.parseStatus);
+  }
 
   const auto getFramePayload(meta_entry entry) const
   {
@@ -214,7 +189,36 @@ public:
       break;
     };
     return frameContent_t{TagContentView.parseStatus, {}};
-  };
+  }
+
+  const auto writeFramePayload(const meta_entry &entry,
+                               std::string_view content) const
+  {
+    switch (entry) {
+    case meta_entry::album:
+      return writeFramePayload(content, 60, 90);
+      break;
+    case meta_entry::artist:
+      return writeFramePayload(content, 30, 60);
+      break;
+    case meta_entry::comments:
+      return writeFramePayload(content, 94, 124);
+      break;
+    case meta_entry::genre:
+      return writeFramePayload(content, 124, 125);
+      break;
+    case meta_entry::title:
+      return writeFramePayload(content, 0, 30);
+      break;
+    case meta_entry::year:
+      return writeFramePayload(content, 90, 94);
+      break;
+    default:
+      return TagContentView.parseStatus;
+      break;
+    };
+    return TagContentView.parseStatus;
+  }
 };
 
 const auto getId3v1Payload = getPayload<id3v1::handle_t>;

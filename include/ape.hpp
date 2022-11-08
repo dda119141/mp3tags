@@ -54,10 +54,10 @@ private:
 
   uint32_t getTagSize(std::ifstream &fRead, uint32_t bufferLength)
   {
-    std::vector<unsigned char> tagbufferLength(bufferLength);
-    fRead.read(reinterpret_cast<char *>(tagbufferLength.data()), bufferLength);
+    std::vector<char> tagbufferLength(bufferLength);
+    fRead.read(tagbufferLength.data(), bufferLength);
 
-    return id3::GetTagSizeDefaultO(tagbufferLength, bufferLength);
+    return id3::GetTagSizeDefault(tagbufferLength, bufferLength);
   }
 
   bool checkAPEtag(std::ifstream &fRead, uint32_t bufferLength,
@@ -139,7 +139,6 @@ class tagReader
 public:
   explicit tagReader(const std::string &FileName) : mFilename{FileName}
   {
-
     bool bContinue = true;
 
     mTagProperties.emplace(mFilename, true);
@@ -169,16 +168,16 @@ public:
     }
   }
 
-  auto writeFramePayload(std::string_view framePayload,
-                         std::string_view frameID) const
+  const auto writeFramePayload(std::string_view framePayload,
+                               std::string_view frameID) const
   {
-    if (!noStatusErrorFrom(this->m_status)) {
+    if (statusErrorFrom(this->m_status)) {
       return get_status_error(tag_type_t::ape, m_status.rstatus);
     }
 
     frameProperties_t frameProperties;
     if (const auto status = this->getFrameProperties(frameID, frameProperties);
-        !noStatusErrorFrom(status)) {
+        statusErrorFrom(status)) {
       return get_status_error(tag_type_t::ape, status.rstatus);
     }
 
@@ -189,10 +188,11 @@ public:
     frameScopeProperties.frameContentStartPosition =
         frameProperties.frameContentPosition;
     frameScopeProperties.frameLength = frameProperties.frameLength;
+    frameScopeProperties.tagType = tag_type_t::ape;
 
     if (frameProperties.frameLength >= framePayload.size()) {
 
-      return WriteFile(mFilename, framePayload, frameScopeProperties);
+      return writeFile(mFilename, framePayload, frameScopeProperties);
     } else {
       const uint32_t additionalSize =
           framePayload.size() - frameProperties.frameLength;
@@ -204,7 +204,7 @@ public:
         return id3::get_status_error(id3::tag_type_t::ape,
                                      id3::rstatus_t::noExtendedTagError);
 
-      const auto writeBackAction = this->ReWriteFile(bufferExtended.value());
+      const auto writeBackAction = this->reWriteFile(bufferExtended.value());
       auto ret = writeBackAction | [&](bool fileWritten) {
         (void)fileWritten;
         return id3::renameFile(mFilename + ape::modifiedEnding, mFilename);
@@ -219,7 +219,7 @@ public:
   }
 
   /* function not thread safe */
-  expected::Result<bool> ReWriteFile(const id3::buffer_t &buff) const
+  expected::Result<bool> reWriteFile(const id3::buffer_t &buff) const
   {
     const uint32_t endOfFooter =
         mTagProperties->getTagFooterBegin() + GetTagFooterSize;
@@ -310,7 +310,7 @@ private:
     frameProperties.frameLength = frameLength;
 
     auto ret =
-        id3::ExtractString(*tagbuffer, frameContentPosition, frameLength);
+        id3::extractString(*tagbuffer, frameContentPosition, frameLength);
     frameProperties.frameContent = id3::stripLeft(ret);
 
     return frameIDstatus;
@@ -376,6 +376,7 @@ public:
   handle_t(const std::string &filename) : TagR(filename) {}
 
   const auto getStatus() const { return TagR.getStatus(); }
+  const auto isOk() const { return noStatusErrorFrom(TagR.getStatus()); }
 
   const auto getFramePayload(meta_entry entry) const
   {
@@ -406,7 +407,39 @@ public:
       break;
     };
     return TagR.getFramePayload("");
-  };
+  }
+
+  const auto writeFramePayload(const meta_entry &entry,
+                               std::string_view content)
+  {
+    switch (entry) {
+    case meta_entry::album:
+      return TagR.writeFramePayload(content, "ALBUM");
+      break;
+    case meta_entry::artist:
+      return TagR.writeFramePayload(content, "ARTIST");
+      break;
+    case meta_entry::comments:
+      return TagR.writeFramePayload(content, "COMMENT");
+      break;
+    case meta_entry::genre:
+      return TagR.writeFramePayload(content, "GENRE");
+      break;
+    case meta_entry::title:
+      return TagR.writeFramePayload(content, "TITLE");
+      break;
+    case meta_entry::year:
+      return TagR.writeFramePayload(content, "YEAR");
+      break;
+    case meta_entry::composer:
+      return TagR.writeFramePayload(content, "COMPOSER");
+      break;
+    default:
+      return TagR.writeFramePayload(content, "");
+      break;
+    };
+    return TagR.writeFramePayload(content, "");
+  }
 };
 
 const auto setFramePayload(const std::string &filename,
@@ -455,40 +488,6 @@ const auto GetComposer(const std::string &filename)
   return getApePayload(filename)(meta_entry::composer);
 }
 
-auto SetTitle(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("TITLE"), content);
-}
-
-auto SetAlbum(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("ALBUM"), content);
-}
-
-auto SetLeadArtist(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("ARTIST"), content);
-}
-
-auto SetYear(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("YEAR"), content);
-}
-
-auto SetComment(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("COMMENT"), content);
-}
-
-auto SetGenre(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("GENRE"), content);
-}
-
-auto SetComposer(const std::string &filename, std::string_view content)
-{
-  return ape::setFramePayload(filename, std::string_view("COMPOSER"), content);
-}
 }; // end namespace ape
 
 #endif // APE_BASE
